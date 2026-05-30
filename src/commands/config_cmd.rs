@@ -9,9 +9,20 @@ use crate::config::loader;
 pub fn execute_config_show() -> Result<()> {
     let config = loader::load_config(None, None, None, None, None, None, false)?;
 
-    println!("{}", "╔══════════════════════════════════════════╗".cyan().bold());
-    println!("{}", "║          Current Configuration            ║".cyan().bold());
-    println!("{}", "╚══════════════════════════════════════════╝".cyan().bold());
+    println!(
+        "{}",
+        "╔══════════════════════════════════════════╗".cyan().bold()
+    );
+    println!(
+        "{}",
+        "║          Current Configuration            ║"
+            .cyan()
+            .bold()
+    );
+    println!(
+        "{}",
+        "╚══════════════════════════════════════════╝".cyan().bold()
+    );
     println!();
 
     println!(
@@ -19,11 +30,7 @@ pub fn execute_config_show() -> Result<()> {
         "provider:".bold(),
         config.provider.provider.green()
     );
-    println!(
-        "{} {}",
-        "  model:".dimmed(),
-        config.provider.model.green()
-    );
+    println!("{} {}", "  model:".dimmed(), config.provider.model.green());
     println!(
         "{} {}",
         "  base_url:".dimmed(),
@@ -55,24 +62,18 @@ pub fn execute_config_show() -> Result<()> {
     }
 
     println!(
-        "{} {}",
+        "{} mode={} min_severity={} max_diff_size={}",
         "hook:".bold(),
-        format!(
-            "mode={} min_severity={} max_diff_size={}",
-            config.hook.mode.yellow(),
-            config.hook.min_severity.yellow(),
-            config.hook.max_diff_size
-        )
+        config.hook.mode.yellow(),
+        config.hook.min_severity.yellow(),
+        config.hook.max_diff_size
     );
 
     println!(
-        "{} {}",
+        "{} format={} color={}",
         "output:".bold(),
-        format!(
-            "format={} color={}",
-            config.output.format.green(),
-            config.output.color
-        )
+        config.output.format.green(),
+        config.output.color
     );
 
     println!(
@@ -109,8 +110,7 @@ pub fn execute_config_set(key: &str, value: &str) -> Result<()> {
     }
 
     let dir = cora_config_dir()?;
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("failed to create {}", dir.display()))?;
+    std::fs::create_dir_all(&dir).with_context(|| format!("failed to create {}", dir.display()))?;
 
     let path = dir.join("config.toml");
 
@@ -118,9 +118,7 @@ pub fn execute_config_set(key: &str, value: &str) -> Result<()> {
     let mut table = if path.is_file() {
         let content = std::fs::read_to_string(&path)
             .with_context(|| format!("failed to read {}", path.display()))?;
-        content
-            .parse::<toml::Table>()
-            .unwrap_or_default()
+        content.parse::<toml::Table>().unwrap_or_default()
     } else {
         toml::Table::new()
     };
@@ -140,7 +138,10 @@ pub fn execute_config_set(key: &str, value: &str) -> Result<()> {
                 .entry("provider")
                 .or_insert_with(|| toml::Value::Table(toml::Table::new()));
             if let toml::Value::Table(p) = provider {
-                p.insert("provider".to_string(), toml::Value::String(value.to_string()));
+                p.insert(
+                    "provider".to_string(),
+                    toml::Value::String(value.to_string()),
+                );
             }
         }
         "format" => {

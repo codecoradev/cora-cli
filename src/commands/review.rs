@@ -100,7 +100,9 @@ pub async fn execute_review(
     };
 
     let mut filtered_response = response.clone();
-    filtered_response.issues.retain(|i| i.severity <= min_severity);
+    filtered_response
+        .issues
+        .retain(|i| i.severity <= min_severity);
 
     // 5. Format output
     let formatter = formatter_for(format);
