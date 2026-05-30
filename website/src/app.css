@@ -388,16 +388,7 @@ body {
   }
 }
 
-@media (max-width: 640px) {
-  .section-tall {
-    padding-top: 3rem;
-    padding-bottom: 3rem;
-  }
-  .section-compact {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-  }
-}
+/* section-tall and section-compact mobile handled by min-width queries above */
 
 /* ---- Badge ---- */
 .badge {
@@ -516,13 +507,7 @@ body {
   color: var(--accent);
 }
 
-@media (max-width: 640px) {
-  .compare-table th,
-  .compare-table td {
-    padding: var(--space-2) var(--space-3);
-    font-size: 13px;
-  }
-}
+/* Compare table mobile handled by min-width queries in section container */
 
 /* ---- Syntax Highlighting ---- */
 .syntax-cmd { color: var(--muted-foreground); }
@@ -559,7 +544,7 @@ body {
   content: '';
   display: block;
   width: 100%;
-  max-width: var(--space-15);
+  max-width: var(--space-10);
   height: 1px;
   background: linear-gradient(
     90deg,
@@ -892,16 +877,14 @@ body {
   color: var(--accent);
 }
 
-@media (max-width: 768px) {
+@media (min-width: 768px) {
   .mobile-docs-nav {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
+    display: none;
   }
 }
 
 /* ---- Mobile: collapse docs sidebar ---- */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .docs-sidebar {
     display: none;
   }
