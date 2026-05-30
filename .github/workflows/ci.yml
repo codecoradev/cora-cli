@@ -10,6 +10,12 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+  id-token: write
+
 jobs:
   check:
     name: Check
@@ -58,3 +64,160 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release
+
+  cora-review:
+    name: Cora Review
+    runs-on: ubuntu-latest
+    needs: [check, fmt, clippy, test]
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Fetch LLM secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: "oidc"
+          identity-id: "6bd2b8d8-a9a3-4331-8b37-bf2764fc320b"
+          project-slug: "github-actions"
+          env-slug: "prod"
+          domain: "https://infisical.ajianaz.dev"
+
+      - name: Run cora review
+        run: |
+          cargo build --release
+          echo "=== CORA REVIEW (SARIF) ===" >> $GITHUB_STEP_SUMMARY
+          ./target/release/cora review \
+            --base origin/develop \
+            --format sarif \
+            --severity major \
+            --quiet \
+            > cora-results.sarif 2>&1 || true
+
+          echo "### 🔍 Cora AI Code Review" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -s cora-results.sarif ]; then
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat cora-results.sarif >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No issues found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: cora-results.sarif
+          category: cora-review
+
+      - name: Post PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let sarifContent;
+            try {
+              sarifContent = JSON.parse(fs.readFileSync('cora-results.sarif', 'utf8'));
+            } catch (e) {
+              sarifContent = null;
+            }
+
+            let body;
+            if (!sarifContent || !sarifContent.runs || sarifContent.runs.length === 0) {
+              body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!`;
+            } else {
+              const results = sarifContent.runs[0].results || [];
+              if (results.length === 0) {
+                body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!`;
+              } else {
+                // Group by severity
+                const grouped = {};
+                for (const r of results) {
+                  const sev = (r.level || 'note').charAt(0).toUpperCase() + (r.level || 'note').slice(1);
+                  if (!grouped[sev]) grouped[sev] = [];
+                  grouped[sev].push(r);
+                }
+
+                const severityOrder = ['Error', 'Warning', 'Note'];
+                let table = '';
+
+                for (const sev of severityOrder) {
+                  if (!grouped[sev]) continue;
+                  const icon = sev === 'Error' ? '🔴' : sev === 'Warning' ? '🟡' : '🔵';
+                  table += `\n### ${icon} ${sev} (${grouped[sev].length})\n\n`;
+                  for (const r of grouped[sev]) {
+                    const loc = r.locations?.[0]?.physicalLocation;
+                    const file = loc?.artifactLocation?.uri || 'unknown';
+                    const line = loc?.region?.startLine || '?';
+                    const msg = r.message?.text || r.message?.markdown || 'No message';
+                    table += `- \`${file}:${line}\` — ${msg}\n`;
+                  }
+                }
+
+                const hasErrors = (grouped['Error'] || []).length > 0;
+                const hasWarnings = (grouped['Warning'] || []).length > 0;
+                const status = hasErrors ? '❌ **Blocked** — critical issues found.' :
+                              hasWarnings ? '⚠️ **Review recommended** — warnings found.' :
+                              '✅ **Passed** — only informational notes.';
+
+                body = `## 🔍 Cora AI Code Review\n\n${status}\n${table}\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
+              }
+            }
+
+            // Find existing cora comment and update it, or create new
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.startsWith('## 🔍 Cora AI Code Review')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Check for blocking issues
+        if: always()
+        run: |
+          if [ -f cora-results.sarif ]; then
+            # Check for error-level results in SARIF
+            ERRORS=$(cat cora-results.sarif | python3 -c "
+            import json, sys
+            try:
+              data = json.load(sys.stdin)
+              results = data.get('runs', [{}])[0].get('results', [])
+              errors = [r for r in results if r.get('level') in ('error', 'error')]
+              print(len(errors))
+            except:
+              print(0)
+            " 2>/dev/null || echo "0")
+
+            if [ "$ERRORS" -gt 0 ]; then
+              echo "::error::Cora found $ERRORS blocking issue(s). Review the Code Scanning results."
+              exit 1
+            fi
+          fi
+          echo "No blocking issues."
