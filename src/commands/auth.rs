@@ -41,11 +41,7 @@ pub fn execute_auth_login() -> Result<()> {
     println!(
         "{} API key saved to {}",
         "✅".green().bold(),
-        dirs::config_dir()
-            .unwrap_or_default()
-            .join("cora")
-            .join("config.toml")
-            .display()
+        "~/.cora/config.toml"
     );
     println!(
         "{}",
