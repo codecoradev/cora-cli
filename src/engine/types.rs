@@ -81,6 +81,21 @@ impl fmt::Display for IssueType {
     }
 }
 
+impl IssueType {
+    /// Parse from string with lenient matching (accepts plural forms, etc.)
+    pub fn from_str_lossy(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "security" | "sec" => IssueType::Security,
+            "performance" | "perf" => IssueType::Performance,
+            "bug" | "bugs" => IssueType::Bug,
+            "best_practice" | "best-practice" | "bestpractice" | "best practice" => IssueType::BestPractice,
+            "style" | "formatting" => IssueType::Style,
+            "suggestion" | "info" => IssueType::Suggestion,
+            _ => IssueType::Suggestion, // fallback
+        }
+    }
+}
+
 /// A single review issue found in code
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewIssue {
@@ -88,8 +103,10 @@ pub struct ReviewIssue {
     #[serde(default)]
     pub line: Option<u32>,
     pub severity: Severity,
+    /// Issue type/category — stored as string since LLM output varies.
+    /// Common values: security, performance, bug, best_practice, style, suggestion
     #[serde(rename = "type", alias = "issue_type")]
-    pub issue_type: Option<IssueType>,
+    pub issue_type: Option<String>,
     pub title: String,
     pub body: String,
     #[serde(default)]
