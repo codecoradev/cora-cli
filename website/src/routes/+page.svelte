@@ -75,10 +75,10 @@
 	<meta name="description" content="cora is a CLI-first AI code reviewer. BYOK, zero config, runs in your terminal. Your code never leaves your machine." />
 </svelte:head>
 
-<div style="background: var(--background);">
+<div class="bg-[var(--background)]">
 
-	<!-- ====== S1 — HERO (TALL) ====== -->
-	<section class="relative flex items-center justify-center" style="min-height: calc(100vh - 3.5rem); padding: 6rem 1.5rem 4rem;">
+	<!-- ====== S1 — HERO ====== -->
+	<section class="section section-hero relative flex items-center justify-center min-h-[calc(100vh-3.5rem)]">
 		<!-- Subtle radial gradient glow -->
 		<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 50% 40% at 50% 40%, oklch(0.65 0.22 270 / 0.04), transparent);"></div>
 
@@ -91,27 +91,27 @@
 				</span>
 			</div>
 
-			<!-- Headline -->
-			<h1 class="mt-6 mb-0 animate-fade-in-up delay-100" style="font-size: clamp(3rem, 6vw, 4.5rem); font-weight: 700; letter-spacing: -0.035em; color: var(--foreground); line-height: 1.1;">
+			<!-- Headline — mt-8 (32px) badge-to-heading, mb-0 -->
+			<h1 class="mt-8 mb-0 animate-fade-in-up delay-100 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-[var(--foreground)] leading-none -tracking-tighter">
 				Review code.<br />
-				<span style="background: linear-gradient(135deg, oklch(0.65 0.22 270), oklch(0.7 0.15 240)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Ship faster.</span>
+				<span class="bg-gradient-to-br from-[oklch(0.65_0.22_270)] to-[oklch(0.7_0.15_240)] bg-clip-text text-transparent">Ship faster.</span>
 			</h1>
 
-			<!-- Subtitle -->
-			<p class="max-w-xl mx-auto mt-6 animate-fade-in-up delay-200" style="font-size: 18px; color: var(--muted-foreground); line-height: 1.5; letter-spacing: -0.005em;">
+			<!-- Subtitle — mt-6 (24px) heading-to-subtitle -->
+			<p class="max-w-xl mx-auto mt-6 animate-fade-in-up delay-200 text-base sm:text-lg text-[var(--muted-foreground)] leading-normal sm:leading-relaxed -tracking-tight">
 				cora catches bugs, security issues, and style violations before they merge. CLI-first. BYOK. Runs in your terminal.
 			</p>
 
-			<!-- Install Terminal -->
+			<!-- Install Terminal — mt-10 (40px) subtitle-to-terminal -->
 			<div class="max-w-lg w-full mx-auto mt-10 animate-fade-in-up delay-300">
-				<div class="terminal" style="position: relative;">
+				<div class="terminal relative">
 					<div class="terminal-header">
 						<span class="terminal-dot terminal-dot-red"></span>
 						<span class="terminal-dot terminal-dot-yellow"></span>
 						<span class="terminal-dot terminal-dot-green"></span>
 						<span class="terminal-title">Terminal</span>
 					</div>
-					<div class="terminal-body" style="position: relative;">
+					<div class="terminal-body relative">
 						<span class="syntax-cmd">$</span>
 						<span class="syntax-highlight"> cargo install</span>
 						<span class="syntax-string"> cora</span>
@@ -127,7 +127,7 @@
 				</div>
 			</div>
 
-			<!-- CTAs -->
+			<!-- CTAs — mt-8 (32px) terminal-to-cta -->
 			<div class="flex flex-wrap justify-center gap-4 items-center mt-8 animate-fade-in-up delay-400">
 				<a href="#quick-start" class="btn-primary">
 					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
@@ -139,44 +139,44 @@
 				</a>
 			</div>
 
-			<!-- Bottom text -->
-			<p class="mt-6 animate-fade-in-up delay-500" style="font-size: 12px; color: var(--muted-foreground); letter-spacing: 0.01em;">
+			<!-- Bottom text — mt-6 (24px) cta-to-text -->
+			<p class="mt-6 animate-fade-in-up delay-500 text-xs text-[var(--muted-foreground)] tracking-wide">
 				MIT License &middot; No account &middot; OpenAI &middot; Anthropic &middot; Groq &middot; Ollama
 			</p>
 		</div>
 	</section>
 
-	<!-- ====== S2 — KPI STATS (COMPACT) ====== -->
+	<!-- ====== S2 — KPI STATS ====== -->
 	<section class="section section-compact">
-		<p class="text-center mb-8 scroll-reveal" style="font-size: 12px; font-weight: 500; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.08em;">
+		<p class="text-center mb-10 scroll-reveal text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-widest">
 			Trusted by developers who ship fast
 		</p>
-	<div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-		<div class="glass-card text-center scroll-reveal py-8">
-			<div style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2;">5</div>
-			<div style="font-size: 14px; color: var(--muted-foreground); margin-top: 0.5rem;">AI Providers</div>
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+			<div class="glass-card text-center scroll-reveal py-8">
+				<div class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">5</div>
+				<div class="text-sm text-[var(--muted-foreground)] mt-2">AI Providers</div>
+			</div>
+			<div class="glass-card text-center scroll-reveal py-8" style="transition-delay: 100ms;">
+				<div class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">&lt; 3s</div>
+				<div class="text-sm text-[var(--muted-foreground)] mt-2">Review Time</div>
+			</div>
+			<div class="glass-card text-center scroll-reveal py-8" style="transition-delay: 200ms;">
+				<div class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">Zero</div>
+				<div class="text-sm text-[var(--muted-foreground)] mt-2">Config Required</div>
+			</div>
 		</div>
-		<div class="glass-card text-center scroll-reveal py-8" style="transition-delay: 100ms;">
-			<div style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2;">&lt; 3s</div>
-			<div style="font-size: 14px; color: var(--muted-foreground); margin-top: 0.5rem;">Review Time</div>
-		</div>
-		<div class="glass-card text-center scroll-reveal py-8" style="transition-delay: 200ms;">
-			<div style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2;">Zero</div>
-			<div style="font-size: 14px; color: var(--muted-foreground); margin-top: 0.5rem;">Config Required</div>
-		</div>
-	</div>
 	</section>
 
-	<!-- ====== S3 — LIVE TERMINAL DEMO (TALL) ====== -->
+	<!-- ====== S3 — LIVE TERMINAL DEMO ====== -->
 	<section class="section section-tall" id="demo-terminal">
-		<h2 class="text-center scroll-reveal" style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2;">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
 			See it in action
 		</h2>
-	<p class="text-center mt-4 scroll-reveal" style="color: var(--muted-foreground); max-width: 32rem; margin-left: auto; margin-right: auto; font-size: 14px;">
-		Run cora against staged changes. Results in seconds, not minutes.
-	</p>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)] max-w-[32rem] mx-auto">
+			Run cora against staged changes. Results in seconds, not minutes.
+		</p>
 
-	<div class="max-w-2xl mx-auto mt-8 scroll-reveal">
+		<div class="max-w-2xl mx-auto mt-10 scroll-reveal">
 			<div class="terminal">
 				<div class="terminal-header">
 					<span class="terminal-dot terminal-dot-red"></span>
@@ -186,7 +186,7 @@
 				</div>
 				<div class="terminal-body">
 					{#each terminalLines as line, i}
-						<div style="min-height: 1.45em; color: {terminalOutput[i]?.color || 'var(--foreground)'};">{line}</div>
+						<div class="min-h-[1.45em]" style="color: {terminalOutput[i]?.color || 'var(--foreground)'};">{line}</div>
 					{/each}
 					{#if terminalComplete}
 						<span class="typing-cursor"></span>
@@ -196,24 +196,24 @@
 		</div>
 	</section>
 
-	<!-- ====== S4 — HOW IT WORKS (COMPACT) ====== -->
+	<!-- ====== S4 — HOW IT WORKS ====== -->
 	<section class="section section-compact">
-		<h2 class="text-center scroll-reveal" style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2;">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
 			How it works
 		</h2>
-	<p class="text-center mt-4 scroll-reveal" style="color: var(--muted-foreground); max-width: 32rem; margin-left: auto; margin-right: auto; font-size: 14px;">
-		Three steps from code to confidence.
-	</p>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)] max-w-[32rem] mx-auto">
+			Three steps from code to confidence.
+		</p>
 
-		<div class="flex flex-col md:flex-row items-stretch mt-10" style="gap: 1.5rem;">
+		<div class="flex flex-col md:flex-row items-stretch mt-10 gap-6">
 			<!-- Step 1 -->
 			<div class="glass-card flex-1 text-center scroll-reveal">
-				<div style="font-size: 24px; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; font-family: var(--font-mono); opacity: 0.5;">01</div>
+				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">01</div>
 				<div class="flex justify-center mt-4">
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
 				</div>
-				<h3 class="mt-4" style="font-size: 20px; font-weight: 600; color: var(--foreground); letter-spacing: -0.01em; line-height: 1.35;">Write code</h3>
-				<p class="mt-2" style="font-size: 14px; color: var(--muted-foreground);">Push your changes as normal. cora only sees your diff.</p>
+				<h3 class="mt-4 text-xl font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Write code</h3>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)]">Push your changes as normal. cora only sees your diff.</p>
 			</div>
 
 			<!-- Connector -->
@@ -223,12 +223,12 @@
 
 			<!-- Step 2 -->
 			<div class="glass-card flex-1 text-center scroll-reveal" style="transition-delay: 100ms;">
-				<div style="font-size: 24px; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; font-family: var(--font-mono); opacity: 0.5;">02</div>
+				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">02</div>
 				<div class="flex justify-center mt-4">
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
 				</div>
-				<h3 class="mt-4" style="font-size: 20px; font-weight: 600; color: var(--foreground); letter-spacing: -0.01em; line-height: 1.35;">Review with AI</h3>
-				<p class="mt-2" style="font-size: 14px; color: var(--muted-foreground);">cora analyzes your diff with the LLM of your choice.</p>
+				<h3 class="mt-4 text-xl font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Review with AI</h3>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)]">cora analyzes your diff with the LLM of your choice.</p>
 			</div>
 
 			<!-- Connector -->
@@ -238,34 +238,34 @@
 
 			<!-- Step 3 -->
 			<div class="glass-card flex-1 text-center scroll-reveal" style="transition-delay: 200ms;">
-				<div style="font-size: 24px; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; font-family: var(--font-mono); opacity: 0.5;">03</div>
+				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">03</div>
 				<div class="flex justify-center mt-4">
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
 				</div>
-				<h3 class="mt-4" style="font-size: 20px; font-weight: 600; color: var(--foreground); letter-spacing: -0.01em; line-height: 1.35;">Ship with confidence</h3>
-				<p class="mt-2" style="font-size: 14px; color: var(--muted-foreground);">Merge clean, production-ready code. Every time.</p>
+				<h3 class="mt-4 text-xl font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Ship with confidence</h3>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)]">Merge clean, production-ready code. Every time.</p>
 			</div>
 		</div>
 	</section>
 
-	<!-- ====== S5 — FEATURES (TALL) ====== -->
+	<!-- ====== S5 — FEATURES ====== -->
 	<section class="section section-tall">
-		<h2 class="text-center scroll-reveal" style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2;">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
 			Built for developers who value control
 		</h2>
-	<p class="text-center mt-4 scroll-reveal" style="color: var(--muted-foreground); font-size: 14px;">
-		Everything you need, nothing you don't.
-	</p>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)]">
+			Everything you need, nothing you don't.
+		</p>
 
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
 			<!-- Feature 1: AI Code Review -->
 			<div class="glass-card scroll-reveal">
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>
 				</div>
-			<h3 class="mt-4" style="font-size: 18px; font-weight: 600; color: var(--foreground);">AI Code Review</h3>
-			<p class="mt-3" style="font-size: 14px; color: var(--accent);">Diff, branch, or full scan</p>
-				<p class="mt-3" style="font-size: 14px; color: var(--muted-foreground); line-height: 1.5;">Three review modes: staged diff, branch comparison, or full project scan. LLM-powered analysis catches bugs, security issues, and style violations.</p>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">AI Code Review</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Diff, branch, or full scan</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Three review modes: staged diff, branch comparison, or full project scan. LLM-powered analysis catches bugs, security issues, and style violations.</p>
 			</div>
 
 			<!-- Feature 2: BYOK -->
@@ -273,9 +273,9 @@
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
 				</div>
-			<h3 class="mt-4" style="font-size: 18px; font-weight: 600; color: var(--foreground);">Bring Your Own Key</h3>
-			<p class="mt-3" style="font-size: 14px; color: var(--accent);">No subscriptions, no lock-in</p>
-				<p class="mt-3" style="font-size: 14px; color: var(--muted-foreground); line-height: 1.5;">Uses YOUR OpenAI, Anthropic, Groq, Ollama, or Z.AI API key. No data stored on our servers. You control the model, you control the cost.</p>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Bring Your Own Key</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">No subscriptions, no lock-in</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Uses YOUR OpenAI, Anthropic, Groq, Ollama, or Z.AI API key. No data stored on our servers. You control the model, you control the cost.</p>
 			</div>
 
 			<!-- Feature 3: Pre-commit Hooks -->
@@ -283,9 +283,9 @@
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V8"/><path d="M5 12H2a10 10 0 0020 0h-3"/><circle cx="12" cy="5" r="3"/></svg>
 				</div>
-			<h3 class="mt-4" style="font-size: 18px; font-weight: 600; color: var(--foreground);">Pre-commit Hooks</h3>
-			<p class="mt-3" style="font-size: 14px; color: var(--accent);">Review before you push</p>
-				<p class="mt-3" style="font-size: 14px; color: var(--muted-foreground); line-height: 1.5;">Install once. Every commit gets reviewed automatically. Block bad code from entering your branch before it ships.</p>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Pre-commit Hooks</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Review before you push</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Install once. Every commit gets reviewed automatically. Block bad code from entering your branch before it ships.</p>
 			</div>
 
 			<!-- Feature 4: Incremental Scan -->
@@ -293,9 +293,9 @@
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
 				</div>
-			<h3 class="mt-4" style="font-size: 18px; font-weight: 600; color: var(--foreground);">Incremental Scan</h3>
-			<p class="mt-3" style="font-size: 14px; color: var(--accent);">Only scan what changed</p>
-				<p class="mt-3" style="font-size: 14px; color: var(--muted-foreground); line-height: 1.5;">SHA256 content hash cache. First scan indexes your codebase. Subsequent scans only review new or modified files.</p>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Incremental Scan</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Only scan what changed</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">SHA256 content hash cache. First scan indexes your codebase. Subsequent scans only review new or modified files.</p>
 			</div>
 
 			<!-- Feature 5: SARIF Output -->
@@ -303,9 +303,9 @@
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
 				</div>
-			<h3 class="mt-4" style="font-size: 18px; font-weight: 600; color: var(--foreground);">SARIF Output</h3>
-			<p class="mt-3" style="font-size: 14px; color: var(--accent);">GitHub Code Scanning</p>
-				<p class="mt-3" style="font-size: 14px; color: var(--muted-foreground); line-height: 1.5;">Upload review findings directly to GitHub's Security tab. Track issues across PRs. Works with any CI/CD pipeline.</p>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">SARIF Output</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">GitHub Code Scanning</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Upload review findings directly to GitHub's Security tab. Track issues across PRs. Works with any CI/CD pipeline.</p>
 			</div>
 
 			<!-- Feature 6: Fully Private -->
@@ -313,24 +313,24 @@
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1"/></svg>
 				</div>
-			<h3 class="mt-4" style="font-size: 18px; font-weight: 600; color: var(--foreground);">Fully Private</h3>
-			<p class="mt-3" style="font-size: 14px; color: var(--accent);">Your code stays yours</p>
-				<p class="mt-3" style="font-size: 14px; color: var(--muted-foreground); line-height: 1.5;">Runs entirely on your machine. No cloud, no telemetry, no data leaving your network. Perfect for Gitea and air-gapped environments.</p>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Fully Private</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Your code stays yours</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Runs entirely on your machine. No cloud, no telemetry, no data leaving your network. Perfect for Gitea and air-gapped environments.</p>
 			</div>
 		</div>
 	</section>
 
-	<!-- ====== S6 — COMPARISON TABLE (COMPACT) ====== -->
+	<!-- ====== S6 — COMPARISON TABLE ====== -->
 	<section class="section section-compact">
-		<h2 class="text-center scroll-reveal" style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2;">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
 			Why developers choose cora
 		</h2>
-	<p class="text-center mt-4 scroll-reveal" style="color: var(--muted-foreground); font-size: 14px;">
-		Side-by-side with popular code review tools.
-	</p>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)]">
+			Side-by-side with popular code review tools.
+		</p>
 
-		<div class="glass-card scroll-reveal mt-10" style="padding: 0; max-width: 56rem; margin-left: auto; margin-right: auto; overflow: hidden;">
-			<div style="overflow-x: auto;">
+		<div class="glass-card scroll-reveal mt-10 p-0 max-w-[56rem] mx-auto overflow-hidden">
+			<div class="overflow-x-auto">
 				<table class="compare-table">
 					<thead>
 						<tr>
@@ -347,7 +347,7 @@
 							<td class="cora-col"><span class="symbol-check">&#10003;</span></td>
 							<td><span class="symbol-cross">&#10007;</span></td>
 							<td><span class="symbol-cross">&#10007;</span></td>
-							<td style="color: var(--muted-foreground);">&mdash;</td>
+							<td class="text-[var(--muted-foreground)]">&mdash;</td>
 						</tr>
 						<tr>
 							<td>Self-hosted</td>
@@ -385,8 +385,8 @@
 							<td><span class="symbol-check">&#10003;</span></td>
 						</tr>
 						<tr>
-							<td style="font-weight: 600;">Cost</td>
-							<td class="cora-col" style="font-weight: 600;">Free + API</td>
+							<td class="font-semibold">Cost</td>
+							<td class="cora-col font-semibold">Free + API</td>
 							<td>$12-39/mo</td>
 							<td>$10-39/mo</td>
 							<td>Free / $150+</td>
@@ -404,32 +404,32 @@
 		</div>
 	</section>
 
-	<!-- ====== S7 — QUICK START + CTA + FOOTER (TALL) ====== -->
+	<!-- ====== S7 — QUICK START + CTA + FOOTER ====== -->
 	<section class="section section-tall" id="quick-start">
-		<h2 class="text-center scroll-reveal" style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2;">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
 			Start in 30 seconds
 		</h2>
-	<p class="text-center mt-4 scroll-reveal" style="color: var(--muted-foreground); font-size: 14px;">
-		No account required. No subscription. No cloud.
-	</p>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)]">
+			No account required. No subscription. No cloud.
+		</p>
 
-		<div class="flex flex-col mt-10" style="max-width: 40rem; margin-left: auto; margin-right: auto; gap: 1.5rem;">
+		<div class="flex flex-col mt-10 max-w-[40rem] mx-auto gap-6">
 			<!-- Step 1 -->
 			<div class="timeline-step scroll-reveal">
 				<div class="timeline-number">1</div>
 				<div>
-					<h3 style="font-size: 18px; font-weight: 600; color: var(--foreground); letter-spacing: -0.01em; line-height: 1.35;">Install</h3>
-					<p class="mt-1 mb-4" style="font-size: 14px; color: var(--muted-foreground);">Single binary, no dependencies.</p>
-				<div class="terminal">
-					<div class="terminal-header">
-						<span class="terminal-dot terminal-dot-red"></span>
-						<span class="terminal-dot terminal-dot-yellow"></span>
-						<span class="terminal-dot terminal-dot-green"></span>
+					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Install</h3>
+					<p class="mt-1 mb-4 text-sm text-[var(--muted-foreground)]">Single binary, no dependencies.</p>
+					<div class="terminal">
+						<div class="terminal-header">
+							<span class="terminal-dot terminal-dot-red"></span>
+							<span class="terminal-dot terminal-dot-yellow"></span>
+							<span class="terminal-dot terminal-dot-green"></span>
+						</div>
+						<div class="terminal-body py-3 px-4">
+							<span class="syntax-cmd">$</span> <span class="syntax-highlight">cargo install</span> <span class="syntax-string">cora</span>
+						</div>
 					</div>
-					<div class="terminal-body" style="padding: 0.75rem 1rem;">
-						<span class="syntax-cmd">$</span> <span class="syntax-highlight">cargo install</span> <span class="syntax-string">cora</span>
-					</div>
-				</div>
 				</div>
 			</div>
 
@@ -437,18 +437,18 @@
 			<div class="timeline-step scroll-reveal" style="transition-delay: 100ms;">
 				<div class="timeline-number">2</div>
 				<div>
-					<h3 style="font-size: 18px; font-weight: 600; color: var(--foreground); letter-spacing: -0.01em; line-height: 1.35;">Initialize</h3>
-					<p class="mt-1 mb-4" style="font-size: 14px; color: var(--muted-foreground);">Creates <code style="color: var(--accent); font-family: var(--font-mono); font-size: 13px;">.cora.yaml</code> config file.</p>
-				<div class="terminal">
-					<div class="terminal-header">
-						<span class="terminal-dot terminal-dot-red"></span>
-						<span class="terminal-dot terminal-dot-yellow"></span>
-						<span class="terminal-dot terminal-dot-green"></span>
+					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Initialize</h3>
+					<p class="mt-1 mb-4 text-sm text-[var(--muted-foreground)]">Creates <code class="text-[var(--accent)] font-mono text-[13px]">.cora.yaml</code> config file.</p>
+					<div class="terminal">
+						<div class="terminal-header">
+							<span class="terminal-dot terminal-dot-red"></span>
+							<span class="terminal-dot terminal-dot-yellow"></span>
+							<span class="terminal-dot terminal-dot-green"></span>
+						</div>
+						<div class="terminal-body py-3 px-4">
+							<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora init</span>
+						</div>
 					</div>
-					<div class="terminal-body" style="padding: 0.75rem 1rem;">
-						<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora init</span>
-					</div>
-				</div>
 				</div>
 			</div>
 
@@ -456,15 +456,15 @@
 			<div class="timeline-step scroll-reveal" style="transition-delay: 200ms;">
 				<div class="timeline-number">3</div>
 				<div>
-					<h3 style="font-size: 18px; font-weight: 600; color: var(--foreground); letter-spacing: -0.01em; line-height: 1.35;">Review</h3>
-					<p class="mt-1 mb-4" style="font-size: 14px; color: var(--muted-foreground);">Review your staged changes.</p>
-				<div class="terminal">
-					<div class="terminal-header">
+					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Review</h3>
+					<p class="mt-1 mb-4 text-sm text-[var(--muted-foreground)]">Review your staged changes.</p>
+					<div class="terminal">
+						<div class="terminal-header">
 							<span class="terminal-dot terminal-dot-red"></span>
 							<span class="terminal-dot terminal-dot-yellow"></span>
 							<span class="terminal-dot terminal-dot-green"></span>
 						</div>
-						<div class="terminal-body" style="padding: 0.75rem 1rem;">
+						<div class="terminal-body py-3 px-4">
 							<span class="syntax-cmd">$</span> <span class="syntax-flag">CORA_API_KEY</span>=<span class="syntax-string">key</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span>
 						</div>
 					</div>
@@ -475,18 +475,18 @@
 			<div class="timeline-step scroll-reveal" style="transition-delay: 300ms;">
 				<div class="timeline-number">4</div>
 				<div>
-					<h3 style="font-size: 18px; font-weight: 600; color: var(--foreground); letter-spacing: -0.01em; line-height: 1.35;">Done</h3>
-					<p class="mt-1" style="font-size: 14px; color: var(--success);">That's it. No account. No subscription.</p>
+					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Done</h3>
+					<p class="mt-1 text-sm text-[var(--success)]">That's it. No account. No subscription.</p>
 				</div>
 			</div>
 		</div>
 
-		<!-- CTA -->
-		<div class="text-center mt-24 scroll-reveal">
-			<h2 style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2;">
+		<!-- CTA — mt-20 (80px) separation from steps -->
+		<div class="text-center mt-20 scroll-reveal">
+			<h2 class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
 				Ready to ship better code?
 			</h2>
-			<p class="mt-3" style="color: var(--muted-foreground); font-size: 14px;">
+			<p class="mt-3 text-sm text-[var(--muted-foreground)]">
 				No account. No subscription. No cloud.
 			</p>
 			<div class="flex flex-wrap justify-center gap-4 items-center mt-8">
@@ -501,16 +501,16 @@
 			</div>
 		</div>
 
-		<!-- Footer -->
-		<footer style="border-top: 1px solid var(--border); margin-top: 4rem; padding: 2rem 1.5rem;">
+		<!-- Footer — mt-20 (80px) -->
+		<footer class="border-t border-[var(--border)] mt-20 py-8">
 			<div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
 				<div>
-					<span style="font-size: 14px; font-weight: 600; color: var(--foreground);">cora</span>
-					<span style="font-size: 12px; color: var(--muted-foreground); margin-left: 0.75rem;">MIT License</span>
+					<span class="text-sm font-semibold text-[var(--foreground)]">cora</span>
+					<span class="text-xs text-[var(--muted-foreground)] ml-3">MIT License</span>
 				</div>
 				<div class="flex items-center gap-6">
-					<a href="https://github.com/ajianaz/cora-cli" target="_blank" rel="noopener" style="font-size: 14px; color: var(--muted-foreground); text-decoration: none; transition: color 0.2s ease; min-height: 44px; display: inline-flex; align-items: center;">GitHub</a>
-					<a href="/docs" style="font-size: 14px; color: var(--muted-foreground); text-decoration: none; transition: color 0.2s ease; min-height: 44px; display: inline-flex; align-items: center;">Docs</a>
+					<a href="https://github.com/ajianaz/cora-cli" target="_blank" rel="noopener" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">GitHub</a>
+					<a href="/docs" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">Docs</a>
 				</div>
 			</div>
 		</footer>
