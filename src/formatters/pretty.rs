@@ -22,9 +22,7 @@ impl Formatter for PrettyFormatter {
         ));
 
         if response.issues.is_empty() {
-            output.push_str(
-                &"✅ No issues found!".green().bold().to_string(),
-            );
+            output.push_str(&"✅ No issues found!".green().bold().to_string());
             if !response.summary.is_empty() {
                 output.push_str(&format!("\n\n{}", response.summary.dimmed()));
             }
@@ -32,10 +30,26 @@ impl Formatter for PrettyFormatter {
         }
 
         // Summary line
-        let crit = response.issues.iter().filter(|i| i.severity == Severity::Critical).count();
-        let maj = response.issues.iter().filter(|i| i.severity == Severity::Major).count();
-        let min = response.issues.iter().filter(|i| i.severity == Severity::Minor).count();
-        let inf = response.issues.iter().filter(|i| i.severity == Severity::Info).count();
+        let crit = response
+            .issues
+            .iter()
+            .filter(|i| i.severity == Severity::Critical)
+            .count();
+        let maj = response
+            .issues
+            .iter()
+            .filter(|i| i.severity == Severity::Major)
+            .count();
+        let min = response
+            .issues
+            .iter()
+            .filter(|i| i.severity == Severity::Minor)
+            .count();
+        let inf = response
+            .issues
+            .iter()
+            .filter(|i| i.severity == Severity::Info)
+            .count();
 
         output.push_str(&format!(
             "Found {} issue{}: {} {} {} {} {}\n\n",
@@ -95,10 +109,26 @@ impl Formatter for PrettyFormatter {
             return Ok(output);
         }
 
-        let crit = response.issues.iter().filter(|i| i.severity == Severity::Critical).count();
-        let maj = response.issues.iter().filter(|i| i.severity == Severity::Major).count();
-        let min = response.issues.iter().filter(|i| i.severity == Severity::Minor).count();
-        let inf = response.issues.iter().filter(|i| i.severity == Severity::Info).count();
+        let crit = response
+            .issues
+            .iter()
+            .filter(|i| i.severity == Severity::Critical)
+            .count();
+        let maj = response
+            .issues
+            .iter()
+            .filter(|i| i.severity == Severity::Major)
+            .count();
+        let min = response
+            .issues
+            .iter()
+            .filter(|i| i.severity == Severity::Minor)
+            .count();
+        let inf = response
+            .issues
+            .iter()
+            .filter(|i| i.severity == Severity::Info)
+            .count();
 
         output.push_str(&format!(
             "Found {} issue{}: {} {} {} {} {}\n\n",
@@ -159,7 +189,11 @@ fn format_issue_pretty(issue: &ReviewIssue, num: usize) -> String {
     out.push('\n');
 
     // Title
-    out.push_str(&format!("  {} {}\n", format!("#{num}").dimmed(), issue.title.bold()));
+    out.push_str(&format!(
+        "  {} {}\n",
+        format!("#{num}").dimmed(),
+        issue.title.bold()
+    ));
 
     // Body
     if !issue.body.is_empty() {
@@ -171,13 +205,160 @@ fn format_issue_pretty(issue: &ReviewIssue, num: usize) -> String {
     // Suggested fix
     if let Some(ref fix) = issue.suggested_fix {
         if !fix.trim().is_empty() {
-            out.push_str(&format!(
-                "  {}\n",
-                "💡 Suggested fix:".green().bold()
-            ));
+            out.push_str(&format!("  {}\n", "💡 Suggested fix:".green().bold()));
             out.push_str(&format!("    {}\n", fix));
         }
     }
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::{ReviewIssue, ScanResponse, Severity};
+
+    fn sample_issue() -> ReviewIssue {
+        ReviewIssue {
+            file: "src/main.rs".to_string(),
+            line: Some(42),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "SQL Injection".to_string(),
+            body: "User input is concatenated directly into SQL query.".to_string(),
+            suggested_fix: Some("Use parameterized queries.".to_string()),
+        }
+    }
+
+    fn sample_response() -> ReviewResponse {
+        ReviewResponse {
+            issues: vec![sample_issue()],
+            summary: "Found 1 critical issue.".to_string(),
+            tokens_used: None,
+            should_block: false,
+        }
+    }
+
+    fn empty_response() -> ReviewResponse {
+        ReviewResponse {
+            issues: vec![],
+            summary: String::new(),
+            tokens_used: None,
+            should_block: false,
+        }
+    }
+
+    fn blocked_response() -> ReviewResponse {
+        ReviewResponse {
+            issues: vec![sample_issue()],
+            summary: String::new(),
+            tokens_used: None,
+            should_block: true,
+        }
+    }
+
+    fn sample_scan_response() -> ScanResponse {
+        ScanResponse {
+            issues: vec![sample_issue()],
+            summary: "Scan done.".to_string(),
+            files_scanned: 10,
+            lines_scanned: 500,
+            tokens_used: None,
+            should_block: false,
+        }
+    }
+
+    #[test]
+    fn format_review_contains_file() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("src/main.rs"));
+    }
+
+    #[test]
+    fn format_review_contains_title() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("SQL Injection"));
+    }
+
+    #[test]
+    fn format_review_contains_header() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("Cora Code Review Results"));
+    }
+
+    #[test]
+    fn format_review_empty_issues_shows_no_issues() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_review(&empty_response()).unwrap();
+        assert!(output.contains("No issues found"));
+    }
+
+    #[test]
+    fn format_review_with_summary() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("Found 1 critical issue."));
+    }
+
+    #[test]
+    fn format_review_blocked_shows_blocked() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_review(&blocked_response()).unwrap();
+        assert!(output.contains("BLOCKED"));
+    }
+
+    #[test]
+    fn format_review_issue_count() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("1 issue"));
+    }
+
+    #[test]
+    fn format_review_issue_type_displayed() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("security"));
+    }
+
+    #[test]
+    fn format_scan_contains_header() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_scan(&sample_scan_response()).unwrap();
+        assert!(output.contains("Cora Project Scan Results"));
+    }
+
+    #[test]
+    fn format_scan_contains_file_line_count() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_scan(&sample_scan_response()).unwrap();
+        assert!(output.contains("10 files"));
+        assert!(output.contains("500 lines"));
+    }
+
+    #[test]
+    fn format_issue_pretty_no_line() {
+        let issue = ReviewIssue {
+            file: "README.md".to_string(),
+            line: None,
+            severity: Severity::Info,
+            issue_type: None,
+            title: "Typo".to_string(),
+            body: String::new(),
+            suggested_fix: None,
+        };
+        let out = format_issue_pretty(&issue, 1);
+        assert!(out.contains("README.md"));
+        assert!(!out.contains("README.md:"));
+    }
+
+    #[test]
+    fn format_issue_pretty_with_fix() {
+        let out = format_issue_pretty(&sample_issue(), 1);
+        assert!(out.contains("Suggested fix"));
+        assert!(out.contains("parameterized"));
+    }
 }

@@ -6,8 +6,7 @@ use git2::Repository;
 
 /// Open the git repository at or above the current working directory.
 pub fn open_repo() -> Result<Repository> {
-    Repository::discover(std::env::current_dir()?)
-        .context("not inside a git repository")
+    Repository::discover(std::env::current_dir()?).context("not inside a git repository")
 }
 
 /// Run a git command and return its stdout as a string.
@@ -22,8 +21,7 @@ fn git_cmd(args: &[&str]) -> Result<String> {
         anyhow::bail!("git command failed: {stderr}");
     }
 
-    Ok(String::from_utf8(output.stdout)
-        .context("git output is not valid UTF-8")?)
+    String::from_utf8(output.stdout).context("git output is not valid UTF-8")
 }
 
 /// Get the diff of currently staged changes (git diff --cached).
@@ -59,8 +57,7 @@ pub fn get_current_branch() -> Result<String> {
         anyhow::bail!("git rev-parse failed: {stderr}");
     }
 
-    let name = String::from_utf8(output.stdout)
-        .context("branch name is not valid UTF-8")?;
+    let name = String::from_utf8(output.stdout).context("branch name is not valid UTF-8")?;
     let name = name.trim().to_string();
 
     if name.is_empty() || name == "HEAD" {

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use chrono::Utc;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::engine::{ReviewIssue, ReviewResponse, ScanResponse, Severity};
 use crate::formatters::Formatter;
@@ -120,5 +120,181 @@ fn severity_to_sarif_level(severity: &Severity) -> &str {
         Severity::Major => "error",
         Severity::Minor => "warning",
         Severity::Info => "note",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::{ReviewIssue, Severity};
+
+    fn sample_issue() -> ReviewIssue {
+        ReviewIssue {
+            file: "src/main.rs".to_string(),
+            line: Some(42),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "SQL Injection".to_string(),
+            body: "User input concatenated into query.".to_string(),
+            suggested_fix: Some("Use parameterized queries.".to_string()),
+        }
+    }
+
+    fn sample_response() -> ReviewResponse {
+        ReviewResponse {
+            issues: vec![sample_issue()],
+            summary: "Found 1 critical issue.".to_string(),
+            tokens_used: None,
+            should_block: false,
+        }
+    }
+
+    fn empty_response() -> ReviewResponse {
+        ReviewResponse {
+            issues: vec![],
+            summary: String::new(),
+            tokens_used: None,
+            should_block: false,
+        }
+    }
+
+    #[test]
+    fn sarif_output_is_valid_json() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert!(parsed.is_object());
+    }
+
+    #[test]
+    fn sarif_has_required_schema_field() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert!(parsed["$schema"].as_str().unwrap().contains("sarif-schema"));
+    }
+
+    #[test]
+    fn sarif_has_version() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["version"].as_str().unwrap(), "2.1.0");
+    }
+
+    #[test]
+    fn sarif_has_runs() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        let runs = parsed["runs"].as_array().unwrap();
+        assert_eq!(runs.len(), 1);
+    }
+
+    #[test]
+    fn sarif_tool_driver_name_is_cora() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["runs"][0]["tool"]["driver"]["name"].as_str().unwrap(), "Cora");
+    }
+
+    #[test]
+    fn sarif_results_contain_issue() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        let results = parsed["runs"][0]["results"].as_array().unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0]["level"].as_str().unwrap(), "error"); // critical → error
+    }
+
+    #[test]
+    fn sarif_empty_issues_produces_valid_output() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&empty_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        let results = parsed["runs"][0]["results"].as_array().unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn sarif_location_includes_line() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        let region = &parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"];
+        assert_eq!(region["startLine"].as_u64().unwrap(), 42);
+    }
+
+    #[test]
+    fn sarif_scan_format_also_valid() {
+        let fmt = SarifFormatter;
+        let scan = ScanResponse {
+            issues: vec![sample_issue()],
+            summary: "Done.".to_string(),
+            files_scanned: 5,
+            lines_scanned: 200,
+            tokens_used: None,
+            should_block: false,
+        };
+        let output = fmt.format_scan(&scan).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert!(parsed["$schema"].as_str().is_some());
+        assert_eq!(parsed["runs"][0]["results"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn sarif_severity_to_level_critical_is_error() {
+        assert_eq!(severity_to_sarif_level(&Severity::Critical), "error");
+    }
+
+    #[test]
+    fn sarif_severity_to_level_major_is_error() {
+        assert_eq!(severity_to_sarif_level(&Severity::Major), "error");
+    }
+
+    #[test]
+    fn sarif_severity_to_level_minor_is_warning() {
+        assert_eq!(severity_to_sarif_level(&Severity::Minor), "warning");
+    }
+
+    #[test]
+    fn sarif_severity_to_level_info_is_note() {
+        assert_eq!(severity_to_sarif_level(&Severity::Info), "note");
+    }
+
+    #[test]
+    fn sarif_issue_without_line_has_no_region() {
+        let issue = ReviewIssue {
+            file: "src/lib.rs".to_string(),
+            line: None,
+            severity: Severity::Info,
+            issue_type: None,
+            title: "No line".to_string(),
+            body: "No line info.".to_string(),
+            suggested_fix: None,
+        };
+        let response = ReviewResponse {
+            issues: vec![issue],
+            summary: String::new(),
+            tokens_used: None,
+            should_block: false,
+        };
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&response).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        let result = &parsed["runs"][0]["results"][0];
+        let loc = &result["locations"][0]["physicalLocation"];
+        assert!(loc.get("region").is_none());
+    }
+
+    #[test]
+    fn sarif_issue_with_fix() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        let result = &parsed["runs"][0]["results"][0];
+        assert!(result.get("fixes").is_some());
     }
 }

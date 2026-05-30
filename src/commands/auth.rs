@@ -39,9 +39,8 @@ pub fn execute_auth_login() -> Result<()> {
 
     loader::save_api_key(&key)?;
     println!(
-        "{} API key saved to {}",
-        "✅".green().bold(),
-        "~/.cora/config.toml"
+        "{} API key saved to ~/.cora/config.toml",
+        "✅".green().bold()
     );
     println!(
         "{}",
@@ -56,16 +55,10 @@ pub fn execute_auth_status() -> Result<()> {
     let status = loader::auth_status()?;
 
     if status.has_key {
-        println!(
-            "{} API key is configured.",
-            "✅".green().bold()
-        );
+        println!("{} API key is configured.", "✅".green().bold());
         println!("   Source: {}", status.source);
     } else {
-        println!(
-            "{} No API key configured.",
-            "❌".red().bold()
-        );
+        println!("{} No API key configured.", "❌".red().bold());
         println!("   Set it via:");
         println!("     • CORA_API_KEY environment variable");
         println!("     • `cora auth login` command");
@@ -79,18 +72,12 @@ pub fn execute_auth_status() -> Result<()> {
 pub fn execute_auth_remove() -> Result<()> {
     let status = loader::auth_status()?;
     if !status.has_key && std::env::var("CORA_API_KEY").is_err() {
-        println!(
-            "{}",
-            "No API key found to remove.".yellow()
-        );
+        println!("{}", "No API key found to remove.".yellow());
         return Ok(());
     }
 
     loader::remove_api_key()?;
-    println!(
-        "{} API key removed from local config.",
-        "✅".green().bold()
-    );
+    println!("{} API key removed from local config.", "✅".green().bold());
     println!(
         "{}",
         "   If you set CORA_API_KEY in your shell, remove it there too.".dimmed()

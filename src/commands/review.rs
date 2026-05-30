@@ -3,7 +3,7 @@ use colored::Colorize;
 use tracing::debug;
 
 use crate::config::schema::Config;
-use crate::formatters::{formatter_for, OutputFormat};
+use crate::formatters::{OutputFormat, formatter_for};
 use crate::git;
 
 /// Exit codes for the review command.
@@ -23,24 +23,37 @@ pub struct ReviewOptions {
     pub unstaged: bool,
     /// Maximum diff size before refusing (0 = use config default).
     pub max_diff_size: Option<usize>,
+    /// Stream LLM response tokens to stdout in real-time.
+    pub stream: bool,
+}
+
+/// Result of a review command execution.
+pub struct ReviewResult {
+    /// Exit code (0 = ok, 2 = blocked).
+    pub exit_code: i32,
+    /// The formatted output string.
+    pub output: String,
 }
 
 /// Execute the review command.
 ///
 /// Gets the diff, validates its size, calls the LLM engine, formats output,
-/// and returns the appropriate exit code.
+/// and returns the appropriate exit code along with the formatted output.
 pub async fn execute_review(
     config: &Config,
     llm_config: &crate::engine::LLMConfig,
     opts: &ReviewOptions,
     format: OutputFormat,
-) -> Result<i32> {
+) -> Result<ReviewResult> {
     // 1. Get the diff
     let diff = get_diff(opts, config)?;
 
     if diff.trim().is_empty() {
-        println!("{}", "No changes to review.".yellow());
-        return Ok(EXIT_OK);
+        let output = format!("{}\n", "No changes to review.".yellow());
+        return Ok(ReviewResult {
+            exit_code: EXIT_OK,
+            output,
+        });
     }
 
     // 2. Validate size
@@ -53,22 +66,23 @@ pub async fn execute_review(
         );
     }
 
-    debug!(diff_len = diff.len(), "running review");
+    debug!(diff_len = diff.len(), stream = opts.stream, "running review");
 
     // 3. Call the LLM engine
-    let response = crate::engine::review::review_diff(config, llm_config, &diff).await?;
+    let response = crate::engine::review::review_diff_with_stream(config, llm_config, &diff, opts.stream).await?;
 
-    // 4. Format and print output
+    // 4. Format output
     let formatter = formatter_for(format);
     let output = formatter.format_review(&response)?;
-    println!("{}", output);
 
     // 5. Return exit code
-    if response.should_block && config.hook.mode == "block" {
-        Ok(EXIT_BLOCKED)
+    let exit_code = if response.should_block && config.hook.mode == "block" {
+        EXIT_BLOCKED
     } else {
-        Ok(EXIT_OK)
-    }
+        EXIT_OK
+    };
+
+    Ok(ReviewResult { exit_code, output })
 }
 
 /// Get the diff based on the provided options.

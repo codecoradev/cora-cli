@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use tracing::debug;
 
+use crate::config::providers::{detected_presets, PRESETS};
 use crate::config::schema::{Config, CoraFile};
 use crate::engine::LLMConfig;
 
@@ -90,27 +91,77 @@ pub fn load_config(
 
 /// Build an `LLMConfig` from the resolved `Config`, fetching the API key
 /// from: CLI flag → env CORA_API_KEY → ~/.config/cora/config.toml.
-pub fn build_llm_config(
-    config: &Config,
-    cli_api_key: Option<&str>,
-) -> Result<LLMConfig> {
-    let api_key = if let Some(key) = cli_api_key {
-        key.to_string()
-    } else if let Some(key) = std::env::var("CORA_API_KEY").ok() {
-        key
+///
+/// If none of those are set, auto-detect from known provider env vars (OPENAI_API_KEY, etc.)
+/// and configure provider/model/base_url from the matching preset.
+pub fn build_llm_config(config: &Config, cli_api_key: Option<&str>) -> Result<LLMConfig> {
+    // Resolve the API key and optional auto-detected preset in one pass.
+    let (api_key, auto_preset) = if let Some(key) = cli_api_key {
+        (key.to_string(), None)
+    } else if let Ok(key) = std::env::var("CORA_API_KEY") {
+        (key, None)
     } else if let Some(key) = load_api_key_from_auth_file()? {
-        key
+        (key, None)
     } else {
-        anyhow::bail!(
-            "no API key found. Set CORA_API_KEY env var, pass --api-key, or run `cora auth login`"
-        );
+        // No CORA_API_KEY or stored key — auto-detect from provider presets
+        let detected = detected_presets();
+        if detected.is_empty() {
+            let available: Vec<String> = PRESETS
+                .iter()
+                .map(|p| format!("  {} (set {})", p.name, p.env_key))
+                .collect();
+            anyhow::bail!(
+                "no API key found.\n\
+                 Set one of the following environment variables, pass --api-key, or run `cora auth login`:\n\
+                 \n  CORA_API_KEY          (generic, used with current config)\n{}",
+                available.join("\n")
+            );
+        }
+
+        // Use the first detected provider
+        let preset = detected[0];
+        let key = std::env::var(preset.env_key).unwrap_or_default();
+
+        if detected.len() > 1 {
+            let names: Vec<&str> = detected.iter().map(|p| p.name).collect();
+            eprintln!(
+                "ℹ️  Multiple providers detected ({}). Using first: {}. Set CORA_PROVIDER or use --provider to override.",
+                names.join(", "),
+                preset.name
+            );
+        } else {
+            debug!(provider = preset.name, "auto-detected provider from env");
+        }
+
+        (key, Some(preset))
     };
+
+    // Resolve provider/model/base_url: CORA_* env > auto-detected preset > config defaults
+    let cora_provider = std::env::var("CORA_PROVIDER").ok();
+    let cora_model = std::env::var("CORA_MODEL").ok();
+    let cora_base_url = std::env::var("CORA_BASE_URL").ok();
+
+    let provider = cora_provider
+        .or_else(|| auto_preset.map(|p| p.name.to_string()))
+        .unwrap_or_else(|| config.provider.provider.clone());
+
+    let model = cora_model
+        .or_else(|| auto_preset.map(|p| p.default_model.to_string()))
+        .unwrap_or_else(|| config.provider.model.clone());
+
+    let base_url = cora_base_url
+        .or_else(|| {
+            // Check if the auto-detected preset has a custom URL override
+            auto_preset.and_then(|p| std::env::var(p.env_url).ok())
+        })
+        .or_else(|| auto_preset.map(|p| p.default_base_url.to_string()))
+        .unwrap_or_else(|| config.provider.base_url.clone());
 
     Ok(LLMConfig {
         api_key,
-        base_url: config.provider.base_url.clone(),
-        model: config.provider.model.clone(),
-        provider: config.provider.provider.clone(),
+        base_url,
+        model,
+        provider,
     })
 }
 
@@ -141,7 +192,12 @@ pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
         .and_then(|a| a.get("api_key"))
         .and_then(|k| k.as_str())
         .map(|s| s.to_string())
-        .or_else(|| value.get("api_key").and_then(|k| k.as_str()).map(|s| s.to_string()));
+        .or_else(|| {
+            value
+                .get("api_key")
+                .and_then(|k| k.as_str())
+                .map(|s| s.to_string())
+        });
 
     Ok(key)
 }
@@ -149,8 +205,7 @@ pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
 /// Save an API key to ~/.cora/config.toml.
 pub fn save_api_key(key: &str) -> Result<()> {
     let dir = cora_dir()?;
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("failed to create {}", dir.display()))?;
+    std::fs::create_dir_all(&dir).with_context(|| format!("failed to create {}", dir.display()))?;
 
     let path = dir.join(AUTH_FILENAME);
     let content = format!("api_key = \"{key}\"\n");
