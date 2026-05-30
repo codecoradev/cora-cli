@@ -369,18 +369,16 @@ async fn main() -> Result<()> {
             }
             0
         }
-        Command::Config { action } => {
-            match action {
-                ConfigAction::Show => {
-                    config_cmd::execute_config_show()?;
-                    0
-                }
-                ConfigAction::Set { key, value } => {
-                    config_cmd::execute_config_set(&key, &value)?;
-                    0
-                }
+        Command::Config { action } => match action {
+            ConfigAction::Show => {
+                config_cmd::execute_config_show()?;
+                0
             }
-        }
+            ConfigAction::Set { key, value } => {
+                config_cmd::execute_config_set(&key, &value)?;
+                0
+            }
+        },
         Command::Providers => {
             providers::execute_providers()?;
             0
