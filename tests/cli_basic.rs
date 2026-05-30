@@ -1,7 +1,7 @@
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
-use std::process::Command;
 use std::io::Write;
+use std::process::Command;
 
 // Binary name matches the [[bin]] in Cargo.toml
 fn cora_cmd() -> Command {

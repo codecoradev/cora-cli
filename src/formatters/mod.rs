@@ -54,29 +54,50 @@ mod tests {
 
     #[test]
     fn output_format_pretty() {
-        assert_eq!(OutputFormat::from_str_loose("pretty").unwrap(), OutputFormat::Pretty);
+        assert_eq!(
+            OutputFormat::from_str_loose("pretty").unwrap(),
+            OutputFormat::Pretty
+        );
     }
 
     #[test]
     fn output_format_json() {
-        assert_eq!(OutputFormat::from_str_loose("json").unwrap(), OutputFormat::Json);
+        assert_eq!(
+            OutputFormat::from_str_loose("json").unwrap(),
+            OutputFormat::Json
+        );
     }
 
     #[test]
     fn output_format_compact() {
-        assert_eq!(OutputFormat::from_str_loose("compact").unwrap(), OutputFormat::Compact);
+        assert_eq!(
+            OutputFormat::from_str_loose("compact").unwrap(),
+            OutputFormat::Compact
+        );
     }
 
     #[test]
     fn output_format_sarif() {
-        assert_eq!(OutputFormat::from_str_loose("sarif").unwrap(), OutputFormat::Sarif);
+        assert_eq!(
+            OutputFormat::from_str_loose("sarif").unwrap(),
+            OutputFormat::Sarif
+        );
     }
 
     #[test]
     fn output_format_case_insensitive() {
-        assert_eq!(OutputFormat::from_str_loose("JSON").unwrap(), OutputFormat::Json);
-        assert_eq!(OutputFormat::from_str_loose("Pretty").unwrap(), OutputFormat::Pretty);
-        assert_eq!(OutputFormat::from_str_loose("SARIF").unwrap(), OutputFormat::Sarif);
+        assert_eq!(
+            OutputFormat::from_str_loose("JSON").unwrap(),
+            OutputFormat::Json
+        );
+        assert_eq!(
+            OutputFormat::from_str_loose("Pretty").unwrap(),
+            OutputFormat::Pretty
+        );
+        assert_eq!(
+            OutputFormat::from_str_loose("SARIF").unwrap(),
+            OutputFormat::Sarif
+        );
     }
 
     #[test]

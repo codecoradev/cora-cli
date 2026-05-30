@@ -195,7 +195,7 @@ impl ScanCache {
             return Ok(Self::default());
         }
         let content = std::fs::read_to_string(&path)?;
-        serde_json::from_str(&content).context("failed to parse scan cache").map_err(Into::into)
+        serde_json::from_str(&content).context("failed to parse scan cache")
     }
 
     fn save(&self) -> Result<()> {

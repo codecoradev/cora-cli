@@ -196,7 +196,12 @@ mod tests {
         let fmt = SarifFormatter;
         let output = fmt.format_review(&sample_response()).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(parsed["runs"][0]["tool"]["driver"]["name"].as_str().unwrap(), "Cora");
+        assert_eq!(
+            parsed["runs"][0]["tool"]["driver"]["name"]
+                .as_str()
+                .unwrap(),
+            "Cora"
+        );
     }
 
     #[test]

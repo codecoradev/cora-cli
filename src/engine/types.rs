@@ -206,7 +206,10 @@ mod tests {
 
     #[test]
     fn issue_type_performance() {
-        assert_eq!(IssueType::from_str_lossy("performance"), IssueType::Performance);
+        assert_eq!(
+            IssueType::from_str_lossy("performance"),
+            IssueType::Performance
+        );
     }
 
     #[test]
@@ -226,10 +229,22 @@ mod tests {
 
     #[test]
     fn issue_type_best_practice_variants() {
-        assert_eq!(IssueType::from_str_lossy("best_practice"), IssueType::BestPractice);
-        assert_eq!(IssueType::from_str_lossy("best-practice"), IssueType::BestPractice);
-        assert_eq!(IssueType::from_str_lossy("bestpractice"), IssueType::BestPractice);
-        assert_eq!(IssueType::from_str_lossy("best practice"), IssueType::BestPractice);
+        assert_eq!(
+            IssueType::from_str_lossy("best_practice"),
+            IssueType::BestPractice
+        );
+        assert_eq!(
+            IssueType::from_str_lossy("best-practice"),
+            IssueType::BestPractice
+        );
+        assert_eq!(
+            IssueType::from_str_lossy("bestpractice"),
+            IssueType::BestPractice
+        );
+        assert_eq!(
+            IssueType::from_str_lossy("best practice"),
+            IssueType::BestPractice
+        );
     }
 
     #[test]
@@ -244,7 +259,10 @@ mod tests {
 
     #[test]
     fn issue_type_suggestion() {
-        assert_eq!(IssueType::from_str_lossy("suggestion"), IssueType::Suggestion);
+        assert_eq!(
+            IssueType::from_str_lossy("suggestion"),
+            IssueType::Suggestion
+        );
     }
 
     #[test]
@@ -299,9 +317,6 @@ mod tests {
         assert_eq!(EXIT_ERROR, 1);
         assert_eq!(EXIT_BLOCKED, 2);
         assert_eq!(EXIT_AUTH_ERROR, 3);
-        assert!(EXIT_OK < EXIT_ERROR);
-        assert!(EXIT_ERROR < EXIT_BLOCKED);
-        assert!(EXIT_BLOCKED < EXIT_AUTH_ERROR);
     }
 
     // ─── Constants ───

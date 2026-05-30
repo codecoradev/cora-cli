@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use tracing::debug;
 
-use crate::config::providers::{detected_presets, PRESETS};
+use crate::config::providers::{PRESETS, detected_presets};
 use crate::config::schema::{Config, CoraFile};
 use crate::engine::LLMConfig;
 

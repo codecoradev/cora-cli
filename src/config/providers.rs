@@ -1,8 +1,8 @@
 /// Known provider presets with their expected env vars and defaults.
 pub struct ProviderPreset {
     pub name: &'static str,
-    pub env_key: &'static str,      // env var for API key
-    pub env_url: &'static str,      // env var for custom base URL
+    pub env_key: &'static str, // env var for API key
+    pub env_url: &'static str, // env var for custom base URL
     pub default_model: &'static str,
     pub default_base_url: &'static str,
 }
@@ -53,7 +53,7 @@ pub fn preset_has_key(preset: &ProviderPreset) -> bool {
     if preset.name == "ollama" {
         return std::env::var("OLLAMA_HOST").is_ok()
             || std::env::var("OLLAMA_API_KEY").is_ok()
-            || std::env::var("CORA_PROVIDER").map_or(false, |v| v == "ollama");
+            || std::env::var("CORA_PROVIDER").is_ok_and(|v| v == "ollama");
     }
     std::env::var(preset.env_key).is_ok()
 }
