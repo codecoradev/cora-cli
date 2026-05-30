@@ -133,7 +133,7 @@ pub struct OutputSection {
 
 impl CoraFile {
     pub fn from_str(content: &str) -> Result<Self> {
-        serde_yml::from_str(content).context("failed to parse .cora.yaml")
+        serde_yaml_ng::from_str(content).context("failed to parse .cora.yaml")
     }
 
     /// Merge this file config into a `Config`, overwriting only fields that are present.
@@ -433,8 +433,8 @@ output:
             focus: Some(vec!["security".to_string()]),
             ..Default::default()
         };
-        let yaml = serde_yml::to_string(&cora).unwrap();
-        let back: CoraFile = serde_yml::from_str(&yaml).unwrap();
+        let yaml = serde_yaml_ng::to_string(&cora).unwrap();
+        let back: CoraFile = serde_yaml_ng::from_str(&yaml).unwrap();
         assert_eq!(
             back.provider.as_ref().unwrap().provider.as_deref(),
             Some("ollama")
