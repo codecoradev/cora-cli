@@ -252,7 +252,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cora"
+name = "cora-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
