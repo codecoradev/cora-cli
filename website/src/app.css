@@ -724,3 +724,32 @@ body {
   height: 24px;
   color: var(--accent);
 }
+
+/* ---- Site Header ---- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: oklch(0.13 0.01 270 / 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid oklch(0.27 0.01 270 / 0.5);
+}
+
+.site-header-link {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.site-header-link:hover {
+  color: var(--foreground);
+}
+
+.site-header-link.active {
+  color: var(--accent);
+}
