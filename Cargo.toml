@@ -1,0 +1,71 @@
+[package]
+name = "cora"
+version = "0.1.0"
+edition = "2024"
+description = "CLI-first AI code review — BYOK, diff/scan/branch, pre-commit hooks"
+license = "MIT"
+repository = "https://github.com/ajianaz/cora-cli"
+readme = "README.md"
+keywords = ["cli", "code-review", "ai", "git", "pre-commit"]
+categories = ["command-line-utilities", "development-tools"]
+rust-version = "1.85"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client (OpenAI-compatible API calls)
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# Git operations
+git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+
+# Terminal output
+colored = "3"
+owo-colors = "4"
+indicatif = "0.18"
+
+# File system
+dirs = "6"
+glob = "0.3"
+walkdir = "2"
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+# Config
+toml = "0.8"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Misc
+chrono = "0.4"
+regex = "1"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[[bin]]
+name = "cora"
+path = "src/main.rs"

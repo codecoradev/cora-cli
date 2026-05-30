@@ -1,0 +1,114 @@
+use std::path::Path;
+use std::process::Command;
+
+use anyhow::{Context, Result};
+use git2::Repository;
+
+/// Open the git repository at or above the current working directory.
+pub fn open_repo() -> Result<Repository> {
+    Repository::discover(std::env::current_dir()?)
+        .context("not inside a git repository")
+}
+
+/// Run a git command and return its stdout as a string.
+fn git_cmd(args: &[&str]) -> Result<String> {
+    let output = Command::new("git")
+        .args(args)
+        .output()
+        .context("failed to execute git command")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("git command failed: {stderr}");
+    }
+
+    Ok(String::from_utf8(output.stdout)
+        .context("git output is not valid UTF-8")?)
+}
+
+/// Get the diff of currently staged changes (git diff --cached).
+pub fn get_staged_diff() -> Result<String> {
+    git_cmd(&["diff", "--cached"])
+}
+
+/// Get the diff of unstaged changes (working tree vs index).
+pub fn get_unstaged_diff() -> Result<String> {
+    git_cmd(&["diff"])
+}
+
+/// Get the diff between the current branch and `base_branch`.
+pub fn get_branch_diff(base_branch: &str) -> Result<String> {
+    let arg = format!("{}...HEAD", base_branch);
+    git_cmd(&["diff", &arg])
+}
+
+/// Get the diff of unpushed commits (HEAD vs @{u}).
+pub fn get_unpushed_diff() -> Result<String> {
+    git_cmd(&["log", "-p", "@{u}..HEAD"])
+}
+
+/// Get the current branch name.
+pub fn get_current_branch() -> Result<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .context("failed to execute git rev-parse")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("git rev-parse failed: {stderr}");
+    }
+
+    let name = String::from_utf8(output.stdout)
+        .context("branch name is not valid UTF-8")?;
+    let name = name.trim().to_string();
+
+    if name.is_empty() || name == "HEAD" {
+        anyhow::bail!("HEAD is detached -- cannot determine branch name");
+    }
+
+    Ok(name)
+}
+
+/// Try to get repository info: (owner, repo_name, branch).
+/// Owner is derived from the remote URL if possible.
+pub fn get_repo_info() -> Result<(String, String, String)> {
+    let repo = open_repo()?;
+    let branch = get_current_branch()?;
+
+    let remote_url = repo
+        .find_remote("origin")
+        .ok()
+        .and_then(|r| r.url().map(|s| s.to_string()))
+        .unwrap_or_default();
+
+    let (owner, repo_name) = parse_remote_url(&remote_url);
+    Ok((owner, repo_name, branch))
+}
+
+/// Parse a remote URL into (owner, repo_name).
+fn parse_remote_url(url: &str) -> (String, String) {
+    // Handle git@host:owner/repo.git, https://host/owner/repo.git, etc.
+    let clean = url
+        .trim_end_matches(".git")
+        .trim_end_matches('/')
+        .trim_start_matches("git@");
+
+    let parts: Vec<&str> = clean.split('/').collect();
+    if parts.len() >= 2 {
+        // git@host:owner/repo  => parts = ["host:owner", "repo"]
+        let maybe_owner = parts[parts.len() - 2];
+        let (owner, _) = maybe_owner.split_once(':').unwrap_or((maybe_owner, ""));
+        let repo_name = parts[parts.len() - 1];
+        (owner.to_string(), repo_name.to_string())
+    } else {
+        ("unknown".to_string(), "unknown".to_string())
+    }
+}
+
+/// Check if a path is inside a git worktree.
+pub fn is_inside_git_repo(dir: Option<&Path>) -> bool {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let search_dir = dir.unwrap_or(&cwd);
+    Repository::discover(search_dir).is_ok()
+}
