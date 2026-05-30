@@ -114,12 +114,15 @@ pub fn build_llm_config(
     })
 }
 
-/// Read the stored API key from ~/.config/cora/config.toml.
-pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
-    let dir = dirs::config_dir()
-        .context("cannot determine config directory")?
-        .join("cora");
+/// Get the cora config directory: ~/.cora/
+fn cora_dir() -> Result<PathBuf> {
+    let home = dirs::home_dir().context("cannot determine home directory")?;
+    Ok(home.join(".cora"))
+}
 
+/// Read the stored API key from ~/.cora/config.toml.
+pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
+    let dir = cora_dir()?;
     let path = dir.join(AUTH_FILENAME);
     if !path.is_file() {
         return Ok(None);
@@ -143,12 +146,9 @@ pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
     Ok(key)
 }
 
-/// Save an API key to ~/.config/cora/config.toml.
+/// Save an API key to ~/.cora/config.toml.
 pub fn save_api_key(key: &str) -> Result<()> {
-    let dir = dirs::config_dir()
-        .context("cannot determine config directory")?
-        .join("cora");
-
+    let dir = cora_dir()?;
     std::fs::create_dir_all(&dir)
         .with_context(|| format!("failed to create {}", dir.display()))?;
 
@@ -171,12 +171,9 @@ pub fn save_api_key(key: &str) -> Result<()> {
     Ok(())
 }
 
-/// Remove the stored API key from ~/.config/cora/config.toml.
+/// Remove the stored API key from ~/.cora/config.toml.
 pub fn remove_api_key() -> Result<()> {
-    let dir = dirs::config_dir()
-        .context("cannot determine config directory")?
-        .join("cora");
-
+    let dir = cora_dir()?;
     let path = dir.join(AUTH_FILENAME);
     if path.is_file() {
         std::fs::remove_file(&path)
@@ -194,9 +191,7 @@ pub fn auth_status() -> Result<AuthStatus> {
             has_key: true,
         })
     } else if load_api_key_from_auth_file()?.is_some() {
-        let dir = dirs::config_dir()
-            .context("cannot determine config directory")?
-            .join("cora");
+        let dir = cora_dir()?;
         Ok(AuthStatus {
             source: format!("{}", dir.join(AUTH_FILENAME).display()),
             has_key: true,
