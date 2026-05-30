@@ -34,7 +34,7 @@
 		<div class="docs-card-number primary">1</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
 			<strong class="text-[var(--foreground)]">Install cora</strong> — Single binary via Cargo:
-			<code>cargo install cora</code>
+			<code>cargo install cora-cli</code>
 		</div>
 	</div>
 
@@ -57,7 +57,7 @@
 		<div class="docs-card-number primary">4</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
 			<strong class="text-[var(--foreground)]">Review</strong> — Analyze your staged changes:
-			<code>cora review --staged</code>
+			<code>cora review</code>
 		</div>
 	</div>
 </div>
@@ -120,24 +120,25 @@
 		</div>
 		<div class="terminal-body">
 			<div><span class="syntax-comment"># .cora.yaml</span></div>
-			<div><span class="syntax-highlight">provider</span>: <span class="syntax-string">openai</span></div>
-			<div><span class="syntax-highlight">model</span>: <span class="syntax-string">gpt-4o</span></div>
+			<div><span class="syntax-highlight">review:</span></div>
+			<div>  <span class="syntax-flag">severity:</span> <span class="syntax-string">warning</span></div>
+			<div>  <span class="syntax-flag">focus:</span> <span class="syntax-string">security,performance</span></div>
 			<div></div>
-			<div><span class="syntax-highlight">custom_prompt</span>: <span class="syntax-string">|</span></div>
-			<div><span class="syntax-string">  Focus on security vulnerabilities and</span></div>
-			<div><span class="syntax-string">  performance issues. Ignore style linting.</span></div>
+			<div><span class="syntax-highlight">providers:</span></div>
+			<div>  <span class="syntax-flag">openai:</span></div>
+			<div>    <span class="syntax-flag">model:</span> <span class="syntax-string">gpt-4o</span></div>
 		</div>
 	</div>
 
 	<div class="docs-term-list">
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="docs-term-key">provider</span> — Which LLM provider to use (openai, anthropic, groq, ollama, zai)
+			<span class="docs-term-key">review.severity</span> — Minimum severity level (info, minor, major, critical)
 		</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="docs-term-key">model</span> — Specific model name (e.g., gpt-4o, claude-sonnet-4-20250514)
+			<span class="docs-term-key">review.focus</span> — Focus areas for review (e.g., security, performance)
 		</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="docs-term-key">custom_prompt</span> — Override the default review prompt to focus on specific concerns
+			<span class="docs-term-key">providers</span> — Provider-specific model overrides (openai, anthropic, groq, ollama, zai)
 		</div>
 	</div>
 </div>
