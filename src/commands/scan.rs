@@ -20,6 +20,8 @@ pub struct ScanOptions {
     pub extensions: Vec<String>,
     /// Only scan files changed since last scan.
     pub incremental: bool,
+    /// Focus areas for review (overrides config).
+    pub focus: Vec<String>,
 }
 
 /// Execute the scan command.
@@ -45,6 +47,13 @@ pub async fn execute_scan(
     let include = opts.include.clone();
     let mut exclude = config.ignore.files.clone();
     exclude.extend(opts.exclude.clone());
+
+    // Merge focus areas: CLI --focus overrides config
+    let effective_focus = if opts.focus.is_empty() {
+        config.focus.clone()
+    } else {
+        opts.focus.clone()
+    };
 
     debug!(root = %root.display(), "starting scan");
 
@@ -107,7 +116,7 @@ pub async fn execute_scan(
         let (issues, _summary, tokens) = crate::engine::llm::scan_files(
             llm_config,
             &files_content,
-            &config.focus,
+            &effective_focus,
             &config.rules,
         )
         .await?;

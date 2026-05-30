@@ -28,7 +28,7 @@
 
 <div class="docs-section scroll-reveal">
 	<h2>Review Modes</h2>
-	<p>cora supports four review modes, each suited to a different workflow:</p>
+	<p>cora supports multiple review modes, each suited to a different workflow:</p>
 
 	<div class="overflow-x-auto">
 		<table class="compare-table">
@@ -42,28 +42,46 @@
 			</thead>
 			<tbody>
 				<tr>
+					<td class="font-medium">Default</td>
+					<td><em>(no flag)</em></td>
+					<td>Tries staged first, then unpushed</td>
+					<td>Quick feedback</td>
+				</tr>
+				<tr>
 					<td class="font-medium">Staged</td>
 					<td><code>--staged</code></td>
 					<td>Files in git staging area</td>
 					<td>Pre-commit review</td>
 				</tr>
 				<tr>
-					<td class="font-medium">Branch</td>
-					<td><code>--branch</code></td>
+					<td class="font-medium">Unstaged</td>
+					<td><code>--unstaged</code></td>
+					<td>Unstaged working changes</td>
+					<td>Review work in progress</td>
+				</tr>
+				<tr>
+					<td class="font-medium">Unpushed</td>
+					<td><code>--unpushed</code></td>
+					<td>Commits not yet pushed</td>
+									<td>Review before push</td>
+				</tr>
+				<tr>
+					<td class="font-medium">Base Branch</td>
+					<td><code>--base &lt;branch&gt;</code></td>
 					<td>Diff against base branch</td>
 					<td>PR review workflow</td>
 				</tr>
 				<tr>
-					<td class="font-medium">Full</td>
-					<td><code>--full</code></td>
-					<td>Entire repository</td>
-					<td>Comprehensive audit</td>
+					<td class="font-medium">Commit</td>
+					<td><code>--commit &lt;ref&gt;</code></td>
+					<td>Specific commit or range</td>
+					<td>Review specific changes</td>
 				</tr>
 				<tr>
-					<td class="font-medium">Incremental</td>
-					<td><code>--incremental</code></td>
-					<td>Only new/changed files</td>
-					<td>Large codebases</td>
+					<td class="font-medium">Diff File</td>
+					<td><code>--diff-file &lt;path&gt;</code></td>
+					<td>External diff file</td>
+					<td>Review patch files</td>
 				</tr>
 			</tbody>
 		</table>
@@ -76,17 +94,20 @@
 			<span class="terminal-dot-green"></span>
 		</div>
 		<div class="terminal-body">
-			<div><span class="syntax-comment"># Review staged changes</span></div>
-			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span></div>
+			<div><span class="syntax-comment"># Review staged changes (default)</span></div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span></div>
 			<div></div>
-			<div><span class="syntax-comment"># Review against main branch</span></div>
-			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--branch</span> <span class="syntax-string">main</span></div>
+			<div><span class="syntax-comment"># Review against a branch</span></div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--base</span> <span class="syntax-string">main</span></div>
 			<div></div>
-			<div><span class="syntax-comment"># Full project scan</span></div>
-			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--full</span></div>
+			<div><span class="syntax-comment"># Review a specific commit</span></div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--commit</span> <span class="syntax-string">HEAD</span></div>
 			<div></div>
-			<div><span class="syntax-comment"># Incremental (only changed files)</span></div>
-			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--incremental</span></div>
+			<div><span class="syntax-comment"># Review from a diff file</span></div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--diff-file</span> <span class="syntax-string">pr.diff</span></div>
+			<div></div>
+			<div><span class="syntax-comment"># Full project scan (use cora scan)</span></div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora scan</span> <span class="syntax-string">.</span></div>
 		</div>
 	</div>
 </div>
@@ -141,7 +162,7 @@
 
 <div class="docs-section scroll-reveal">
 	<h2>Configuration File</h2>
-	<p>The <code>.cora.yaml</code> file provides persistent configuration. Place it in your project root or use <code>~/.cora/config.yaml</code> for global settings.</p>
+	<p>The <code>.cora.yaml</code> file provides persistent configuration. Place it in your project root. API keys are stored at <code>~/.cora/config.toml</code>.</p>
 
 	<div class="docs-terminal">
 		<div class="terminal-bar">
@@ -150,30 +171,19 @@
 			<span class="terminal-dot-green"></span>
 		</div>
 		<div class="terminal-body">
-			<div><span class="syntax-comment"># .cora.yaml — full example</span></div>
-			<div></div>
-			<div><span class="syntax-comment"># LLM provider: openai, anthropic, groq, ollama, zai</span></div>
-			<div><span class="syntax-highlight">provider</span>: <span class="syntax-string">openai</span></div>
-			<div></div>
-			<div><span class="syntax-comment"># Model name</span></div>
-			<div><span class="syntax-highlight">model</span>: <span class="syntax-string">gpt-4o</span></div>
-			<div></div>
-			<div><span class="syntax-comment"># Custom base URL (for proxies or self-hosted endpoints)</span></div>
-			<div><span class="syntax-comment"># base_url: https://api.example.com/v1</span></div>
-			<div></div>
-			<div><span class="syntax-comment"># Custom review prompt</span></div>
-			<div><span class="syntax-comment"># custom_prompt: |</span></div>
-			<div><span class="syntax-comment">#   Focus on security and performance only.</span></div>
-			<div></div>
-			<div><span class="syntax-comment"># File patterns to include</span></div>
-			<div><span class="syntax-comment"># include:</span></div>
-			<div><span class="syntax-comment">#   - "src/**"</span></div>
-			<div><span class="syntax-comment">#   - "lib/**"</span></div>
-			<div></div>
-			<div><span class="syntax-comment"># File patterns to exclude</span></div>
-			<div><span class="syntax-comment"># exclude:</span></div>
-			<div><span class="syntax-comment">#   - "**/*.test.ts"</span></div>
-			<div><span class="syntax-comment">#   - "**/node_modules/**"</span></div>
+		<div><span class="syntax-comment"># .cora.yaml — example</span></div>
+		<div></div>
+		<div><span class="syntax-highlight">review:</span></div>
+		<div>  <span class="syntax-flag">severity:</span> <span class="syntax-string">warning</span></div>
+		<div>  <span class="syntax-flag">focus:</span> <span class="syntax-string">security,performance</span></div>
+		<div></div>
+		<div><span class="syntax-highlight">ignore:</span></div>
+		<div>  <span class="syntax-cmd">- "vendor/**"</span></div>
+		<div>  <span class="syntax-cmd">- "*.min.js"</span></div>
+		<div></div>
+		<div><span class="syntax-highlight">providers:</span></div>
+		<div>  <span class="syntax-flag">openai:</span></div>
+		<div>    <span class="syntax-flag">model:</span> <span class="syntax-string">gpt-4o</span></div>
 		</div>
 	</div>
 </div>
@@ -288,19 +298,19 @@
 	<div class="flex flex-col gap-3">
 		<div class="docs-term-item">
 			<span class="text-[var(--accent)]">&#8226;</span>
-			Use <code>--staged</code> as a pre-commit hook for the fastest feedback loop
+			Use <code>cora review</code> with no flags for the fastest pre-commit feedback
 		</div>
 		<div class="docs-term-item">
 			<span class="text-[var(--accent)]">&#8226;</span>
-			Combine <code>--format json</code> with <code>--branch main</code> in CI pipelines
+			Combine <code>--format json</code> with <code>--base main</code> in CI pipelines
 		</div>
 		<div class="docs-term-item">
 			<span class="text-[var(--accent)]">&#8226;</span>
-			Use <code>--incremental</code> for large codebases — only changed files are analyzed
+			Use <code>cora scan . --incremental</code> for large codebases — only changed files are analyzed
 		</div>
 		<div class="docs-term-item">
 			<span class="text-[var(--accent)]">&#8226;</span>
-			Set <code>custom_prompt</code> to match your team's coding standards
+			Use <code>--quiet</code> for minimal output and <code>--severity</code> to filter by severity level
 		</div>
 		<div class="docs-term-item">
 			<span class="text-[var(--accent)]">&#8226;</span>

@@ -31,7 +31,7 @@
 	<p>cora is a Rust binary. You have two installation paths:</p>
 	<div class="docs-term-list">
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="font-semibold text-[var(--accent)]">Via Cargo (recommended)</span> — Requires Rust 1.70 or later with Cargo installed
+			<span class="font-semibold text-[var(--accent)]">Via Cargo (recommended)</span> — Requires Rust 1.85 or later with Cargo installed
 		</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
 			<span class="font-semibold text-[var(--accent)]">Binary download</span> — No Rust required; just download and place in your PATH
@@ -51,7 +51,7 @@
 			<span class="terminal-dot-green"></span>
 		</div>
 		<div class="terminal-body">
-			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cargo install</span> <span class="syntax-string">cora</span></div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cargo install</span>			<span class="syntax-string">cora-cli</span></div>
 		</div>
 	</div>
 
@@ -157,7 +157,7 @@
 
 	<div class="docs-term-list">
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="font-semibold text-[var(--accent)]">Via Cargo:</span> <code>cargo install cora --force</code>
+			<span class="font-semibold text-[var(--accent)]">Via Cargo:</span> <code>cargo install cora-cli --force</code>
 		</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
 			<span class="font-semibold text-[var(--accent)]">Via Binary:</span> Download the latest release from GitHub and replace the existing binary

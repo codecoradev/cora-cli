@@ -35,13 +35,6 @@
 cargo install cora-cli
 ```
 
-### Homebrew
-
-```bash
-brew tap ajianaz/tap
-brew install cora-cli
-```
-
 ### Binary Download
 
 Download the latest release from [GitHub Releases](https://github.com/ajianaz/cora-cli/releases):
@@ -84,19 +77,13 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 cora review
 ```
 
-### 3. Review a Specific File
-
-```bash
-cora review src/main.rs
-```
-
-### 4. Review the Last Commit
+### 3. Review a Specific Commit
 
 ```bash
 cora review --commit HEAD
 ```
 
-### 5. Scan the Entire Project
+### 4. Scan the Entire Project
 
 ```bash
 cora scan .
@@ -109,32 +96,48 @@ cora scan .
 Review code changes using an LLM.
 
 ```bash
-# Review staged files
+# Review staged files (default)
 cora review
 
-# Review specific files
-cora review src/main.rs src/lib.rs
+# Review staged explicitly
+cora review --staged
 
-# Review a range of commits
+# Review unstaged changes
+cora review --unstaged
+
+# Review unpushed commits
+cora review --unpushed
+
+# Review against a branch
+cora review --base develop
+
+# Review a commit or range
+cora review --commit HEAD
 cora review --commit HEAD~3..HEAD
 
-# Review a pull request diff
+# Review from a diff file
 cora review --diff-file pr.diff
 
 # Use a specific model
 cora review --model gpt-4o
 
-# Output as SARIF (for CI)
-cora review --output sarif --output-file results.sarif
+# Filter by severity
+cora review --severity major
+
+# Quiet mode (minimal output)
+cora review --quiet
+
+# Stream response
+cora review --stream
+
+# Output as SARIF
+cora review --format sarif
+
+# Review and upload SARIF to GitHub Code Scanning
+cora review --base develop --upload
 
 # Output as JSON
-cora review --output json
-
-# Set severity threshold
-cora review --severity warning
-
-# Quiet mode (machine-readable)
-cora review --quiet
+cora review --format json
 ```
 
 ### `cora scan`
@@ -145,14 +148,14 @@ Scan files for code quality issues without requiring git context.
 # Scan current directory
 cora scan .
 
-# Scan specific files
-cora scan src/**/*.rs
-
-# Scan with custom rules focus
+# Scan with focus areas
 cora scan . --focus security,performance
 
 # Exclude patterns
-cora scan . --exclude "tests/**" --exclude "examples/**"
+cora scan . --exclude "tests/**" --exclude "vendor/**"
+
+# Incremental (only changed files)
+cora scan . --incremental
 ```
 
 ### `cora config`
@@ -163,12 +166,55 @@ Manage configuration.
 # Show current configuration
 cora config show
 
-# Initialize config file
-cora config init
+# Set model
+cora config set model gpt-4o
 
-# Set a configuration value
-cora config set model claude-sonnet-4-20250514
-cora config set severity error
+# Set provider
+cora config set provider anthropic
+```
+
+### `cora init`
+
+Create a `.cora.yaml` config file in your project.
+
+```bash
+cora init
+cora init --force
+```
+
+### `cora auth`
+
+Manage API key authentication.
+
+```bash
+cora auth login
+cora auth status
+cora auth remove
+```
+
+### `cora hook`
+
+Manage git hooks.
+
+```bash
+cora hook install
+cora hook uninstall
+```
+
+### `cora providers`
+
+List detected AI providers.
+
+```bash
+cora providers
+```
+
+### `cora upload-sarif`
+
+Upload a SARIF file to GitHub Code Scanning.
+
+```bash
+cora upload-sarif results.sarif
 ```
 
 ### `cora completion`
@@ -176,65 +222,56 @@ cora config set severity error
 Generate shell completions.
 
 ```bash
-cora completion bash > ~/.cora-completion.bash
-cora completion zsh > ~/.cora-completion.zsh
-cora completion fish > ~/.cora-completion.fish
+cora completion bash
+cora completion zsh
+cora completion fish
 ```
 
 ## ⚙️ Configuration
 
-Create a `.cora.yaml` in your project root or `~/.config/cora/config.yaml` globally:
+Create a `.cora.yaml` in your project root. API keys are stored at `~/.cora/config.toml`.
 
 ```yaml
 # .cora.yaml
-model: gpt-4o
-temperature: 0.1
-
-# Provider configuration
-provider:
-  name: openai          # openai | anthropic | google | custom
-  base_url: null        # Override API endpoint (for custom/self-hosted)
-  api_key_env: OPENAI_API_KEY  # Environment variable for API key
 
 # Review settings
 review:
-  severity: warning      # error | warning | info | note
-  focus:                 # Focus areas (empty = all)
-    - security
-    - performance
-    - maintainability
-  ignore:
-    patterns:
-      - "tests/**"
-      - "vendor/**"
-      - "*.generated.*"
-    rules:
-      - "line-too-long"
-  max_tokens: 4096
-  language: en            # Response language
+  severity: warning        # minimum severity level
+  max_issues: 20           # max issues to report
+  focus: security,performance  # focus areas
 
-# Output settings
-output:
-  format: colored         # colored | plain | json | sarif
-  file: null              # Output to file instead of stdout
+# Patterns to ignore
+ignore:
+  - "vendor/**"
+  - "*.min.js"
+  - "migrations/**"
 
-# Git settings
-git:
-  auto_stage: false       # Auto-stage files after review
-  base_branch: main       # Base branch for PR reviews
+# Provider-specific model overrides
+providers:
+  openai:
+    model: gpt-4o
+  anthropic:
+    model: claude-sonnet-4-20250514
 ```
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OPENAI_API_KEY` | OpenAI API key | — |
-| `ANTHROPIC_API_KEY` | Anthropic API key | — |
-| `GOOGLE_API_KEY` | Google AI API key | — |
-| `CORa_MODEL` | Override model | — |
-| `CORa_PROVIDER` | Override provider | — |
-| `CORa_CONFIG` | Path to config file | `.cora.yaml` |
-| `CORa_LOG_LEVEL` | Log verbosity | `info` |
+| Variable | Description |
+|----------|-------------|
+| `CORA_API_KEY` | Generic API key |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `GROQ_API_KEY` | Groq API key |
+| `ZAI_API_KEY` | Z.AI API key |
+| `CORA_PROVIDER` | Override provider |
+| `CORA_MODEL` | Override model |
+| `CORA_BASE_URL` | Override API base URL |
+| `CORA_CONFIG` | Config file path |
+| `CORA_FORMAT` | Output format |
+| `CORA_NO_COLOR` | Disable colors |
+| `GITHUB_TOKEN` | GitHub token for SARIF upload |
+| `GITHUB_REPOSITORY` | GitHub repo for SARIF upload |
+| `GITHUB_REF` | GitHub ref for SARIF upload |
 
 ## 🔗 CI/CD Integration
 
@@ -263,9 +300,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          cora review --commit origin/main..HEAD \
-            --output sarif \
-            --output-file results.sarif
+          cora review --base origin/develop --format sarif --output-file results.sarif
 
       - name: Upload SARIF to GitHub Code Scanning
         if: always()
@@ -284,7 +319,7 @@ code-review:
   before_script:
     - cargo install cora-cli
   script:
-    - cora review --commit origin/main..HEAD --severity error
+    - cora review --base origin/develop --severity critical
   variables:
     OPENAI_API_KEY: $CI_OPENAI_API_KEY
   rules:
@@ -311,24 +346,12 @@ Or add it manually to `.git/hooks/pre-commit`:
 ```bash
 #!/bin/sh
 # cora-cli pre-commit hook
-cora review --quiet --severity error
+cora review --quiet --severity critical
 if [ $? -ne 0 ]; then
   echo "❌ Code review found critical issues. Commit blocked."
   echo "   Run 'cora review' to see details, or use 'git commit --no-verify' to skip."
   exit 1
 fi
-```
-
-### With [pre-commit](https://pre-commit.com) framework
-
-```yaml
-# .pre-commit-config.yaml
-repos:
-  - repo: https://github.com/ajianaz/cora-cli
-    rev: v0.1.0
-    hooks:
-      - id: cora-review
-        args: ['--severity', 'warning']
 ```
 
 ## 🆚 Positioning: How Cora Compares

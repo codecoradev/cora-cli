@@ -41,7 +41,10 @@
 			<span class="terminal-dot terminal-dot-green"></span>
 		</div>
 		<div class="terminal-body">
-			<span class="syntax-cmd">$</span> <span class="syntax-flag">CORA_API_KEY</span>=<span class="syntax-string">sk-xxx</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span>
+<span class="syntax-comment"># Review staged changes (default)</span><br/>
+				<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span><br/><br/>
+				<span class="syntax-comment"># Or review with explicit flags</span><br/>
+				<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span>
 		</div>
 	</div>
 </section>
@@ -60,7 +63,7 @@
 			<span class="terminal-dot terminal-dot-green"></span>
 		</div>
 		<div class="terminal-body">
-			<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--branch</span> <span class="syntax-string">main</span>
+			<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--base</span> <span class="syntax-string">main</span>
 		</div>
 	</div>
 </section>
@@ -149,12 +152,12 @@
     <span class="syntax-flag">steps:</span>
       <span class="syntax-cmd">- uses:</span> <span class="syntax-string">actions/checkout@v4</span>
       <span class="syntax-cmd">- name:</span> <span class="syntax-string">Install cora</span>
-        <span class="syntax-flag">run:</span> <span class="syntax-string">cargo install cora</span>
+        <span class="syntax-flag">run:</span> <span class="syntax-string">cargo install cora-cli</span>
       <span class="syntax-cmd">- name:</span> <span class="syntax-string">Run AI code review</span>
         <span class="syntax-flag">env:</span>
           {@html '<span class="syntax-flag">CORA_API_KEY:</span> <span class="syntax-string">${{ secrets.CORA_API_KEY }}</span>'}
           <span class="syntax-flag">CORA_PROVIDER:</span> <span class="syntax-string">openai</span>
-        <span class="syntax-flag">run:</span> <span class="syntax-string">cora review --branch main --fail-on error</span></pre>
+        <span class="syntax-flag">run:</span> <span class="syntax-string">cora review --base main --format sarif</span></pre>
 		</div>
 	</div>
 </section>
@@ -197,10 +200,10 @@
 			<span class="terminal-dot terminal-dot-green"></span>
 		</div>
 		<div class="terminal-body">
-			<span class="syntax-comment"># Generate SARIF report and upload</span><br/>
-			<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span> <span class="syntax-flag">--output</span> <span class="syntax-string">sarif</span> <span class="syntax-cmd">&gt;</span> <span class="syntax-string">results.sarif</span> <span class="syntax-cmd">&amp;&amp;</span> \<br/>
-			&nbsp;&nbsp;<span class="syntax-highlight">cora upload-sarif</span> <span class="syntax-string">results.sarif</span><br/><br/>
-			<span class="syntax-success">Uploaded 3 findings to GitHub Code Scanning</span>
+				<span class="syntax-comment"># Generate SARIF report and upload</span><br/>
+				<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--base</span> <span class="syntax-string">main</span> <span class="syntax-flag">--format</span> <span class="syntax-string">sarif</span> <span class="syntax-cmd">></span> <span class="syntax-string">results.sarif</span> <span class="syntax-cmd">&&</span> \\<br/>
+				&nbsp;&nbsp;<span class="syntax-highlight">cora upload-sarif</span> <span class="syntax-string">results.sarif</span><br/><br/>
+				<span class="syntax-success">Uploaded 3 findings to GitHub Code Scanning</span>
 		</div>
 	</div>
 </section>
