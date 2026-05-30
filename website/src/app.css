@@ -325,6 +325,17 @@ body {
   padding-bottom: 4rem;
 }
 
+@media (max-width: 640px) {
+  .section-tall {
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+  .section-compact {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+}
+
 /* ---- Badge ---- */
 .badge {
   display: inline-flex;
