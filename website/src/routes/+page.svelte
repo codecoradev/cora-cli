@@ -156,11 +156,11 @@
 				<div class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">5</div>
 				<div class="text-sm text-[var(--muted-foreground)] mt-2">AI Providers</div>
 			</div>
-			<div class="glass-card text-center scroll-reveal py-8" style="transition-delay: 100ms;">
+			<div class="glass-card text-center scroll-reveal py-8 [transition-delay:100ms]">
 				<div class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">&lt; 3s</div>
 				<div class="text-sm text-[var(--muted-foreground)] mt-2">Review Time</div>
 			</div>
-			<div class="glass-card text-center scroll-reveal py-8" style="transition-delay: 200ms;">
+			<div class="glass-card text-center scroll-reveal py-8 [transition-delay:200ms]">
 				<div class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">Zero</div>
 				<div class="text-sm text-[var(--muted-foreground)] mt-2">Config Required</div>
 			</div>
@@ -222,7 +222,7 @@
 			</div>
 
 			<!-- Step 2 -->
-			<div class="glass-card flex-1 text-center scroll-reveal" style="transition-delay: 100ms;">
+			<div class="glass-card flex-1 text-center scroll-reveal [transition-delay:100ms]">
 				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">02</div>
 				<div class="flex justify-center mt-4">
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
@@ -232,12 +232,12 @@
 			</div>
 
 			<!-- Connector -->
-			<div class="connect-line hidden md:flex scroll-reveal" style="transition-delay: 100ms;">
+			<div class="connect-line hidden md:flex scroll-reveal [transition-delay:100ms]">
 				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
 			</div>
 
 			<!-- Step 3 -->
-			<div class="glass-card flex-1 text-center scroll-reveal" style="transition-delay: 200ms;">
+			<div class="glass-card flex-1 text-center scroll-reveal [transition-delay:200ms]">
 				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">03</div>
 				<div class="flex justify-center mt-4">
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -269,7 +269,7 @@
 			</div>
 
 			<!-- Feature 2: BYOK -->
-			<div class="glass-card scroll-reveal" style="transition-delay: 100ms;">
+			<div class="glass-card scroll-reveal [transition-delay:100ms]">
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
 				</div>
@@ -279,7 +279,7 @@
 			</div>
 
 			<!-- Feature 3: Pre-commit Hooks -->
-			<div class="glass-card scroll-reveal" style="transition-delay: 200ms;">
+			<div class="glass-card scroll-reveal [transition-delay:200ms]">
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V8"/><path d="M5 12H2a10 10 0 0020 0h-3"/><circle cx="12" cy="5" r="3"/></svg>
 				</div>
@@ -289,7 +289,7 @@
 			</div>
 
 			<!-- Feature 4: Incremental Scan -->
-			<div class="glass-card scroll-reveal" style="transition-delay: 300ms;">
+			<div class="glass-card scroll-reveal [transition-delay:300ms]">
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
 				</div>
@@ -299,7 +299,7 @@
 			</div>
 
 			<!-- Feature 5: SARIF Output -->
-			<div class="glass-card scroll-reveal" style="transition-delay: 400ms;">
+			<div class="glass-card scroll-reveal [transition-delay:400ms]">
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
 				</div>
@@ -309,7 +309,7 @@
 			</div>
 
 			<!-- Feature 6: Fully Private -->
-			<div class="glass-card scroll-reveal" style="transition-delay: 500ms;">
+			<div class="glass-card scroll-reveal [transition-delay:500ms]">
 				<div class="feature-icon">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1"/></svg>
 				</div>
@@ -434,7 +434,7 @@
 			</div>
 
 			<!-- Step 2 -->
-			<div class="timeline-step scroll-reveal" style="transition-delay: 100ms;">
+			<div class="timeline-step scroll-reveal [transition-delay:100ms]">
 				<div class="timeline-number">2</div>
 				<div>
 					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Initialize</h3>
@@ -453,7 +453,7 @@
 			</div>
 
 			<!-- Step 3 -->
-			<div class="timeline-step scroll-reveal" style="transition-delay: 200ms;">
+			<div class="timeline-step scroll-reveal [transition-delay:200ms]">
 				<div class="timeline-number">3</div>
 				<div>
 					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Review</h3>
@@ -472,7 +472,7 @@
 			</div>
 
 			<!-- Step 4 -->
-			<div class="timeline-step scroll-reveal" style="transition-delay: 300ms;">
+			<div class="timeline-step scroll-reveal [transition-delay:300ms]">
 				<div class="timeline-number">4</div>
 				<div>
 					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Done</h3>

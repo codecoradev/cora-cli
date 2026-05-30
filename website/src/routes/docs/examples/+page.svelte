@@ -23,16 +23,17 @@
 	<meta name="description" content="Practical examples for using cora - quick review, CI, pre-commit hooks, SARIF, and more." />
 </svelte:head>
 
-<h1 class="scroll-reveal" style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2; margin-bottom: 0.5rem;">Examples</h1>
-<p class="scroll-reveal" style="color: var(--muted-foreground); font-size: 14px; margin-bottom: 2.5rem;">Practical examples to get you started with cora.</p>
+<div class="docs-content">
+<h1 class="scroll-reveal">Examples</h1>
+<p class="scroll-reveal">Practical examples to get you started with cora.</p>
 
 <!-- Quick Review -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
-		<span style="color: var(--accent); font-family: var(--font-mono); font-size: 14px;">01</span>
+	<h2 class="flex items-center gap-2">
+		<span class="text-[var(--accent)] font-mono text-sm">01</span>
 		Quick Review
 	</h2>
-	<p style="font-size: 14px; color: var(--muted-foreground); margin-bottom: 0.75rem;">Review your staged changes before committing.</p>
+	<p class="text-sm text-[var(--muted-foreground)] mb-3">Review your staged changes before committing.</p>
 	<div class="docs-terminal">
 		<div class="terminal-bar">
 			<span class="terminal-dot terminal-dot-red"></span>
@@ -47,11 +48,11 @@
 
 <!-- Branch Comparison -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
-		<span style="color: var(--accent); font-family: var(--font-mono); font-size: 14px;">02</span>
+	<h2 class="flex items-center gap-2">
+		<span class="text-[var(--accent)] font-mono text-sm">02</span>
 		Branch Comparison
 	</h2>
-	<p style="font-size: 14px; color: var(--muted-foreground); margin-bottom: 0.75rem;">Compare your current branch against main.</p>
+	<p class="text-sm text-[var(--muted-foreground)] mb-3">Compare your current branch against main.</p>
 	<div class="docs-terminal">
 		<div class="terminal-bar">
 			<span class="terminal-dot terminal-dot-red"></span>
@@ -66,11 +67,11 @@
 
 <!-- Full Project Scan -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
-		<span style="color: var(--accent); font-family: var(--font-mono); font-size: 14px;">03</span>
+	<h2 class="flex items-center gap-2">
+		<span class="text-[var(--accent)] font-mono text-sm">03</span>
 		Full Project Scan
 	</h2>
-	<p style="font-size: 14px; color: var(--muted-foreground); margin-bottom: 0.75rem;">Scan your entire project for issues.</p>
+	<p class="text-sm text-[var(--muted-foreground)] mb-3">Scan your entire project for issues.</p>
 	<div class="docs-terminal">
 		<div class="terminal-bar">
 			<span class="terminal-dot terminal-dot-red"></span>
@@ -85,11 +86,11 @@
 
 <!-- Incremental Scan -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
-		<span style="color: var(--accent); font-family: var(--font-mono); font-size: 14px;">04</span>
+	<h2 class="flex items-center gap-2">
+		<span class="text-[var(--accent)] font-mono text-sm">04</span>
 		Incremental Scan
 	</h2>
-	<p style="font-size: 14px; color: var(--muted-foreground); margin-bottom: 0.75rem;">Only scan files that changed since the last scan.</p>
+	<p class="text-sm text-[var(--muted-foreground)] mb-3">Only scan files that changed since the last scan.</p>
 	<div class="docs-terminal">
 		<div class="terminal-bar">
 			<span class="terminal-dot terminal-dot-red"></span>
@@ -104,11 +105,11 @@
 
 <!-- Streaming -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
-		<span style="color: var(--accent); font-family: var(--font-mono); font-size: 14px;">05</span>
+	<h2 class="flex items-center gap-2">
+		<span class="text-[var(--accent)] font-mono text-sm">05</span>
 		Streaming Output
 	</h2>
-	<p style="font-size: 14px; color: var(--muted-foreground); margin-bottom: 0.75rem;">Stream results as they come in from the LLM.</p>
+	<p class="text-sm text-[var(--muted-foreground)] mb-3">Stream results as they come in from the LLM.</p>
 	<div class="docs-terminal">
 		<div class="terminal-bar">
 			<span class="terminal-dot terminal-dot-red"></span>
@@ -123,11 +124,11 @@
 
 <!-- GitHub Actions -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
-		<span style="color: var(--accent); font-family: var(--font-mono); font-size: 14px;">06</span>
+	<h2 class="flex items-center gap-2">
+		<span class="text-[var(--accent)] font-mono text-sm">06</span>
 		GitHub Actions CI
 	</h2>
-	<p style="font-size: 14px; color: var(--muted-foreground); margin-bottom: 0.75rem;">Add cora to your CI pipeline.</p>
+	<p class="text-sm text-[var(--muted-foreground)] mb-3">Add cora to your CI pipeline.</p>
 	<div class="docs-terminal">
 		<div class="terminal-bar">
 			<span class="terminal-dot terminal-dot-red"></span>
@@ -146,10 +147,10 @@
   <span class="syntax-flag">review:</span>
     <span class="syntax-flag">runs-on:</span> <span class="syntax-string">ubuntu-latest</span>
     <span class="syntax-flag">steps:</span>
-      <span style="color: var(--muted-foreground);">- uses:</span> <span class="syntax-string">actions/checkout@v4</span>
-      <span style="color: var(--muted-foreground);">- name:</span> <span class="syntax-string">Install cora</span>
+      <span class="syntax-cmd">- uses:</span> <span class="syntax-string">actions/checkout@v4</span>
+      <span class="syntax-cmd">- name:</span> <span class="syntax-string">Install cora</span>
         <span class="syntax-flag">run:</span> <span class="syntax-string">cargo install cora</span>
-      <span style="color: var(--muted-foreground);">- name:</span> <span class="syntax-string">Run AI code review</span>
+      <span class="syntax-cmd">- name:</span> <span class="syntax-string">Run AI code review</span>
         <span class="syntax-flag">env:</span>
           {@html '<span class="syntax-flag">CORA_API_KEY:</span> <span class="syntax-string">${{ secrets.CORA_API_KEY }}</span>'}
           <span class="syntax-flag">CORA_PROVIDER:</span> <span class="syntax-string">openai</span>
@@ -160,11 +161,11 @@
 
 <!-- Pre-commit Hook -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
-		<span style="color: var(--accent); font-family: var(--font-mono); font-size: 14px;">07</span>
+	<h2 class="flex items-center gap-2">
+		<span class="text-[var(--accent)] font-mono text-sm">07</span>
 		Pre-commit Hook
 	</h2>
-	<p style="font-size: 14px; color: var(--muted-foreground); margin-bottom: 0.75rem;">Install once, then every commit gets reviewed automatically.</p>
+	<p class="text-sm text-[var(--muted-foreground)] mb-3">Install once, then every commit gets reviewed automatically.</p>
 	<div class="docs-terminal">
 		<div class="terminal-bar">
 			<span class="terminal-dot terminal-dot-red"></span>
@@ -176,7 +177,7 @@
 			<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora hook</span> <span class="syntax-string">install</span><br/><br/>
 			<span class="syntax-comment"># Now just commit normally &mdash; cora reviews automatically</span><br/>
 			<span class="syntax-cmd">$</span> <span class="syntax-highlight">git</span> <span class="syntax-string">commit</span> <span class="syntax-flag">-m</span> <span class="syntax-string">"fix: handle edge case in parser"</span><br/>
-			<span style="color: var(--muted-foreground);">cora pre-commit hook running...</span><br/>
+			<span class="syntax-cmd">cora pre-commit hook running...</span><br/>
 			<span class="syntax-success">No issues found &mdash; commit allowed</span>
 		</div>
 	</div>
@@ -184,11 +185,11 @@
 
 <!-- SARIF Upload -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
-		<span style="color: var(--accent); font-family: var(--font-mono); font-size: 14px;">08</span>
+	<h2 class="flex items-center gap-2">
+		<span class="text-[var(--accent)] font-mono text-sm">08</span>
 		SARIF Upload
 	</h2>
-	<p style="font-size: 14px; color: var(--muted-foreground); margin-bottom: 0.75rem;">Generate SARIF output and upload to GitHub Code Scanning.</p>
+	<p class="text-sm text-[var(--muted-foreground)] mb-3">Generate SARIF output and upload to GitHub Code Scanning.</p>
 	<div class="docs-terminal">
 		<div class="terminal-bar">
 			<span class="terminal-dot terminal-dot-red"></span>
@@ -197,9 +198,10 @@
 		</div>
 		<div class="terminal-body">
 			<span class="syntax-comment"># Generate SARIF report and upload</span><br/>
-			<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span> <span class="syntax-flag">--output</span> <span class="syntax-string">sarif</span> <span style="color: var(--muted-foreground);">&gt;</span> <span class="syntax-string">results.sarif</span> <span style="color: var(--muted-foreground);">&amp;&amp;</span> \<br/>
+			<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span> <span class="syntax-flag">--output</span> <span class="syntax-string">sarif</span> <span class="syntax-cmd">&gt;</span> <span class="syntax-string">results.sarif</span> <span class="syntax-cmd">&amp;&amp;</span> \<br/>
 			&nbsp;&nbsp;<span class="syntax-highlight">cora upload-sarif</span> <span class="syntax-string">results.sarif</span><br/><br/>
 			<span class="syntax-success">Uploaded 3 findings to GitHub Code Scanning</span>
 		</div>
 	</div>
 </section>
+</div>

@@ -23,16 +23,17 @@
 	<meta name="description" content="Supported AI providers for cora - OpenAI, Anthropic, Groq, Ollama, Z.AI." />
 </svelte:head>
 
-<h1 class="scroll-reveal" style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2; margin-bottom: 0.5rem;">Providers</h1>
-<p class="scroll-reveal" style="color: var(--muted-foreground); font-size: 14px; margin-bottom: 2.5rem;">cora supports multiple AI providers. Use your own API key &mdash; no subscriptions to us.</p>
+<div class="docs-content">
+<h1 class="scroll-reveal">Providers</h1>
+<p class="scroll-reveal">cora supports multiple AI providers. Use your own API key &mdash; no subscriptions to us.</p>
 
 <!-- Supported Providers -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
+	<h2 class="flex items-center gap-2">
 		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
 		Supported Providers
 	</h2>
-	<div class="glass-card" style="padding: 0; overflow-x: auto;">
+	<div class="glass-card p-0 overflow-x-auto">
 		<table class="compare-table">
 			<thead>
 				<tr>
@@ -45,31 +46,31 @@
 			<tbody>
 				<tr>
 					<td class="cora-col">OpenAI</td>
-					<td><code style="color: var(--muted-foreground);">gpt-4o</code></td>
+					<td><code class="text-[var(--muted-foreground)]">gpt-4o</code></td>
 					<td><code class="syntax-flag">OPENAI_API_KEY</code></td>
 					<td><code class="syntax-flag">OPENAI_BASE_URL</code></td>
 				</tr>
 				<tr>
 					<td class="cora-col">Anthropic</td>
-					<td><code style="color: var(--muted-foreground);">claude-sonnet-4-20250514</code></td>
+					<td><code class="text-[var(--muted-foreground)]">claude-sonnet-4-20250514</code></td>
 					<td><code class="syntax-flag">ANTHROPIC_API_KEY</code></td>
 					<td><code class="syntax-flag">ANTHROPIC_BASE_URL</code></td>
 				</tr>
 				<tr>
 					<td class="cora-col">Groq</td>
-					<td><code style="color: var(--muted-foreground);">llama-3.3-70b-versatile</code></td>
+					<td><code class="text-[var(--muted-foreground)]">llama-3.3-70b-versatile</code></td>
 					<td><code class="syntax-flag">GROQ_API_KEY</code></td>
 					<td><code class="syntax-flag">GROQ_BASE_URL</code></td>
 				</tr>
 				<tr>
 					<td class="cora-col">Ollama</td>
-					<td><code style="color: var(--muted-foreground);">llama3.1</code></td>
-					<td style="color: var(--muted-foreground);">&mdash; (local)</td>
-					<td><code class="syntax-flag">OLLAMA_BASE_URL</code> <span style="color: var(--muted-foreground); font-size: 12px;">(default: http://localhost:11434)</span></td>
+					<td><code class="text-[var(--muted-foreground)]">llama3.1</code></td>
+					<td class="text-[var(--muted-foreground)]">&mdash; (local)</td>
+					<td><code class="syntax-flag">OLLAMA_BASE_URL</code> <span class="text-[var(--muted-foreground)] text-xs">(default: http://localhost:11434)</span></td>
 				</tr>
 				<tr>
 					<td class="cora-col">Z.AI</td>
-					<td><code style="color: var(--muted-foreground);">glm-5.1</code></td>
+					<td><code class="text-[var(--muted-foreground)]">glm-5.1</code></td>
 					<td><code class="syntax-flag">ZAI_API_KEY</code></td>
 					<td><code class="syntax-flag">ZAI_BASE_URL</code></td>
 				</tr>
@@ -80,14 +81,14 @@
 
 <!-- Auto Detection -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
+	<h2 class="flex items-center gap-2">
 		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
 		Auto-Detection
 	</h2>
-	<p style="color: var(--muted-foreground); margin-bottom: 1.5rem;">
+	<p class="text-[var(--muted-foreground)] mb-6">
 		cora automatically detects which provider to use by checking environment variables in this order:
 	</p>
-	<div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem;">
+	<div class="flex flex-col gap-2 mb-6">
 		{#each [
 			'OPENAI_API_KEY \u2192 uses OpenAI',
 			'ANTHROPIC_API_KEY \u2192 uses Anthropic',
@@ -97,22 +98,22 @@
 		] as item, i}
 			<div class="docs-card">
 				<div class="docs-card-number muted">{i + 1}</div>
-				<code style="font-size: 14px; color: var(--muted-foreground);">{item}</code>
+				<code class="text-sm text-[var(--muted-foreground)]">{item}</code>
 			</div>
 		{/each}
 	</div>
-	<p style="font-size: 14px; color: var(--muted-foreground);">
+	<p class="text-sm text-[var(--muted-foreground)]">
 		Override auto-detection with <code class="syntax-highlight">CORA_PROVIDER</code> env var or <code class="syntax-flag">--provider</code> flag.
 	</p>
 </section>
 
 <!-- Usage Examples -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
+	<h2 class="flex items-center gap-2">
 		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
 		Usage Examples
 	</h2>
-	<div style="display: flex; flex-direction: column; gap: 0.75rem;">
+	<div class="flex flex-col gap-3">
 		<div class="docs-terminal">
 			<div class="terminal-bar">
 				<span class="terminal-dot terminal-dot-red"></span>
@@ -162,3 +163,4 @@
 		</div>
 	</div>
 </section>
+</div>

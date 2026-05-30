@@ -23,27 +23,28 @@
 	<meta name="description" content="Complete CLI reference for cora - AI code review tool commands, flags, and options." />
 </svelte:head>
 
-<h1 class="scroll-reveal" style="font-size: 32px; font-weight: 700; color: var(--foreground); letter-spacing: -0.025em; line-height: 1.2; margin-bottom: 0.5rem;">CLI Reference</h1>
-<p class="scroll-reveal" style="color: var(--muted-foreground); font-size: 14px; margin-bottom: 2.5rem;">Complete command reference for the cora CLI.</p>
+<div class="docs-content">
+<h1 class="scroll-reveal">CLI Reference</h1>
+<p class="scroll-reveal">Complete command reference for the cora CLI.</p>
 
 <!-- Global Flags -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
+	<h2 class="flex items-center gap-2">
 		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
 		Global Flags
 	</h2>
-	<div class="glass-card" style="padding: 0; overflow: hidden;">
+	<div class="glass-card p-0 overflow-hidden">
 		<table class="compare-table">
 			<thead>
 				<tr>
-					<th style="width: 33%;">Flag</th>
+					<th class="w-1/3">Flag</th>
 					<th>Description</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr>
-					<td><code class="syntax-flag">--config</code> <code style="color: var(--muted-foreground);">&lt;path&gt;</code></td>
-					<td>Override config file path (default: <code style="color: var(--muted-foreground);">.cora.yaml</code>)</td>
+					<td><code class="syntax-flag">--config</code> <code class="text-[var(--muted-foreground)]">&lt;path&gt;</code></td>
+					<td>Override config file path (default: <code class="text-[var(--muted-foreground)]">.cora.yaml</code>)</td>
 				</tr>
 				<tr>
 					<td><code class="syntax-flag">--json</code></td>
@@ -60,37 +61,37 @@
 
 <!-- Commands -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
+	<h2 class="flex items-center gap-2">
 		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
 		Commands
 	</h2>
-	<div class="glass-card" style="padding: 0; overflow: hidden;">
+	<div class="glass-card p-0 overflow-hidden">
 		<table class="compare-table">
 			<thead>
 				<tr>
-					<th style="width: 33%;">Command</th>
+					<th class="w-1/3">Command</th>
 					<th>Description</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr>
 					<td><code class="syntax-highlight">cora init</code></td>
-					<td>Create <code style="color: var(--muted-foreground);">.cora.yaml</code> config file</td>
+					<td>Create <code class="text-[var(--muted-foreground)]">.cora.yaml</code> config file</td>
 				</tr>
 				<tr>
 					<td><code class="syntax-highlight">cora review --staged</code></td>
 					<td>Review staged git changes (default)</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora review --branch</code> <code style="color: var(--muted-foreground);">&lt;name&gt;</code></td>
+					<td><code class="syntax-highlight">cora review --branch</code> <code class="text-[var(--muted-foreground)]">&lt;name&gt;</code></td>
 					<td>Compare current branch against target</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora review --diff</code> <code style="color: var(--muted-foreground);">&lt;base&gt;..&lt;head&gt;</code></td>
+					<td><code class="syntax-highlight">cora review --diff</code> <code class="text-[var(--muted-foreground)]">&lt;base&gt;..&lt;head&gt;</code></td>
 					<td>Review specific diff range</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora review --file</code> <code style="color: var(--muted-foreground);">&lt;path&gt;</code></td>
+					<td><code class="syntax-highlight">cora review --file</code> <code class="text-[var(--muted-foreground)]">&lt;path&gt;</code></td>
 					<td>Review single file</td>
 				</tr>
 				<tr>
@@ -107,7 +108,7 @@
 				</tr>
 				<tr>
 					<td><code class="syntax-highlight">cora auth login</code></td>
-					<td>Save API key to <code style="color: var(--muted-foreground);">~/.cora/config.toml</code></td>
+					<td>Save API key to <code class="text-[var(--muted-foreground)]">~/.cora/config.toml</code></td>
 				</tr>
 				<tr>
 					<td><code class="syntax-highlight">cora auth status</code></td>
@@ -118,11 +119,11 @@
 					<td>List supported AI providers</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora completion</code> <code style="color: var(--muted-foreground);">&lt;shell&gt;</code></td>
+					<td><code class="syntax-highlight">cora completion</code> <code class="text-[var(--muted-foreground)]">&lt;shell&gt;</code></td>
 					<td>Generate shell completions (bash/zsh/fish/powershell)</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora upload-sarif</code> <code style="color: var(--muted-foreground);">&lt;file&gt;</code></td>
+					<td><code class="syntax-highlight">cora upload-sarif</code> <code class="text-[var(--muted-foreground)]">&lt;file&gt;</code></td>
 					<td>Upload SARIF to GitHub Code Scanning</td>
 				</tr>
 			</tbody>
@@ -132,11 +133,11 @@
 
 <!-- Quick Examples -->
 <section class="docs-section scroll-reveal">
-	<h2 style="display: flex; align-items: center; gap: 0.5rem;">
+	<h2 class="flex items-center gap-2">
 		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
 		Quick Examples
 	</h2>
-	<div style="display: flex; flex-direction: column; gap: 0.75rem;">
+	<div class="flex flex-col gap-3">
 		<div class="docs-terminal">
 			<div class="terminal-bar">
 				<span class="terminal-dot terminal-dot-red"></span>
@@ -186,3 +187,4 @@
 		</div>
 	</div>
 </section>
+</div>
