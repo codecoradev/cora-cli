@@ -149,6 +149,6 @@
 		<a href="/docs/usage" style="font-size: 14px; color: var(--accent); text-decoration: none;">Usage — review modes, output formats, and configuration</a>
 		<a href="/docs/configuration" style="font-size: 14px; color: var(--accent); text-decoration: none;">Configuration — full .cora.yaml reference</a>
 		<a href="/docs/providers" style="font-size: 14px; color: var(--accent); text-decoration: none;">Providers — setting up OpenAI, Anthropic, Groq, Ollama, and Z.AI</a>
-		<a href="/docs/self-hosted" style="font-size: 14px; color: var(--accent); text-decoration: none;">Self-Hosted — running cora with local LLMs and air-gapped environments</a>
+		<a href="/docs/cli-reference" style="font-size: 14px; color: var(--accent); text-decoration: none;">CLI Reference — full command documentation</a>
 	</div>
 </div>
