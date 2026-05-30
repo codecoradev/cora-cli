@@ -7,11 +7,11 @@
 	const isDocs = $derived($page.url.pathname.startsWith('/docs'));
 </script>
 
-<div style="background: var(--background); min-height: 100vh;">
+<div class="bg-background min-h-screen">
 	<!-- Header -->
 	<header class="site-header">
-		<div class="max-w-6xl mx-auto px-6 flex items-center justify-between" style="height: 3.5rem;">
-			<a href="/" class="site-header-link" style="font-weight: 600; color: var(--foreground);">
+		<div class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
+			<a href="/" class="site-header-link font-semibold text-foreground">
 				cora
 			</a>
 
@@ -22,8 +22,14 @@
 				</a>
 			</nav>
 
+			<!-- Desktop CTA -->
 			<div class="hidden sm:block">
-				<a href="/docs/getting-started" class="btn-primary" style="font-size: 13px; padding: 0.375rem 0.875rem;">Get Started</a>
+				<a href="/docs/getting-started" class="btn-primary text-[13px] px-3.5 py-1.5">Get Started</a>
+			</div>
+
+			<!-- Mobile-only CTA -->
+			<div class="sm:hidden">
+				<a href="/docs/getting-started" class="btn-primary text-xs px-3 py-1.5">Get Started</a>
 			</div>
 		</div>
 	</header>
