@@ -44,13 +44,14 @@ runs:
     - name: Run cora review
       shell: bash
       run: |
-        cargo build --release 2>/dev/null
+        cargo build --release
         ./target/release/cora review \
           --base ${{ inputs.base-branch }} \
           --format sarif \
           --severity ${{ inputs.severity }} \
           --quiet \
-          > cora-results.sarif 2>/dev/null || true
+          > cora-results.sarif 2>/dev/null
+        echo "Cora review complete ($(wc -c < cora-results.sarif) bytes)"
 
     - name: Upload SARIF to GitHub Code Scanning
       if: always() && hashFiles('cora-results.sarif') != ''
