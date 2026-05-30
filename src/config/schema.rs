@@ -202,7 +202,10 @@ mod tests {
     #[test]
     fn config_default_focus() {
         let cfg = Config::default();
-        assert_eq!(cfg.focus, vec!["security", "performance", "bugs", "best_practice"]);
+        assert_eq!(
+            cfg.focus,
+            vec!["security", "performance", "bugs", "best_practice"]
+        );
     }
 
     #[test]
@@ -382,10 +385,16 @@ output:
   color: false
 "#;
         let cora = CoraFile::from_str(yaml).unwrap();
-        assert_eq!(cora.provider.as_ref().unwrap().provider.as_deref(), Some("anthropic"));
+        assert_eq!(
+            cora.provider.as_ref().unwrap().provider.as_deref(),
+            Some("anthropic")
+        );
         assert_eq!(cora.focus.as_ref().unwrap().len(), 2);
         assert_eq!(cora.rules.as_ref().unwrap().len(), 1);
-        assert_eq!(cora.output.as_ref().unwrap().format.as_deref(), Some("json"));
+        assert_eq!(
+            cora.output.as_ref().unwrap().format.as_deref(),
+            Some("json")
+        );
         assert_eq!(cora.output.as_ref().unwrap().color, Some(false));
     }
 
@@ -426,7 +435,10 @@ output:
         };
         let yaml = serde_yaml::to_string(&cora).unwrap();
         let back: CoraFile = serde_yaml::from_str(&yaml).unwrap();
-        assert_eq!(back.provider.as_ref().unwrap().provider.as_deref(), Some("ollama"));
+        assert_eq!(
+            back.provider.as_ref().unwrap().provider.as_deref(),
+            Some("ollama")
+        );
         assert_eq!(back.focus.as_ref().unwrap().len(), 1);
     }
 

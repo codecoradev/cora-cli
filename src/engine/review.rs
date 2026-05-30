@@ -38,7 +38,11 @@ async fn review_diff_inner(
     diff: &str,
     stream: bool,
 ) -> Result<ReviewResponse> {
-    debug!(diff_len = diff.len(), stream = stream, "starting diff review");
+    debug!(
+        diff_len = diff.len(),
+        stream = stream,
+        "starting diff review"
+    );
 
     if diff.trim().is_empty() {
         return Ok(ReviewResponse {

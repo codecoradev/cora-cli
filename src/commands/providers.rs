@@ -1,7 +1,7 @@
 use anyhow::Result;
 use colored::Colorize;
 
-use crate::config::providers::{detected_presets, PRESETS};
+use crate::config::providers::{PRESETS, detected_presets};
 
 /// Execute the `cora providers` subcommand.
 pub fn execute_providers() -> Result<()> {
@@ -21,29 +21,13 @@ pub fn execute_providers() -> Result<()> {
         println!("  {} {}", status, preset.name.bold());
 
         if is_detected {
-            println!(
-                "    {}  {} (detected)",
-                "key:".dimmed(),
-                preset.env_key
-            );
+            println!("    {}  {} (detected)", "key:".dimmed(), preset.env_key);
         } else {
-            println!(
-                "    {}  set {} to enable",
-                "key:".dimmed(),
-                preset.env_key
-            );
+            println!("    {}  set {} to enable", "key:".dimmed(), preset.env_key);
         }
 
-        println!(
-            "    {}  {}",
-            "model:".dimmed(),
-            preset.default_model
-        );
-        println!(
-            "    {}  {}",
-            "base:".dimmed(),
-            preset.default_base_url
-        );
+        println!("    {}  {}", "model:".dimmed(), preset.default_model);
+        println!("    {}  {}", "base:".dimmed(), preset.default_base_url);
         println!(
             "    {}  {} = <custom url>",
             "url override:".dimmed(),
@@ -60,7 +44,8 @@ pub fn execute_providers() -> Result<()> {
         );
         println!(
             "{}",
-            "   Or set CORA_API_KEY with --provider to use any OpenAI-compatible endpoint.".dimmed()
+            "   Or set CORA_API_KEY with --provider to use any OpenAI-compatible endpoint."
+                .dimmed()
         );
     } else if detected.len() == 1 {
         println!(

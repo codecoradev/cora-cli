@@ -10,10 +10,7 @@ fn cora_cmd() -> Command {
 
 /// Helper: write content to a temp file and return its path.
 fn write_temp_yaml(content: &str) -> NamedTempFile {
-    let mut file = tempfile::Builder::new()
-        .suffix(".yaml")
-        .tempfile()
-        .unwrap();
+    let mut file = tempfile::Builder::new().suffix(".yaml").tempfile().unwrap();
     write!(file, "{}", content).unwrap();
     file.flush().unwrap();
     file
@@ -36,11 +33,14 @@ fn init_creates_valid_yaml() {
 
     // Verify the created file is valid YAML
     let content = std::fs::read_to_string(&config_path).unwrap();
-    let parsed: serde_yaml::Value = serde_yaml::from_str(&content)
-        .expect("init should create valid YAML");
+    let parsed: serde_yaml::Value =
+        serde_yaml::from_str(&content).expect("init should create valid YAML");
 
     // Verify it has expected top-level keys
-    assert!(parsed.get("provider").is_some(), "should have provider section");
+    assert!(
+        parsed.get("provider").is_some(),
+        "should have provider section"
+    );
     assert!(parsed.get("focus").is_some(), "should have focus section");
     assert!(parsed.get("output").is_some(), "should have output section");
 }
@@ -63,14 +63,8 @@ output:
     let content = std::fs::read_to_string(file.path()).unwrap();
     let parsed: serde_yaml::Value = serde_yaml::from_str(&content).unwrap();
 
-    assert_eq!(
-        parsed["provider"]["provider"].as_str(),
-        Some("anthropic")
-    );
-    assert_eq!(
-        parsed["provider"]["model"].as_str(),
-        Some("claude-3-haiku")
-    );
+    assert_eq!(parsed["provider"]["provider"].as_str(), Some("anthropic"));
+    assert_eq!(parsed["provider"]["model"].as_str(), Some("claude-3-haiku"));
     assert_eq!(parsed["focus"].as_sequence().unwrap().len(), 1);
     assert_eq!(parsed["output"]["format"].as_str(), Some("json"));
 }
@@ -142,7 +136,12 @@ model: test-model
     // We can't run a full review without an API key, but we can verify
     // the --config flag is accepted
     cora_cmd()
-        .args(["--config", &file.path().to_string_lossy(), "review", "--help"])
+        .args([
+            "--config",
+            &file.path().to_string_lossy(),
+            "review",
+            "--help",
+        ])
         .assert()
         .success();
 }

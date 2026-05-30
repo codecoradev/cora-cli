@@ -66,10 +66,16 @@ pub async fn execute_review(
         );
     }
 
-    debug!(diff_len = diff.len(), stream = opts.stream, "running review");
+    debug!(
+        diff_len = diff.len(),
+        stream = opts.stream,
+        "running review"
+    );
 
     // 3. Call the LLM engine
-    let response = crate::engine::review::review_diff_with_stream(config, llm_config, &diff, opts.stream).await?;
+    let response =
+        crate::engine::review::review_diff_with_stream(config, llm_config, &diff, opts.stream)
+            .await?;
 
     // 4. Format output
     let formatter = formatter_for(format);

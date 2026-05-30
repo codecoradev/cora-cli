@@ -220,12 +220,7 @@ pub async fn review_diff_stream(
 ) -> Result<ReviewResponse> {
     let user_prompt = build_review_prompt(diff, focus, rules);
 
-    let raw = chat_completion_stream(
-        llm_config,
-        REVIEW_SYSTEM_PROMPT,
-        &user_prompt,
-    )
-    .await?;
+    let raw = chat_completion_stream(llm_config, REVIEW_SYSTEM_PROMPT, &user_prompt).await?;
 
     let (issues, summary, tokens_used) = parse_review_response(&raw)?;
 
@@ -248,8 +243,8 @@ async fn chat_completion_stream(
     system_prompt: &str,
     user_message: &str,
 ) -> Result<String> {
-    use std::io::Write;
     use futures_util::StreamExt;
+    use std::io::Write;
 
     let client = reqwest::Client::new();
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
@@ -420,7 +415,9 @@ fn build_review_prompt(diff: &str, focus: &[String], rules: &[String]) -> String
 
 /// Parse the LLM response into review issues.
 /// Handles: raw JSON array, JSON wrapped in ```json fences, array|||summary format.
-pub(crate) fn parse_review_response(raw: &str) -> Result<(Vec<ReviewIssue>, String, Option<TokenUsage>)> {
+pub(crate) fn parse_review_response(
+    raw: &str,
+) -> Result<(Vec<ReviewIssue>, String, Option<TokenUsage>)> {
     let (json_str, summary) = extract_json_and_summary(raw);
 
     // Strip markdown code fences if present
