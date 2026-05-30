@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -14,7 +15,7 @@ mod formatters;
 mod git;
 mod hook;
 
-use commands::{auth, hook_cmd, init, review, scan};
+use commands::{auth, completion, hook_cmd, init, providers, review, scan, upload};
 use config::loader;
 use formatters::OutputFormat;
 
@@ -93,6 +94,27 @@ enum Command {
         /// Review unstaged changes (working tree)
         #[clap(long)]
         unstaged: bool,
+
+        /// Stream LLM response tokens in real-time
+        #[clap(long)]
+        stream: bool,
+
+        /// Upload SARIF output to GitHub Code Scanning after review
+        /// (implies --format sarif)
+        #[clap(long)]
+        upload: bool,
+
+        /// GitHub repository for upload (default: from git remote origin)
+        #[clap(long, env = "GITHUB_REPOSITORY")]
+        repo: Option<String>,
+
+        /// GitHub ref for upload (default: current branch)
+        #[clap(long, env = "GITHUB_REF")]
+        ref_name: Option<String>,
+
+        /// GitHub token for upload (default: GITHUB_TOKEN env var)
+        #[clap(long, env = "GITHUB_TOKEN")]
+        token: Option<String>,
     },
 
     /// Scan a project directory for issues
@@ -112,6 +134,28 @@ enum Command {
         /// Additional file extensions to scan
         #[clap(long)]
         extensions: Vec<String>,
+
+        /// Only scan files changed since last scan (uses ~/.cora/scan-cache.json)
+        #[clap(long)]
+        incremental: bool,
+    },
+
+    /// Upload a SARIF file to GitHub Code Scanning
+    UploadSarif {
+        /// Path to SARIF file to upload (default: reads from stdin)
+        file: Option<String>,
+
+        /// GitHub repository (default: from git remote origin)
+        #[clap(long, env = "GITHUB_REPOSITORY")]
+        repo: Option<String>,
+
+        /// GitHub ref (default: current branch)
+        #[clap(long, env = "GITHUB_REF")]
+        ref_name: Option<String>,
+
+        /// GitHub token (default: GITHUB_TOKEN env var)
+        #[clap(long, env = "GITHUB_TOKEN")]
+        token: Option<String>,
     },
 
     /// Create a .cora.yaml config file in the current directory
@@ -131,6 +175,15 @@ enum Command {
     Auth {
         #[command(subcommand)]
         action: AuthAction,
+    },
+
+    /// List detected/available LLM providers
+    Providers,
+
+    /// Generate shell completion scripts
+    Completion {
+        /// Shell name: bash, zsh, fish, or powershell
+        shell: String,
     },
 }
 
@@ -181,11 +234,65 @@ async fn main() -> Result<()> {
 
     // Dispatch based on subcommand
     let exit_code = match cli.command {
-        Command::Review { staged, unpushed, base, unstaged } => {
-            cmd_review(&cli.global, ReviewOpts { staged, unpushed, base, unstaged }).await?
+        Command::Review {
+            staged,
+            unpushed,
+            base,
+            unstaged,
+            stream,
+            upload,
+            repo,
+            ref_name,
+            token,
+        } => {
+            cmd_review(
+                &cli.global,
+                ReviewOpts {
+                    staged,
+                    unpushed,
+                    base,
+                    unstaged,
+                    stream,
+                    upload,
+                    repo,
+                    ref_name,
+                    token,
+                },
+            )
+            .await?
         }
-        Command::Scan { path, include, exclude, extensions } => {
-            cmd_scan(&cli.global, ScanOpts { path, include, exclude, extensions }).await?
+        Command::Scan {
+            path,
+            include,
+            exclude,
+            extensions,
+            incremental,
+        } => {
+            cmd_scan(
+                &cli.global,
+                ScanOpts {
+                    path,
+                    include,
+                    exclude,
+                    extensions,
+                    incremental,
+                },
+            )
+            .await?
+        }
+        Command::UploadSarif {
+            file,
+            repo,
+            ref_name,
+            token,
+        } => {
+            let opts = upload::UploadOptions {
+                file,
+                repo,
+                ref_name,
+                token,
+            };
+            upload::execute_upload(&opts).await?
         }
         Command::Init { force } => {
             if force {
@@ -213,6 +320,14 @@ async fn main() -> Result<()> {
             }
             0
         }
+        Command::Providers => {
+            providers::execute_providers()?;
+            0
+        }
+        Command::Completion { shell } => {
+            completion::execute_completion(&shell)?;
+            0
+        }
     };
 
     std::process::exit(exit_code);
@@ -224,6 +339,11 @@ struct ReviewOpts {
     unpushed: bool,
     base: Option<String>,
     unstaged: bool,
+    stream: bool,
+    upload: bool,
+    repo: Option<String>,
+    ref_name: Option<String>,
+    token: Option<String>,
 }
 
 /// Struct to hold scan options from CLI.
@@ -232,6 +352,7 @@ struct ScanOpts {
     include: Vec<String>,
     exclude: Vec<String>,
     extensions: Vec<String>,
+    incremental: bool,
 }
 
 /// Handle the `review` subcommand.
@@ -248,17 +369,86 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
 
     let llm_config = loader::build_llm_config(&config, globals.api_key.as_deref())?;
 
-    let format = resolve_format(globals.format.as_deref(), &config)?;
+    // If --upload is set, force SARIF format
+    let effective_format = if opts.upload {
+        OutputFormat::Sarif
+    } else {
+        resolve_format(globals.format.as_deref(), &config)?
+    };
 
     let review_opts = review::ReviewOptions {
         staged: opts.staged,
         unpushed: opts.unpushed,
-        base: opts.base,
+        base: opts.base.clone(),
         unstaged: opts.unstaged,
         max_diff_size: None,
+        stream: opts.stream,
     };
 
-    review::execute_review(&config, &llm_config, &review_opts, format).await
+    // When streaming, show a simpler message (no spinner, since we print tokens live)
+    if opts.stream {
+        eprintln!(
+            "{}",
+            format!(
+                "⏳ Streaming review from {} ({})…",
+                llm_config.provider, llm_config.model
+            )
+            .dimmed()
+        );
+    }
+
+    // Execute the review (returns formatted output)
+    let result =
+        review::execute_review(&config, &llm_config, &review_opts, effective_format).await?;
+
+    // Print the formatted output
+    print!("{}", result.output);
+
+    // If --upload, send the SARIF output to GitHub Code Scanning
+    if opts.upload {
+        let sarif_content = result.output;
+        upload_sarif_content(&sarif_content, &opts.repo, &opts.ref_name, &opts.token).await?;
+    }
+
+    Ok(result.exit_code)
+}
+
+/// Upload a SARIF string to GitHub Code Scanning.
+async fn upload_sarif_content(
+    sarif_content: &str,
+    repo: &Option<String>,
+    ref_name: &Option<String>,
+    token: &Option<String>,
+) -> Result<i32> {
+    use std::io::Write;
+
+    // Write SARIF to a temp file and upload it
+    let tmp_dir = std::env::temp_dir();
+    let tmp_path = tmp_dir.join("cora-sarif-upload.json");
+
+    {
+        let mut file = std::fs::File::create(&tmp_path)?;
+        file.write_all(sarif_content.as_bytes())?;
+    }
+
+    println!(
+        "{}",
+        "\n→ Uploading SARIF to GitHub Code Scanning...".cyan()
+    );
+
+    let upload_opts = upload::UploadOptions {
+        file: Some(tmp_path.to_string_lossy().to_string()),
+        repo: repo.clone(),
+        ref_name: ref_name.clone(),
+        token: token.clone(),
+    };
+
+    let exit = upload::execute_upload(&upload_opts).await?;
+
+    // Clean up temp file
+    let _ = std::fs::remove_file(&tmp_path);
+
+    Ok(exit)
 }
 
 /// Handle the `scan` subcommand.
@@ -282,13 +472,19 @@ async fn cmd_scan(globals: &GlobalOptions, opts: ScanOpts) -> Result<i32> {
         include: opts.include,
         exclude: opts.exclude,
         extensions: opts.extensions,
+        incremental: opts.incremental,
     };
 
     scan::execute_scan(&config, &llm_config, &scan_opts, format).await
 }
 
 /// Resolve the output format: CLI flag > config > default.
-fn resolve_format(cli_format: Option<&str>, config: &crate::config::schema::Config) -> Result<OutputFormat> {
-    let fmt_str = cli_format.map(|s| s.to_string()).unwrap_or_else(|| config.output.format.clone());
+fn resolve_format(
+    cli_format: Option<&str>,
+    config: &crate::config::schema::Config,
+) -> Result<OutputFormat> {
+    let fmt_str = cli_format
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| config.output.format.clone());
     OutputFormat::from_str_loose(&fmt_str)
 }

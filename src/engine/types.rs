@@ -57,7 +57,7 @@ impl Severity {
 }
 
 /// Issue type categories
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IssueType {
     Security,
@@ -88,7 +88,9 @@ impl IssueType {
             "security" | "sec" => IssueType::Security,
             "performance" | "perf" => IssueType::Performance,
             "bug" | "bugs" => IssueType::Bug,
-            "best_practice" | "best-practice" | "bestpractice" | "best practice" => IssueType::BestPractice,
+            "best_practice" | "best-practice" | "bestpractice" | "best practice" => {
+                IssueType::BestPractice
+            }
             "style" | "formatting" => IssueType::Style,
             "suggestion" | "info" => IssueType::Suggestion,
             _ => IssueType::Suggestion, // fallback
@@ -111,6 +113,251 @@ pub struct ReviewIssue {
     pub body: String,
     #[serde(default)]
     pub suggested_fix: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─── Severity::from_str_lossy ───
+
+    #[test]
+    fn severity_critical() {
+        assert_eq!(Severity::from_str_lossy("critical"), Severity::Critical);
+    }
+
+    #[test]
+    fn severity_major() {
+        assert_eq!(Severity::from_str_lossy("major"), Severity::Major);
+    }
+
+    #[test]
+    fn severity_minor() {
+        assert_eq!(Severity::from_str_lossy("minor"), Severity::Minor);
+    }
+
+    #[test]
+    fn severity_info() {
+        assert_eq!(Severity::from_str_lossy("info"), Severity::Info);
+    }
+
+    #[test]
+    fn severity_case_insensitive() {
+        assert_eq!(Severity::from_str_lossy("CRITICAL"), Severity::Critical);
+        assert_eq!(Severity::from_str_lossy("Major"), Severity::Major);
+        assert_eq!(Severity::from_str_lossy("MINOR"), Severity::Minor);
+        assert_eq!(Severity::from_str_lossy("Info"), Severity::Info);
+    }
+
+    #[test]
+    fn severity_unknown_falls_back_to_info() {
+        assert_eq!(Severity::from_str_lossy("unknown"), Severity::Info);
+        assert_eq!(Severity::from_str_lossy(""), Severity::Info);
+        assert_eq!(Severity::from_str_lossy("foobar"), Severity::Info);
+    }
+
+    // ─── Severity ordering ───
+
+    #[test]
+    fn severity_ordering() {
+        // Ord is by discriminant: Critical(0) < Major(1) < Minor(2) < Info(3)
+        assert!(Severity::Critical < Severity::Major);
+        assert!(Severity::Major < Severity::Minor);
+        assert!(Severity::Minor < Severity::Info);
+    }
+
+    // ─── Severity display ───
+
+    #[test]
+    fn severity_display() {
+        assert_eq!(format!("{}", Severity::Critical), "critical");
+        assert_eq!(format!("{}", Severity::Major), "major");
+        assert_eq!(format!("{}", Severity::Minor), "minor");
+        assert_eq!(format!("{}", Severity::Info), "info");
+    }
+
+    #[test]
+    fn severity_label() {
+        assert_eq!(Severity::Critical.label(), "CRITICAL");
+        assert_eq!(Severity::Major.label(), "MAJOR");
+        assert_eq!(Severity::Minor.label(), "MINOR");
+        assert_eq!(Severity::Info.label(), "INFO");
+    }
+
+    #[test]
+    fn severity_icon() {
+        assert!(!Severity::Critical.icon().is_empty());
+        assert!(!Severity::Major.icon().is_empty());
+        assert!(!Severity::Minor.icon().is_empty());
+        assert!(!Severity::Info.icon().is_empty());
+    }
+
+    // ─── IssueType::from_str_lossy ───
+
+    #[test]
+    fn issue_type_security() {
+        assert_eq!(IssueType::from_str_lossy("security"), IssueType::Security);
+    }
+
+    #[test]
+    fn issue_type_sec_alias() {
+        assert_eq!(IssueType::from_str_lossy("sec"), IssueType::Security);
+    }
+
+    #[test]
+    fn issue_type_performance() {
+        assert_eq!(IssueType::from_str_lossy("performance"), IssueType::Performance);
+    }
+
+    #[test]
+    fn issue_type_perf_alias() {
+        assert_eq!(IssueType::from_str_lossy("perf"), IssueType::Performance);
+    }
+
+    #[test]
+    fn issue_type_bug() {
+        assert_eq!(IssueType::from_str_lossy("bug"), IssueType::Bug);
+    }
+
+    #[test]
+    fn issue_type_bugs_alias() {
+        assert_eq!(IssueType::from_str_lossy("bugs"), IssueType::Bug);
+    }
+
+    #[test]
+    fn issue_type_best_practice_variants() {
+        assert_eq!(IssueType::from_str_lossy("best_practice"), IssueType::BestPractice);
+        assert_eq!(IssueType::from_str_lossy("best-practice"), IssueType::BestPractice);
+        assert_eq!(IssueType::from_str_lossy("bestpractice"), IssueType::BestPractice);
+        assert_eq!(IssueType::from_str_lossy("best practice"), IssueType::BestPractice);
+    }
+
+    #[test]
+    fn issue_type_style() {
+        assert_eq!(IssueType::from_str_lossy("style"), IssueType::Style);
+    }
+
+    #[test]
+    fn issue_type_formatting_alias() {
+        assert_eq!(IssueType::from_str_lossy("formatting"), IssueType::Style);
+    }
+
+    #[test]
+    fn issue_type_suggestion() {
+        assert_eq!(IssueType::from_str_lossy("suggestion"), IssueType::Suggestion);
+    }
+
+    #[test]
+    fn issue_type_info_alias() {
+        assert_eq!(IssueType::from_str_lossy("info"), IssueType::Suggestion);
+    }
+
+    #[test]
+    fn issue_type_unknown_falls_back() {
+        assert_eq!(IssueType::from_str_lossy("xyz"), IssueType::Suggestion);
+        assert_eq!(IssueType::from_str_lossy(""), IssueType::Suggestion);
+    }
+
+    // ─── IssueType display ───
+
+    #[test]
+    fn issue_type_display() {
+        assert_eq!(format!("{}", IssueType::Security), "security");
+        assert_eq!(format!("{}", IssueType::Performance), "performance");
+        assert_eq!(format!("{}", IssueType::Bug), "bug");
+        assert_eq!(format!("{}", IssueType::BestPractice), "best_practice");
+        assert_eq!(format!("{}", IssueType::Style), "style");
+        assert_eq!(format!("{}", IssueType::Suggestion), "suggestion");
+    }
+
+    // ─── LLMConfig::default ───
+
+    #[test]
+    fn llm_config_default() {
+        let cfg = LLMConfig::default();
+        assert!(cfg.api_key.is_empty());
+        assert_eq!(cfg.base_url, "https://api.openai.com/v1");
+        assert_eq!(cfg.model, "gpt-4o-mini");
+        assert_eq!(cfg.provider, "openai");
+    }
+
+    // ─── TokenUsage::default ───
+
+    #[test]
+    fn token_usage_default() {
+        let usage = TokenUsage::default();
+        assert_eq!(usage.input_tokens, 0);
+        assert_eq!(usage.output_tokens, 0);
+        assert!((usage.estimated_cost_usd - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ─── Exit codes ───
+
+    #[test]
+    fn exit_codes_are_correct() {
+        assert_eq!(EXIT_OK, 0);
+        assert_eq!(EXIT_ERROR, 1);
+        assert_eq!(EXIT_BLOCKED, 2);
+        assert_eq!(EXIT_AUTH_ERROR, 3);
+        assert!(EXIT_OK < EXIT_ERROR);
+        assert!(EXIT_ERROR < EXIT_BLOCKED);
+        assert!(EXIT_BLOCKED < EXIT_AUTH_ERROR);
+    }
+
+    // ─── Constants ───
+
+    #[test]
+    fn max_diff_size() {
+        assert_eq!(MAX_DIFF_SIZE, 50 * 1024);
+    }
+
+    #[test]
+    fn max_scan_batch_files() {
+        assert_eq!(MAX_SCAN_BATCH_FILES, 20);
+    }
+
+    #[test]
+    fn max_scan_batch_chars() {
+        assert_eq!(MAX_SCAN_BATCH_CHARS, 80_000);
+    }
+
+    // ─── ReviewIssue serde round-trip ───
+
+    #[test]
+    fn review_issue_roundtrip() {
+        let issue = ReviewIssue {
+            file: "src/main.rs".to_string(),
+            line: Some(42),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "SQL Injection".to_string(),
+            body: "Details here".to_string(),
+            suggested_fix: Some("Use params".to_string()),
+        };
+        let json = serde_json::to_string(&issue).unwrap();
+        let back: ReviewIssue = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.file, issue.file);
+        assert_eq!(back.line, issue.line);
+        assert_eq!(back.severity, issue.severity);
+        assert_eq!(back.issue_type, issue.issue_type);
+        assert_eq!(back.title, issue.title);
+        assert_eq!(back.body, issue.body);
+        assert_eq!(back.suggested_fix, issue.suggested_fix);
+    }
+
+    #[test]
+    fn review_issue_with_type_alias_deserializes() {
+        let json = r#"{"file":"a.rs","severity":"info","type":"security","title":"T","body":"B"}"#;
+        let issue: ReviewIssue = serde_json::from_str(json).unwrap();
+        assert_eq!(issue.issue_type.as_deref(), Some("security"));
+    }
+
+    #[test]
+    fn review_issue_with_issue_type_deserializes() {
+        let json = r#"{"file":"a.rs","severity":"info","issue_type":"performance","title":"T","body":"B"}"#;
+        let issue: ReviewIssue = serde_json::from_str(json).unwrap();
+        assert_eq!(issue.issue_type.as_deref(), Some("performance"));
+    }
 }
 
 /// Token usage tracking

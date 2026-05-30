@@ -16,10 +16,7 @@ pub fn execute_hook_install() -> Result<()> {
         "{}",
         "   The hook will run `cora review --staged --format compact` before each commit.".dimmed()
     );
-    println!(
-        "{}",
-        "   Use `cora hook uninstall` to remove.".dimmed()
-    );
+    println!("{}", "   Use `cora hook uninstall` to remove.".dimmed());
 
     Ok(())
 }
@@ -28,10 +25,7 @@ pub fn execute_hook_install() -> Result<()> {
 pub fn execute_hook_uninstall() -> Result<()> {
     hook::uninstall_hook()?;
 
-    println!(
-        "{} Pre-commit hook removed.",
-        "✅".green().bold()
-    );
+    println!("{} Pre-commit hook removed.", "✅".green().bold());
 
     Ok(())
 }

@@ -16,7 +16,29 @@ pub async fn review_diff(
     llm_config: &LLMConfig,
     diff: &str,
 ) -> Result<ReviewResponse> {
-    debug!(diff_len = diff.len(), "starting diff review");
+    review_diff_inner(config, llm_config, diff, false).await
+}
+
+/// Run a code review on the given diff string with optional streaming.
+///
+/// When `stream` is true, LLM tokens are printed to stdout in real-time.
+#[instrument(skip_all)]
+pub async fn review_diff_with_stream(
+    config: &Config,
+    llm_config: &LLMConfig,
+    diff: &str,
+    stream: bool,
+) -> Result<ReviewResponse> {
+    review_diff_inner(config, llm_config, diff, stream).await
+}
+
+async fn review_diff_inner(
+    config: &Config,
+    llm_config: &LLMConfig,
+    diff: &str,
+    stream: bool,
+) -> Result<ReviewResponse> {
+    debug!(diff_len = diff.len(), stream = stream, "starting diff review");
 
     if diff.trim().is_empty() {
         return Ok(ReviewResponse {
@@ -27,13 +49,11 @@ pub async fn review_diff(
         });
     }
 
-    let mut response = llm::review_diff(
-        llm_config,
-        diff,
-        &config.focus,
-        &config.rules,
-    )
-    .await?;
+    let mut response = if stream {
+        llm::review_diff_stream(llm_config, diff, &config.focus, &config.rules).await?
+    } else {
+        llm::review_diff(llm_config, diff, &config.focus, &config.rules).await?
+    };
 
     // Apply ignore rules: filter out issues matching ignored patterns
     response.issues = apply_ignore_rules(response.issues, &config.ignore.rules);
@@ -66,7 +86,11 @@ pub async fn scan_project(
     files_count: usize,
     lines_count: usize,
 ) -> Result<ScanResponse> {
-    debug!(files = files_count, lines = lines_count, "starting project scan");
+    debug!(
+        files = files_count,
+        lines = lines_count,
+        "starting project scan"
+    );
 
     if files_content.trim().is_empty() {
         return Ok(ScanResponse {
@@ -79,13 +103,8 @@ pub async fn scan_project(
         });
     }
 
-    let (issues, summary, tokens_used) = llm::scan_files(
-        llm_config,
-        files_content,
-        &config.focus,
-        &config.rules,
-    )
-    .await?;
+    let (issues, summary, tokens_used) =
+        llm::scan_files(llm_config, files_content, &config.focus, &config.rules).await?;
 
     // Apply ignore rules
     let issues = apply_ignore_rules(issues, &config.ignore.rules);
@@ -94,7 +113,11 @@ pub async fn scan_project(
     let min_severity = config.hook.min_severity_level();
     let should_block = issues.iter().any(|issue| issue.severity >= min_severity);
 
-    let default_summary = format!("Scanned {} files, found {} issues.", files_count, issues.len());
+    let default_summary = format!(
+        "Scanned {} files, found {} issues.",
+        files_count,
+        issues.len()
+    );
     Ok(ScanResponse {
         issues,
         files_scanned: files_count,
@@ -114,7 +137,8 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
     issues.retain(|issue| {
         !ignore_rules.iter().any(|pattern| {
             let pattern_lower = pattern.to_lowercase();
-            let issue_type_lower = issue.issue_type
+            let issue_type_lower = issue
+                .issue_type
                 .as_ref()
                 .map(|t| t.to_string())
                 .unwrap_or_default()

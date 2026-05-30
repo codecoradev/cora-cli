@@ -6,8 +6,7 @@ use glob::Pattern;
 
 /// Open the git repository at or above the current working directory.
 pub fn open_repo() -> Result<Repository> {
-    Repository::discover(std::env::current_dir()?)
-        .context("not inside a git repository")
+    Repository::discover(std::env::current_dir()?).context("not inside a git repository")
 }
 
 /// List all tracked files in the repository.
@@ -68,9 +67,16 @@ pub fn list_changed_files(base_branch: &str) -> Result<Vec<String>> {
 
     let _head_oid = repo.head()?.peel_to_commit()?.id();
 
-    let base_tree = repo.find_tree(base_oid).context("failed to find base tree")?;
-    let head_commit = repo.head()?.peel_to_commit().context("HEAD is not a commit")?;
-    let head_tree = repo.find_tree(head_commit.tree_id()).context("failed to find HEAD tree")?;
+    let base_tree = repo
+        .find_tree(base_oid)
+        .context("failed to find base tree")?;
+    let head_commit = repo
+        .head()?
+        .peel_to_commit()
+        .context("HEAD is not a commit")?;
+    let head_tree = repo
+        .find_tree(head_commit.tree_id())
+        .context("failed to find HEAD tree")?;
 
     let mut opts = git2::DiffOptions::new();
     let diff = repo
@@ -149,11 +155,7 @@ pub fn list_all_changed_files() -> Result<Vec<String>> {
 }
 
 /// Filter a list of file paths using glob include/exclude patterns.
-pub fn filter_by_globs(
-    files: &[String],
-    include: &[String],
-    exclude: &[String],
-) -> Vec<String> {
+pub fn filter_by_globs(files: &[String], include: &[String], exclude: &[String]) -> Vec<String> {
     let include_patterns: Vec<Pattern> = include
         .iter()
         .filter_map(|p| Pattern::new(p).ok())

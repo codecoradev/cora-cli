@@ -1,4 +1,3 @@
-
 use anyhow::{Context, Result};
 use tracing::debug;
 
@@ -62,16 +61,13 @@ pub fn uninstall_hook() -> Result<()> {
     }
 
     if backup_path.is_file() {
-        std::fs::rename(&backup_path, &hook_path)
-            .context("failed to restore backup hook")?;
+        std::fs::rename(&backup_path, &hook_path).context("failed to restore backup hook")?;
         debug!("restored hook from backup");
     } else if pre_backup.is_file() {
-        std::fs::rename(&pre_backup, &hook_path)
-            .context("failed to restore pre-cora backup")?;
+        std::fs::rename(&pre_backup, &hook_path).context("failed to restore pre-cora backup")?;
         debug!("restored pre-cora hook from backup");
     } else {
-        std::fs::remove_file(&hook_path)
-            .context("failed to remove hook")?;
+        std::fs::remove_file(&hook_path).context("failed to remove hook")?;
         debug!("removed cora hook");
     }
 
