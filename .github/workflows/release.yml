@@ -87,6 +87,8 @@ jobs:
     name: Publish to crates.io
     needs: []
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
