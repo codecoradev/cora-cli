@@ -103,7 +103,7 @@
 			</p>
 
 			<!-- Install Terminal -->
-			<div class="max-w-md w-full mx-auto mt-10 animate-fade-in-up delay-300">
+			<div class="max-w-lg w-full mx-auto mt-10 animate-fade-in-up delay-300">
 				<div class="terminal" style="position: relative;">
 					<div class="terminal-header">
 						<span class="terminal-dot terminal-dot-red"></span>
@@ -509,8 +509,8 @@
 					<span style="font-size: 12px; color: var(--muted-foreground); margin-left: 0.75rem;">MIT License</span>
 				</div>
 				<div class="flex items-center gap-6">
-					<a href="https://github.com/ajianaz/cora-cli" target="_blank" rel="noopener" style="font-size: 14px; color: var(--muted-foreground); text-decoration: none; transition: color 0.2s ease;">GitHub</a>
-					<a href="/docs" style="font-size: 14px; color: var(--muted-foreground); text-decoration: none; transition: color 0.2s ease;">Docs</a>
+					<a href="https://github.com/ajianaz/cora-cli" target="_blank" rel="noopener" style="font-size: 14px; color: var(--muted-foreground); text-decoration: none; transition: color 0.2s ease; min-height: 44px; display: inline-flex; align-items: center;">GitHub</a>
+					<a href="/docs" style="font-size: 14px; color: var(--muted-foreground); text-decoration: none; transition: color 0.2s ease; min-height: 44px; display: inline-flex; align-items: center;">Docs</a>
 				</div>
 			</div>
 		</footer>

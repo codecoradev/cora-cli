@@ -389,8 +389,8 @@ body {
   font-family: var(--font-sans);
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease;
-  min-height: 32px;
-  min-width: 32px;
+  min-height: 44px;
+  min-width: 44px;
   justify-content: center;
 }
 
@@ -440,6 +440,14 @@ body {
 .compare-table thead .cora-col {
   background: oklch(0.65 0.22 270 / 0.1);
   color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .compare-table th,
+  .compare-table td {
+    padding: 0.5rem 0.75rem;
+    font-size: 13px;
+  }
 }
 
 /* ---- Syntax Highlighting ---- */
