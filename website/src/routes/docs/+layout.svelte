@@ -8,9 +8,8 @@
 		{ href: '/docs/installation', label: 'Installation' },
 		{ href: '/docs/usage', label: 'Usage' },
 		{ href: '/docs/configuration', label: 'Configuration' },
-		{ href: '/docs/providers', label: 'Providers' },
-		{ href: '/docs/self-hosted', label: 'Self-Hosted' },
-		{ href: '/docs/examples', label: 'Examples' },
+	{ href: '/docs/providers', label: 'Providers' },
+	{ href: '/docs/examples', label: 'Examples' },
 		{ href: '/docs/cli-reference', label: 'CLI Reference' },
 	];
 </script>
