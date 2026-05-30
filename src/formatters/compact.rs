@@ -63,3 +63,116 @@ fn format_issue_compact(issue: &ReviewIssue) -> String {
 
     format!("[{sev}] {loc}: {}\n", issue.title)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::{ReviewIssue, ScanResponse, Severity};
+
+    fn sample_issue() -> ReviewIssue {
+        ReviewIssue {
+            file: "src/main.rs".to_string(),
+            line: Some(42),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "SQL Injection".to_string(),
+            body: "Details here.".to_string(),
+            suggested_fix: None,
+        }
+    }
+
+    fn sample_response() -> ReviewResponse {
+        ReviewResponse {
+            issues: vec![sample_issue()],
+            summary: "Summary".to_string(),
+            tokens_used: None,
+            should_block: false,
+        }
+    }
+
+    fn empty_response() -> ReviewResponse {
+        ReviewResponse {
+            issues: vec![],
+            summary: String::new(),
+            tokens_used: None,
+            should_block: false,
+        }
+    }
+
+    fn sample_scan_response() -> ScanResponse {
+        ScanResponse {
+            issues: vec![sample_issue()],
+            summary: String::new(),
+            files_scanned: 10,
+            lines_scanned: 500,
+            tokens_used: None,
+            should_block: false,
+        }
+    }
+
+    #[test]
+    fn format_review_contains_issue_count() {
+        let fmt = CompactFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("Found 1 issue"));
+    }
+
+    #[test]
+    fn format_review_contains_file() {
+        let fmt = CompactFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("src/main.rs"));
+    }
+
+    #[test]
+    fn format_review_contains_title() {
+        let fmt = CompactFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("SQL Injection"));
+    }
+
+    #[test]
+    fn format_review_empty_issues() {
+        let fmt = CompactFormatter;
+        let output = fmt.format_review(&empty_response()).unwrap();
+        assert!(output.contains("No issues found"));
+    }
+
+    #[test]
+    fn format_review_contains_severity() {
+        let fmt = CompactFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("CRITICAL"));
+    }
+
+    #[test]
+    fn format_scan_contains_file_count() {
+        let fmt = CompactFormatter;
+        let output = fmt.format_scan(&sample_scan_response()).unwrap();
+        assert!(output.contains("10 files"));
+    }
+
+    #[test]
+    fn format_issue_compact_no_line() {
+        let issue = ReviewIssue {
+            file: "README.md".to_string(),
+            line: None,
+            severity: Severity::Info,
+            issue_type: None,
+            title: "Typo".to_string(),
+            body: String::new(),
+            suggested_fix: None,
+        };
+        let line = format_issue_compact(&issue);
+        assert!(line.contains("README.md"));
+        // When no line, file is directly followed by ": title" not "file:N: title"
+        // Output is "[INFO] README.md: Typo\n"
+        assert!(!line.contains("README.md:1"));
+    }
+
+    #[test]
+    fn format_issue_compact_with_line() {
+        let line = format_issue_compact(&sample_issue());
+        assert!(line.contains("src/main.rs:42"));
+    }
+}

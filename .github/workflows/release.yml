@@ -25,18 +25,10 @@ jobs:
             runner: ubuntu-latest
             artifact_name: cora
             asset_name: cora-linux-aarch64
-          - target: x86_64-unknown-linux-gnu
-            runner: ubuntu-latest
-            artifact_name: cora
-            asset_name: cora-linux-x86_64
           - target: aarch64-apple-darwin
             runner: macos-latest
             artifact_name: cora
             asset_name: cora-macos-aarch64
-          - target: x86_64-apple-darwin
-            runner: macos-latest
-            artifact_name: cora
-            asset_name: cora-macos-x86_64
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
             artifact_name: cora.exe
@@ -79,6 +71,9 @@ jobs:
     needs: build-release
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -92,16 +87,77 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  publish-crates-io:
-    name: Publish to crates.io
+  update-homebrew-formula:
+    name: Update Homebrew Formula
     needs: build-release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Extract version and download info
+        id: info
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Publish to crates.io
-        run: cargo publish --token ${{ secrets.CRATES_TOKEN }}
+          # Get the macOS ARM64 asset download URL (will be available after release)
+          # We use the GitHub API to get the release asset URL
+          REPO="${GITHUB_REPOSITORY}"
+          TAG="${GITHUB_REF_NAME}"
+
+          # Wait briefly for release to be fully published
+          sleep 5
+
+          # Get the download URL for the macOS ARM64 tarball
+          ASSET_URL=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${REPO}/releases/tags/${TAG}" \
+            | jq -r '.assets[] | select(.name | contains("macos-aarch64")) | .url')
+
+          # Get SHA256 of the macOS ARM64 tarball
+          MACOS_SHA256=$(curl -sL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/octet-stream" \
+            "${ASSET_URL}" | sha256sum | awk '{print $1}')
+
+          echo "macos_sha256=${MACOS_SHA256}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Homebrew formula
+        run: |
+          cat > cora.rb << FORMULA
+          class Cora < Formula
+            desc "CLI-first AI code review — BYOK, diff/scan/branch, pre-commit hooks"
+            homepage "https://github.com/ajianaz/cora-cli"
+            version "${{ steps.info.outputs.version }}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/ajianaz/cora-cli/releases/download/${{ steps.info.outputs.version }}/cora-macos-aarch64.tar.gz"
+                sha256 "${{ steps.info.outputs.macos_sha256 }}"
+              end
+            end
+
+            def install
+              bin.install "cora"
+            end
+
+            test do
+              shell_output("#{bin}/cora --version")
+            end
+          end
+          FORMULA
+
+      - name: Push formula to homebrew-cora repo
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone https://x-access-token:${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/ajianaz/homebrew-cora.git /tmp/homebrew-cora
+          cp cora.rb /tmp/homebrew-cora/Formula/cora.rb
+          cd /tmp/homebrew-cora
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/cora.rb
+          git commit -m "Update cora to ${{ steps.info.outputs.version }}" || echo "No changes to commit"
+          git push

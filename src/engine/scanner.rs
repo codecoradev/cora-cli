@@ -26,11 +26,9 @@ const MAX_FILES_PER_BATCH: usize = 20;
 
 /// File extensions to include in scans by default (source code).
 const DEFAULT_EXTENSIONS: &[&str] = &[
-    "rs", "py", "js", "ts", "tsx", "jsx", "go", "java", "kt", "rb",
-    "c", "cpp", "h", "hpp", "cs", "php", "swift", "scala", "vue",
-    "svelte", "sh", "bash", "zsh", "ps1",
-    "toml", "yaml", "yml", "json", "sql", "graphql", "proto",
-    "md", "rst", "txt", "html", "css", "scss", "less",
+    "rs", "py", "js", "ts", "tsx", "jsx", "go", "java", "kt", "rb", "c", "cpp", "h", "hpp", "cs",
+    "php", "swift", "scala", "vue", "svelte", "sh", "bash", "zsh", "ps1", "toml", "yaml", "yml",
+    "json", "sql", "graphql", "proto", "md", "rst", "txt", "html", "css", "scss", "less",
 ];
 
 /// Walk a project directory, respecting .gitignore, and collect scannable files.
@@ -48,7 +46,8 @@ pub fn walk_project(
     );
 
     // Build extension set
-    let mut extensions: BTreeSet<String> = DEFAULT_EXTENSIONS.iter().map(|s| s.to_string()).collect();
+    let mut extensions: BTreeSet<String> =
+        DEFAULT_EXTENSIONS.iter().map(|s| s.to_string()).collect();
     for ext in extra_extensions {
         extensions.insert(ext.trim_start_matches('.').to_lowercase());
     }
