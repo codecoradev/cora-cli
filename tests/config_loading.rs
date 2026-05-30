@@ -33,8 +33,8 @@ fn init_creates_valid_yaml() {
 
     // Verify the created file is valid YAML
     let content = std::fs::read_to_string(&config_path).unwrap();
-    let parsed: serde_yaml::Value =
-        serde_yaml::from_str(&content).expect("init should create valid YAML");
+    let parsed: serde_yml::Value =
+        serde_yml::from_str(&content).expect("init should create valid YAML");
 
     // Verify it has expected top-level keys
     assert!(
@@ -59,9 +59,9 @@ output:
 "#;
     let file = write_temp_yaml(yaml);
 
-    // Parse and verify using serde_yaml directly
+    // Parse and verify using serde_yml directly
     let content = std::fs::read_to_string(file.path()).unwrap();
-    let parsed: serde_yaml::Value = serde_yaml::from_str(&content).unwrap();
+    let parsed: serde_yml::Value = serde_yml::from_str(&content).unwrap();
 
     assert_eq!(parsed["provider"]["provider"].as_str(), Some("anthropic"));
     assert_eq!(parsed["provider"]["model"].as_str(), Some("claude-3-haiku"));
@@ -88,11 +88,11 @@ ignore:
     let content = std::fs::read_to_string(file.path()).unwrap();
 
     // Parse to Value, serialize back
-    let val: serde_yaml::Value = serde_yaml::from_str(&content).unwrap();
-    let reser = serde_yaml::to_string(&val).unwrap();
+    let val: serde_yml::Value = serde_yml::from_str(&content).unwrap();
+    let reser = serde_yml::to_string(&val).unwrap();
 
     // Re-parse the re-serialized version to ensure round-trip
-    let val2: serde_yaml::Value = serde_yaml::from_str(&reser).unwrap();
+    let val2: serde_yml::Value = serde_yml::from_str(&reser).unwrap();
     assert_eq!(val2["provider"]["provider"], val["provider"]["provider"]);
     assert_eq!(val2["hook"]["mode"], val["hook"]["mode"]);
     assert_eq!(
@@ -106,7 +106,7 @@ fn config_file_empty_yaml_is_valid() {
     let yaml = "";
     let file = write_temp_yaml(yaml);
     let content = std::fs::read_to_string(file.path()).unwrap();
-    let parsed: serde_yaml::Value = serde_yaml::from_str(&content).unwrap();
+    let parsed: serde_yml::Value = serde_yml::from_str(&content).unwrap();
     assert!(parsed.is_null());
 }
 
@@ -118,7 +118,7 @@ focus:
 "#;
     let file = write_temp_yaml(yaml);
     let content = std::fs::read_to_string(file.path()).unwrap();
-    let parsed: serde_yaml::Value = serde_yaml::from_str(&content).unwrap();
+    let parsed: serde_yml::Value = serde_yml::from_str(&content).unwrap();
     assert_eq!(parsed["focus"].as_sequence().unwrap().len(), 1);
     assert!(parsed.get("provider").is_none());
 }
