@@ -7,7 +7,7 @@
  / /  / / /_/ / /__ | |/ |/ /| |/ /__/
 /_/  /_/\____/\___/ |__/|__/_/|_|\___/
 
- cora-cli — AI Code Review
+ AI-Powered Code Review CLI
 ```
 
 [![CI](https://github.com/ajianaz/cora-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/ajianaz/cora-cli/actions/workflows/ci.yml)
