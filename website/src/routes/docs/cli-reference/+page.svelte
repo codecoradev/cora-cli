@@ -47,8 +47,28 @@
 					<td>Override config file path (default: <code class="text-[var(--muted-foreground)]">.cora.yaml</code>)</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-flag">--json</code></td>
-					<td>Output results as JSON</td>
+					<td><code class="syntax-flag">--format</code> <code class="text-[var(--muted-foreground)]">&lt;fmt&gt;</code></td>
+					<td>Output format: pretty, json, compact, sarif</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-flag">--no-color</code></td>
+					<td>Disable colored output</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-flag">--provider</code> <code class="text-[var(--muted-foreground)]">&lt;name&gt;</code></td>
+					<td>Override provider</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-flag">--model</code> <code class="text-[var(--muted-foreground)]">&lt;name&gt;</code></td>
+					<td>Override model</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-flag">--base-url</code> <code class="text-[var(--muted-foreground)]">&lt;url&gt;</code></td>
+					<td>Override API base URL</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-flag">--api-key</code> <code class="text-[var(--muted-foreground)]">&lt;key&gt;</code></td>
+					<td>Override API key</td>
 				</tr>
 				<tr>
 					<td><code class="syntax-flag">--verbose</code></td>
@@ -79,24 +99,52 @@
 					<td>Create <code class="text-[var(--muted-foreground)]">.cora.yaml</code> config file</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora review --staged</code></td>
-					<td>Review staged git changes (default)</td>
+					<td><code class="syntax-highlight">cora review</code></td>
+					<td>Review code changes (default: staged files)</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora review --branch</code> <code class="text-[var(--muted-foreground)]">&lt;name&gt;</code></td>
+					<td><code class="syntax-highlight">cora review --staged</code></td>
+					<td>Review staged git changes explicitly</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">cora review --unstaged</code></td>
+					<td>Review unstaged working changes</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">cora review --unpushed</code></td>
+					<td>Review unpushed commits</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">cora review --base</code> <code class="text-[var(--muted-foreground)]">&lt;branch&gt;</code></td>
 					<td>Compare current branch against target</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora review --diff</code> <code class="text-[var(--muted-foreground)]">&lt;base&gt;..&lt;head&gt;</code></td>
-					<td>Review specific diff range</td>
+					<td><code class="syntax-highlight">cora review --commit</code> <code class="text-[var(--muted-foreground)]">&lt;ref&gt;</code></td>
+					<td>Review specific commit or range</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora review --file</code> <code class="text-[var(--muted-foreground)]">&lt;path&gt;</code></td>
-					<td>Review single file</td>
+					<td><code class="syntax-highlight">cora review --diff-file</code> <code class="text-[var(--muted-foreground)]">&lt;path&gt;</code></td>
+					<td>Review from a diff file</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora scan</code> <code class="syntax-flag">[--incremental]</code></td>
-					<td>Full project scan</td>
+					<td><code class="syntax-highlight">cora review --upload</code></td>
+					<td>Review and upload SARIF to GitHub Code Scanning</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">cora scan</code> <code class="text-[var(--muted-foreground)]">&lt;path&gt;</code></td>
+					<td>Scan files for issues</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">cora scan .</code> <code class="syntax-flag">[--incremental]</code></td>
+					<td>Scan only changed files</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">cora config show</code></td>
+					<td>Show resolved configuration</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">cora config set</code> <code class="text-[var(--muted-foreground)]">&lt;key&gt; &lt;value&gt;</code></td>
+					<td>Set a config value</td>
 				</tr>
 				<tr>
 					<td><code class="syntax-highlight">cora hook install</code></td>
@@ -115,16 +163,20 @@
 					<td>Check current auth status</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora providers</code></td>
-					<td>List supported AI providers</td>
+					<td><code class="syntax-highlight">cora auth remove</code></td>
+					<td>Remove stored API key</td>
 				</tr>
 				<tr>
-					<td><code class="syntax-highlight">cora completion</code> <code class="text-[var(--muted-foreground)]">&lt;shell&gt;</code></td>
-					<td>Generate shell completions (bash/zsh/fish/powershell)</td>
+					<td><code class="syntax-highlight">cora providers</code></td>
+					<td>List detected AI providers</td>
 				</tr>
 				<tr>
 					<td><code class="syntax-highlight">cora upload-sarif</code> <code class="text-[var(--muted-foreground)]">&lt;file&gt;</code></td>
 					<td>Upload SARIF to GitHub Code Scanning</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">cora completion</code> <code class="text-[var(--muted-foreground)]">&lt;shell&gt;</code></td>
+					<td>Generate shell completions (bash/zsh/fish)</td>
 				</tr>
 			</tbody>
 		</table>
@@ -158,7 +210,7 @@
 			</div>
 			<div class="terminal-body">
 				<span class="syntax-comment"># Compare your feature branch against main</span><br/>
-				<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--branch</span> <span class="syntax-string">main</span>
+				<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--base</span> <span class="syntax-string">main</span>
 			</div>
 		</div>
 

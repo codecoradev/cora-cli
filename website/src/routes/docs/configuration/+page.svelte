@@ -70,7 +70,7 @@
 		<div class="terminal-body">
 <pre class="whitespace-pre"><span class="syntax-comment"># cora project config</span>
 <span class="syntax-highlight">review:</span>
-  <span class="syntax-flag">severity:</span> <span class="syntax-string">warning</span>          <span class="syntax-comment"># minimum severity: info, warning, error</span>
+  <span class="syntax-flag">severity:</span> <span class="syntax-string">warning</span>          <span class="syntax-comment"># minimum severity: info, minor, major, critical</span>
   <span class="syntax-flag">max_issues:</span> <span class="text-[var(--foreground)]">20</span>             <span class="syntax-comment"># max issues to report</span>
   <span class="syntax-flag">focus:</span> <span class="syntax-string">security,performance</span>  <span class="syntax-comment"># focus areas</span>
 
@@ -119,6 +119,30 @@
 					<td><code class="syntax-highlight">CORA_BASE_URL</code></td>
 					<td>Custom API base URL</td>
 				</tr>
+				<tr>
+					<td><code class="syntax-highlight">CORA_CONFIG</code></td>
+					<td>Path to config file</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">CORA_FORMAT</code></td>
+					<td>Output format (pretty, json, compact, sarif)</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">CORA_NO_COLOR</code></td>
+					<td>Disable colored output</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">GITHUB_TOKEN</code></td>
+					<td>GitHub token for SARIF upload</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">GITHUB_REPOSITORY</code></td>
+					<td>GitHub repo for SARIF upload</td>
+				</tr>
+				<tr>
+					<td><code class="syntax-highlight">GITHUB_REF</code></td>
+					<td>GitHub ref for SARIF upload</td>
+				</tr>
 			</tbody>
 		</table>
 	</div>
@@ -150,7 +174,9 @@
 <span class="syntax-flag">GROQ_API_KEY</span>=<span class="syntax-string">gsk_...</span>
 
 <span class="syntax-comment"># Ollama (local, no key needed)</span>
-<span class="syntax-flag">OLLAMA_BASE_URL</span>=<span class="syntax-string">http://localhost:11434</span>
+<span class="syntax-flag">OLLAMA_HOST</span>=<span class="syntax-string">http://localhost:11434</span>
+<span class="syntax-comment"># Optional: OLLAMA_API_KEY if your Ollama instance requires auth</span>
+<span class="syntax-flag">OLLAMA_API_KEY</span>=<span class="syntax-string">...</span>
 
 <span class="syntax-comment"># Z.AI</span>
 <span class="syntax-flag">ZAI_API_KEY</span>=<span class="syntax-string">...</span></pre>

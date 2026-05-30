@@ -45,6 +45,19 @@ pub fn get_unpushed_diff() -> Result<String> {
     git_cmd(&["log", "-p", "@{u}..HEAD"])
 }
 
+/// Get the diff for a commit reference.
+///
+/// - If the ref contains `..` (e.g. `HEAD~3..HEAD`), uses `git diff <ref>`.
+/// - Otherwise (e.g. `HEAD`, `abc123`), uses `git show <ref> --format=""` to
+///   get just the diff without commit metadata.
+pub fn get_commit_diff(ref_str: &str) -> Result<String> {
+    if ref_str.contains("..") {
+        git_cmd(&["diff", ref_str])
+    } else {
+        git_cmd(&["show", ref_str, "--format="])
+    }
+}
+
 /// Get the current branch name.
 pub fn get_current_branch() -> Result<String> {
     let output = Command::new("git")

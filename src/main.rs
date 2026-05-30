@@ -15,7 +15,7 @@ mod formatters;
 mod git;
 mod hook;
 
-use commands::{auth, completion, hook_cmd, init, providers, review, scan, upload};
+use commands::{auth, completion, config_cmd, hook_cmd, init, providers, review, scan, upload};
 use config::loader;
 use formatters::OutputFormat;
 
@@ -91,6 +91,14 @@ enum Command {
         #[clap(long)]
         base: Option<String>,
 
+        /// Review changes from a git commit ref (e.g. HEAD, HEAD~3..HEAD, abc123)
+        #[clap(long)]
+        commit: Option<String>,
+
+        /// Read diff from a file instead of git
+        #[clap(long)]
+        diff_file: Option<String>,
+
         /// Review unstaged changes (working tree)
         #[clap(long)]
         unstaged: bool,
@@ -98,6 +106,14 @@ enum Command {
         /// Stream LLM response tokens in real-time
         #[clap(long)]
         stream: bool,
+
+        /// Suppress all output except the formatted review result
+        #[clap(long, short)]
+        quiet: bool,
+
+        /// Filter results by minimum severity (info, minor, major, critical)
+        #[clap(long, value_parser = ["info", "minor", "major", "critical"])]
+        severity: Option<String>,
 
         /// Upload SARIF output to GitHub Code Scanning after review
         /// (implies --format sarif)
@@ -138,6 +154,10 @@ enum Command {
         /// Only scan files changed since last scan (uses ~/.cora/scan-cache.json)
         #[clap(long)]
         incremental: bool,
+
+        /// Focus areas for review (overrides config)
+        #[clap(long)]
+        focus: Vec<String>,
     },
 
     /// Upload a SARIF file to GitHub Code Scanning
@@ -177,6 +197,12 @@ enum Command {
         action: AuthAction,
     },
 
+    /// View or set configuration
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+
     /// List detected/available LLM providers
     Providers,
 
@@ -203,6 +229,19 @@ enum AuthAction {
     Status,
     /// Remove the stored API key
     Remove,
+}
+
+#[derive(Subcommand, Debug)]
+enum ConfigAction {
+    /// Show the current resolved configuration
+    Show,
+    /// Set a configuration value (keys: model, provider, format, severity)
+    Set {
+        /// Configuration key to set
+        key: String,
+        /// Value to assign
+        value: String,
+    },
 }
 
 #[tokio::main]
@@ -238,8 +277,12 @@ async fn main() -> Result<()> {
             staged,
             unpushed,
             base,
+            commit,
+            diff_file,
             unstaged,
             stream,
+            quiet,
+            severity,
             upload,
             repo,
             ref_name,
@@ -251,8 +294,12 @@ async fn main() -> Result<()> {
                     staged,
                     unpushed,
                     base,
+                    commit,
+                    diff_file,
                     unstaged,
                     stream,
+                    quiet,
+                    severity,
                     upload,
                     repo,
                     ref_name,
@@ -267,6 +314,7 @@ async fn main() -> Result<()> {
             exclude,
             extensions,
             incremental,
+            focus,
         } => {
             cmd_scan(
                 &cli.global,
@@ -276,6 +324,7 @@ async fn main() -> Result<()> {
                     exclude,
                     extensions,
                     incremental,
+                    focus,
                 },
             )
             .await?
@@ -320,6 +369,18 @@ async fn main() -> Result<()> {
             }
             0
         }
+        Command::Config { action } => {
+            match action {
+                ConfigAction::Show => {
+                    config_cmd::execute_config_show()?;
+                    0
+                }
+                ConfigAction::Set { key, value } => {
+                    config_cmd::execute_config_set(&key, &value)?;
+                    0
+                }
+            }
+        }
         Command::Providers => {
             providers::execute_providers()?;
             0
@@ -338,8 +399,12 @@ struct ReviewOpts {
     staged: bool,
     unpushed: bool,
     base: Option<String>,
+    commit: Option<String>,
+    diff_file: Option<String>,
     unstaged: bool,
     stream: bool,
+    quiet: bool,
+    severity: Option<String>,
     upload: bool,
     repo: Option<String>,
     ref_name: Option<String>,
@@ -353,6 +418,7 @@ struct ScanOpts {
     exclude: Vec<String>,
     extensions: Vec<String>,
     incremental: bool,
+    focus: Vec<String>,
 }
 
 /// Handle the `review` subcommand.
@@ -380,13 +446,17 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         staged: opts.staged,
         unpushed: opts.unpushed,
         base: opts.base.clone(),
+        commit: opts.commit.clone(),
+        diff_file: opts.diff_file.clone(),
         unstaged: opts.unstaged,
         max_diff_size: None,
         stream: opts.stream,
+        quiet: opts.quiet,
+        severity: opts.severity.clone(),
     };
 
-    // When streaming, show a simpler message (no spinner, since we print tokens live)
-    if opts.stream {
+    // When streaming and not quiet, show a simpler message
+    if opts.stream && !opts.quiet {
         eprintln!(
             "{}",
             format!(
@@ -473,6 +543,7 @@ async fn cmd_scan(globals: &GlobalOptions, opts: ScanOpts) -> Result<i32> {
         exclude: opts.exclude,
         extensions: opts.extensions,
         incremental: opts.incremental,
+        focus: opts.focus,
     };
 
     scan::execute_scan(&config, &llm_config, &scan_opts, format).await

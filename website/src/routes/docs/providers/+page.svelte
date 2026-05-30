@@ -46,8 +46,8 @@
 			<tbody>
 				<tr>
 					<td class="cora-col">OpenAI</td>
-					<td><code class="text-[var(--muted-foreground)]">gpt-4o</code></td>
-					<td><code class="syntax-flag">OPENAI_API_KEY</code></td>
+						<td><code class="text-[var(--muted-foreground)]">gpt-4o-mini</code></td>
+						<td><code class="syntax-flag">OPENAI_API_KEY</code></td>
 					<td><code class="syntax-flag">OPENAI_BASE_URL</code></td>
 				</tr>
 				<tr>
@@ -58,7 +58,7 @@
 				</tr>
 				<tr>
 					<td class="cora-col">Groq</td>
-					<td><code class="text-[var(--muted-foreground)]">llama-3.3-70b-versatile</code></td>
+						<td><code class="text-[var(--muted-foreground)]">llama-3.1-8b-instant</code></td>
 					<td><code class="syntax-flag">GROQ_API_KEY</code></td>
 					<td><code class="syntax-flag">GROQ_BASE_URL</code></td>
 				</tr>
@@ -66,7 +66,7 @@
 					<td class="cora-col">Ollama</td>
 					<td><code class="text-[var(--muted-foreground)]">llama3.1</code></td>
 					<td class="text-[var(--muted-foreground)]">&mdash; (local)</td>
-					<td><code class="syntax-flag">OLLAMA_BASE_URL</code> <span class="text-[var(--muted-foreground)] text-xs">(default: http://localhost:11434)</span></td>
+					<td><code class="syntax-flag">OLLAMA_HOST</code> <span class="text-[var(--muted-foreground)] text-xs">(default: http://localhost:11434)</span></td>
 				</tr>
 				<tr>
 					<td class="cora-col">Z.AI</td>
@@ -94,7 +94,7 @@
 			'ANTHROPIC_API_KEY \u2192 uses Anthropic',
 			'GROQ_API_KEY \u2192 uses Groq',
 			'ZAI_API_KEY \u2192 uses Z.AI',
-			'OLLAMA_BASE_URL \u2192 uses Ollama (localhost)'
+			'OLLAMA_HOST \u2192 uses Ollama (localhost)'
 		] as item, i}
 			<div class="docs-card">
 				<div class="docs-card-number muted">{i + 1}</div>

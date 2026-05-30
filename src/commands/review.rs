@@ -1,8 +1,9 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use colored::Colorize;
 use tracing::debug;
 
 use crate::config::schema::Config;
+use crate::engine::Severity;
 use crate::formatters::{OutputFormat, formatter_for};
 use crate::git;
 
@@ -19,12 +20,20 @@ pub struct ReviewOptions {
     pub unpushed: bool,
     /// Review diff against a base branch.
     pub base: Option<String>,
+    /// Review diff from a git commit reference (e.g. HEAD, HEAD~3..HEAD, abc123).
+    pub commit: Option<String>,
+    /// Read diff from a file instead of git.
+    pub diff_file: Option<String>,
     /// Review unstaged changes.
     pub unstaged: bool,
     /// Maximum diff size before refusing (0 = use config default).
     pub max_diff_size: Option<usize>,
     /// Stream LLM response tokens to stdout in real-time.
     pub stream: bool,
+    /// Suppress all output except the formatted review result.
+    pub quiet: bool,
+    /// Minimum severity level for filtering issues.
+    pub severity: Option<String>,
 }
 
 /// Result of a review command execution.
@@ -49,6 +58,12 @@ pub async fn execute_review(
     let diff = get_diff(opts, config)?;
 
     if diff.trim().is_empty() {
+        if opts.quiet {
+            return Ok(ReviewResult {
+                exit_code: EXIT_OK,
+                output: String::new(),
+            });
+        }
         let output = format!("{}\n", "No changes to review.".yellow());
         return Ok(ReviewResult {
             exit_code: EXIT_OK,
@@ -77,11 +92,21 @@ pub async fn execute_review(
         crate::engine::review::review_diff_with_stream(config, llm_config, &diff, opts.stream)
             .await?;
 
-    // 4. Format output
-    let formatter = formatter_for(format);
-    let output = formatter.format_review(&response)?;
+    // 4. Filter by severity if specified
+    let min_severity = if let Some(ref sev) = opts.severity {
+        Severity::from_str_lossy(sev)
+    } else {
+        config.hook.min_severity_level()
+    };
 
-    // 5. Return exit code
+    let mut filtered_response = response.clone();
+    filtered_response.issues.retain(|i| i.severity <= min_severity);
+
+    // 5. Format output
+    let formatter = formatter_for(format);
+    let output = formatter.format_review(&filtered_response)?;
+
+    // 6. Return exit code
     let exit_code = if response.should_block && config.hook.mode == "block" {
         EXIT_BLOCKED
     } else {
@@ -93,6 +118,17 @@ pub async fn execute_review(
 
 /// Get the diff based on the provided options.
 fn get_diff(opts: &ReviewOptions, _config: &Config) -> Result<String> {
+    if let Some(ref diff_file) = opts.diff_file {
+        let path = std::path::Path::new(diff_file);
+        if !path.exists() {
+            anyhow::bail!("diff file not found: {}", diff_file);
+        }
+        return std::fs::read_to_string(path)
+            .with_context(|| format!("failed to read diff file: {}", diff_file));
+    }
+    if let Some(ref commit_ref) = opts.commit {
+        return git::get_commit_diff(commit_ref);
+    }
     if opts.staged {
         git::get_staged_diff()
     } else if opts.unpushed {
