@@ -1,19 +1,13 @@
 <div align="center">
 
-```
-    __  ___          _       ___  ____
-   /  |/  /___  ____| |     / _ \/ __/
-  / /|_/ / __ \/ __/| | /| / , _/ /__
- / /  / / /_/ / /__ | |/ |/ /| |/ /__/
-/_/  /_/\____/\___/ |__/|__/_/|_|\___/
+<img src="assets/icon.png" alt="cora" width="120" />
 
- AI-Powered Code Review CLI
-```
+**AI-Powered Code Review CLI**
 
 [![CI](https://github.com/ajianaz/cora-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/ajianaz/cora-cli/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/cora-cli.svg)](https://crates.io/crates/cora-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/Rust-1.75+-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.85+-orange.svg)](https://www.rust-lang.org/)
 
 **Cora** is a fast, opinionated CLI tool that uses LLMs to review your code changes — directly in your terminal, CI/CD pipeline, or git hooks.
 
