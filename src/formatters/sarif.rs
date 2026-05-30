@@ -1,5 +1,4 @@
 use anyhow::Result;
-use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::engine::{ReviewIssue, ReviewResponse, ScanResponse, Severity};
@@ -27,24 +26,33 @@ impl Formatter for SarifFormatter {
 
 /// Build a SARIF v2.1.0 document from a list of issues.
 fn build_sarif(issues: &[ReviewIssue]) -> Value {
-    let rules: Vec<Value> = issues
-        .iter()
-        .map(|issue| {
-            json!({
-                "id": issue.issue_type.as_ref().map(|t| t.to_string()).unwrap_or_else(|| "unknown".to_string()),
-                "shortDescription": {
-                    "text": issue.title.clone()
-                },
-                "fullDescription": {
-                    "text": issue.body.clone()
-                },
-                "helpUri": null,
-                "defaultConfiguration": {
-                    "level": severity_to_sarif_level(&issue.severity)
-                }
-            })
-        })
-        .collect();
+    // Deduplicate rules by id (multiple issues can share same rule)
+    let mut rule_map = serde_json::Map::new();
+    for issue in issues {
+        let rule_id = issue
+            .issue_type
+            .as_ref()
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        if !rule_map.contains_key(&rule_id) {
+            rule_map.insert(
+                rule_id.clone(),
+                json!({
+                    "id": rule_id,
+                    "shortDescription": {
+                        "text": issue.title.clone()
+                    },
+                    "fullDescription": {
+                        "text": issue.body.clone()
+                    },
+                    "defaultConfiguration": {
+                        "level": severity_to_sarif_level(&issue.severity)
+                    }
+                }),
+            );
+        }
+    }
+    let rules: Vec<Value> = rule_map.into_values().collect();
 
     let results: Vec<Value> = issues
         .iter()
@@ -73,17 +81,23 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
 
             // Add fix suggestion if available
             if let Some(ref fix) = issue.suggested_fix {
-                let mut replacements = Vec::new();
-                replacements.push(json!({
-                    "description": {
-                        "text": "Suggested fix"
-                    }
-                    // We don't have a full replacement spec, but we can include the text
-                }));
                 result["fixes"] = json!([{
                     "description": {
                         "text": fix.clone()
-                    }
+                    },
+                    "artifactChanges": [{
+                        "artifactLocation": {
+                            "uri": issue.file.clone()
+                        },
+                        "replacements": [{
+                            "deletedRegion": {
+                                "startLine": issue.line.unwrap_or(1)
+                            },
+                            "insertedContent": {
+                                "text": fix.clone()
+                            }
+                        }]
+                    }]
                 }]);
             }
 
@@ -103,12 +117,7 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
                     "rules": rules
                 }
             },
-            "results": results,
-            "invocation": {
-                "executionSuccessful": true,
-                "startTimeUtc": Utc::now().to_rfc3339(),
-                "endTimeUtc": Utc::now().to_rfc3339()
-            }
+            "results": results
         }]
     })
 }
