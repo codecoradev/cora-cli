@@ -8,8 +8,8 @@
 		{ href: '/docs/installation', label: 'Installation' },
 		{ href: '/docs/usage', label: 'Usage' },
 		{ href: '/docs/configuration', label: 'Configuration' },
-	{ href: '/docs/providers', label: 'Providers' },
-	{ href: '/docs/examples', label: 'Examples' },
+		{ href: '/docs/providers', label: 'Providers' },
+		{ href: '/docs/examples', label: 'Examples' },
 		{ href: '/docs/cli-reference', label: 'CLI Reference' },
 	];
 </script>
@@ -18,21 +18,21 @@
 	<title>Docs — cora</title>
 </svelte:head>
 
-<div style="min-height: 100vh; display: flex; background: var(--background);">
+<div class="min-h-screen flex bg-[var(--background)]">
 
 	<!-- Sidebar (desktop) -->
 	<aside class="docs-sidebar hidden lg:block">
-		<div style="padding: 1.5rem;">
-			<a href="/" class="flex items-center gap-2 mb-8" style="color: var(--muted-foreground); text-decoration: none; font-size: 14px; transition: color 0.2s ease; min-height: 44px; display: flex; align-items: center;">
+		<div class="p-6">
+			<a href="/" class="flex items-center gap-2 mb-8 text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 hover:text-[var(--foreground)]">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
 				Back to Home
 			</a>
 
-			<div style="margin-bottom: 1.5rem;">
-				<a href="/docs" style="font-size: 18px; font-weight: 600; color: var(--accent); text-decoration: none; letter-spacing: -0.01em; line-height: 1.35;">cora docs</a>
+			<div class="mb-6">
+				<a href="/docs" class="text-lg font-semibold text-[var(--accent)] no-underline -tracking-tight leading-tight">cora docs</a>
 			</div>
 
-			<nav style="display: flex; flex-direction: column; gap: 0.25rem;">
+			<nav class="flex flex-col gap-1">
 				{#each navLinks as link}
 					<a
 						href={link.href}
@@ -48,7 +48,7 @@
 
 	<!-- Mobile nav -->
 	<nav class="mobile-docs-nav">
-		<a href="/" style="color: var(--muted-foreground);" aria-label="Back to Home">
+		<a href="/" class="text-[var(--muted-foreground)]" aria-label="Back to Home">
 			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
 		</a>
 		{#each navLinks as link}
@@ -59,8 +59,8 @@
 	</nav>
 
 	<!-- Main content -->
-	<main style="flex: 1; min-width: 0;">
-		<div style="max-width: 48rem; margin: 0 auto; padding: 3rem 2rem;">
+	<main class="flex-1 min-w-0">
+		<div class="max-w-3xl mx-auto px-8 py-12">
 			{@render children()}
 		</div>
 	</main>
