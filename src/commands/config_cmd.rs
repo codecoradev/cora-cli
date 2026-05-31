@@ -118,7 +118,20 @@ pub fn execute_config_set(key: &str, value: &str, global: bool) -> Result<()> {
             .with_context(|| format!("failed to create {}", dir.display()))?;
         dir.join("config.yaml")
     } else {
-        PathBuf::from(".cora.yaml")
+        // Warn if not inside a git project (could create orphan file)
+        if std::process::Command::new("git")
+            .args(["rev-parse", "--git-dir"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map_or(false, |s| s.success())
+        {
+            PathBuf::from(".cora.yaml")
+        } else {
+            anyhow::bail!(
+                "Not in a git project. Use --global to set config in ~/.cora/config.yaml, or cd into a git repo first."
+            );
+        }
     };
 
     // Load existing file or start fresh
@@ -158,6 +171,13 @@ pub fn execute_config_set(key: &str, value: &str, global: bool) -> Result<()> {
     // Write back as YAML
     let yaml = serde_yaml_ng::to_string(&cora).context("failed to serialize config to YAML")?;
     std::fs::write(&path, &yaml).with_context(|| format!("failed to write {}", path.display()))?;
+
+    // Restrict permissions for global config (defense-in-depth)
+    #[cfg(unix)]
+    if global {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
 
     let scope = if global { "global" } else { "project" };
     println!(
