@@ -11,6 +11,8 @@
 
 **Cora** is a fast, opinionated CLI tool that uses LLMs to review your code changes — directly in your terminal, CI/CD pipeline, or git hooks.
 
+🌐 [Website](https://codecora.dev)
+
 </div>
 
 ---
@@ -275,38 +277,194 @@ providers:
 
 ## 🔗 CI/CD Integration
 
-### GitHub Actions
+Cora ships with **two reusable composite actions** for GitHub Actions. Both handle downloading the binary from GitHub Releases, running the review, posting PR comments, and optionally uploading SARIF. The difference is how LLM secrets are provided.
+
+### Which Action to Use?
+
+| | **cora-review** | **cora-review-simple** |
+|--|:--|:--|
+| Secret source | Infisical (OIDC) | GitHub Secrets |
+| Keys in GitHub? | ❌ Zero | ✅ 3 secrets |
+| Setup complexity | Infisical account needed | Copy-paste |
+| Best for | Teams with Infisical | Quick setup, personal repos |
+
+---
+
+### Option A: `cora-review` — Infisical OIDC (recommended)
+
+Zero API keys stored in GitHub. Secrets are pulled at runtime from [Infisical](https://infisical.com/) via OIDC.
+
+#### Step 1: Copy the action
+
+```bash
+mkdir -p .github/actions/cora-review
+curl -sL https://raw.githubusercontent.com/ajianaz/cora-cli/develop/.github/actions/cora-review/action.yml \
+  -o .github/actions/cora-review/action.yml
+```
+
+#### Step 2: Add required secrets
+
+| Secret | Description |
+|--------|-------------|
+| `INFISICAL_IDENTITY_ID` | Infisical OIDC identity ID |
+| `CORA_API_KEY` | LLM API key (set in Infisical, not GitHub) |
+| `CORA_BASE_URL` | API base URL (set in Infisical, not GitHub) |
+| `CORA_MODEL` | Model ID (set in Infisical, not GitHub) |
+
+#### Step 3: Add the CI job
 
 ```yaml
-# .github/workflows/review.yml
-name: Code Review
+# .github/workflows/ci.yml
+name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    branches: [develop]
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+  id-token: write   # Required for Infisical OIDC
 
 jobs:
-  review:
+  cora-review:
+    name: Cora Review
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install cora-cli
-        run: cargo install cora-cli
-
-      - name: Run code review
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          cora review --base origin/develop --format sarif --output-file results.sarif
-
-      - name: Upload SARIF to GitHub Code Scanning
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
+      - uses: ./.github/actions/cora-review
         with:
-          sarif_file: results.sarif
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          infisical-identity-id: ${{ secrets.INFISICAL_IDENTITY_ID }}
+          # Optional:
+          # upload-sarif: 'true'        # Enable GitHub Code Scanning
+          # cora-version: 'v0.1.2'      # Pin version (default: latest)
+          # severity: 'warning'          # Minimum severity (default: major)
+          # base-branch: 'origin/main'   # Diff target (default: origin/develop)
+```
+
+---
+
+### Option B: `cora-review-simple` — GitHub Secrets
+
+Set API keys directly as GitHub repository secrets. No external service needed.
+
+#### Step 1: Copy the action
+
+```bash
+mkdir -p .github/actions/cora-review-simple
+curl -sL https://raw.githubusercontent.com/ajianaz/cora-cli/develop/.github/actions/cora-review-simple/action.yml \
+  -o .github/actions/cora-review-simple/action.yml
+```
+
+#### Step 2: Add required secrets
+
+Go to your repo → **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Example Value |
+|--------|---------------|
+| `CORA_API_KEY` | `sk-...` (OpenAI, Anthropic, etc.) |
+| `CORA_BASE_URL` | `https://api.openai.com/v1` |
+| `CORA_MODEL` | `gpt-4o` |
+
+#### Step 3: Add the CI job
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  cora-review:
+    name: Cora Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/cora-review-simple
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cora-api-key: ${{ secrets.CORA_API_KEY }}
+          cora-base-url: ${{ secrets.CORA_BASE_URL }}
+          cora-model: ${{ secrets.CORA_MODEL }}
+          # Optional:
+          # upload-sarif: 'true'        # Enable GitHub Code Scanning
+          # cora-version: 'v0.1.2'      # Pin version (default: latest)
+          # severity: 'warning'          # Minimum severity (default: major)
+          # base-branch: 'origin/main'   # Diff target (default: origin/develop)
+```
+
+---
+
+### Configuration Reference (both actions)
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `github-token` | *(required)* | `secrets.GITHUB_TOKEN` for PR comments |
+| `cora-version` | `latest` | Version tag or `latest` for auto-resolve via API |
+| `upload-sarif` | `false` | Upload SARIF to GitHub Code Scanning |
+| `severity` | `major` | Minimum severity: `info`, `minor`, `major`, `critical` |
+| `base-branch` | `origin/develop` | Branch to diff against |
+
+### How It Works
+
+```
+PR opened
+  → Resolve cora version (GitHub API if "latest", or use pinned tag)
+  → Download cora binary from GitHub Releases
+  → Fetch LLM secrets (Infisical OIDC or GitHub Secrets)
+  → Run cora review --base <branch> --format sarif
+  → Parse SARIF → post structured PR comment (updates on re-run)
+  → Optionally upload SARIF to GitHub Code Scanning
+  → Exit 1 if error-level findings found (blocks merge)
+```
+
+### Block Merge on Critical Findings
+
+Add `Cora Review` as a required status check in your **Branch Protection** or **Repository Ruleset**. When cora finds error-level issues, the job fails and merge is blocked.
+
+### Pre-commit Hook
+
+Add cora as a git pre-commit hook for instant feedback:
+
+```bash
+cora hook install
+```
+
+Or add it manually to `.git/hooks/pre-commit`:
+
+```bash
+#!/bin/sh
+cora review --quiet --severity critical
+if [ $? -ne 0 ]; then
+  echo "❌ Code review found critical issues. Commit blocked."
+  exit 1
+fi
 ```
 
 ### GitLab CI
@@ -326,33 +484,41 @@ code-review:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 ```
 
-### Pre-commit Hook
+### ⚠️ Troubleshooting
 
-Add cora as a git pre-commit hook for instant feedback:
+<details>
+<summary>Common issues and solutions</summary>
+
+**Q: `tar: Child returned status 1` — binary download fails**
+
+Release archives contain a binary named `cora` (since v0.1.2). Older releases used the target triple name. Always use `latest` or pin to `>=v0.1.2`.
+
+**Q: `latest` version doesn't resolve**
+
+The action resolves `latest` via GitHub API: `GET /repos/ajianaz/cora-cli/releases/latest` → extracts `tag_name`. This requires internet access on the runner. If rate-limited, pin a specific version instead.
+
+**Q: Branch protection blocks merge but no failing checks visible in UI**
+
+GitHub has two layers: **Branch Protection** (API) and **Repository Rulesets** (UI). Ruleset checks may not appear in the PR checks list. Verify via API:
 
 ```bash
-# Install as pre-commit hook
-cora hook install
-
-# Review only staged files before each commit
-# This runs automatically on `git commit`
-
-# Remove the hook
-cora hook uninstall
+gh api repos/{owner}/{repo}/rulesets/{id}
+gh api repos/{owner}/{repo}/branches/{branch}/protection
 ```
 
-Or add it manually to `.git/hooks/pre-commit`:
+**Q: Chicken-and-egg — action needs new binary but can't merge to release it**
 
-```bash
-#!/bin/sh
-# cora-cli pre-commit hook
-cora review --quiet --severity critical
-if [ $? -ne 0 ]; then
-  echo "❌ Code review found critical issues. Commit blocked."
-  echo "   Run 'cora review' to see details, or use 'git commit --no-verify' to skip."
-  exit 1
-fi
-```
+Temporarily remove `Cora Review` from your ruleset's required checks, merge the fix, release, then re-add.
+
+**Q: Private repos get 403 on Branch Protection API**
+
+GitHub Free doesn't support Branch Protection API for private repos. Use **Repository Rulesets** instead.
+
+**Q: Should cora-cli review itself in CI?**
+
+No — the action downloads the released binary, which doesn't include in-progress changes. Self-review always reviews the *previous* release against itself.
+
+</details>
 
 ## 🆚 Positioning: How Cora Compares
 
