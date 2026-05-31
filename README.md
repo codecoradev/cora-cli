@@ -11,7 +11,7 @@
 
 **Cora** is a fast, opinionated CLI tool that uses LLMs to review your code changes — directly in your terminal, CI/CD pipeline, or git hooks.
 
-🌐 [Website](https://codecora.dev)
+🌐 [Website](https://cora.ajianaz.dev)
 
 </div>
 
