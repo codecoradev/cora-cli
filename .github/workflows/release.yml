@@ -64,9 +64,9 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir -p release
-          cp target/${{ matrix.target }}/release/cora release/${{ matrix.artifact }}
+          cp target/${{ matrix.target }}/release/cora release/cora
           cd release
-          tar czf ${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}.${{ matrix.ext }} ${{ matrix.artifact }}
+          tar czf ${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}.${{ matrix.ext }} cora
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -151,10 +151,10 @@ jobs:
 
           | Platform | File |
           |----------|------|
-          | Linux (x86_64) | `cora-VERSION-x86_64-unknown-linux-gnu.tar.gz` |
-          | Linux (ARM64) | `cora-VERSION-aarch64-unknown-linux-gnu.tar.gz` |
-          | macOS (Apple Silicon) | `cora-VERSION-aarch64-apple-darwin.tar.gz` |
-          | Windows (x86_64) | `cora-VERSION-x86_64-pc-windows-msvc.zip` |
+          | Linux (x86_64) | `cora-x86_64-unknown-linux-gnu-VERSION.tar.gz` |
+          | Linux (ARM64) | `cora-aarch64-unknown-linux-gnu-VERSION.tar.gz` |
+          | macOS (Apple Silicon) | `cora-aarch64-apple-darwin-VERSION.tar.gz` |
+          | Windows (x86_64) | `cora-x86_64-pc-windows-msvc-VERSION.zip` |
 
           ### 🚀 Quick Start
 
@@ -162,8 +162,10 @@ jobs:
           # Install via cargo
           cargo install cora
 
-          # Or download binary
-          curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-v0.1.1.tar.gz | tar xz
+          # Or download binary (extracts as 'cora')
+          curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-VERSION.tar.gz | tar xz
+          chmod +x cora
+          sudo mv cora /usr/local/bin/
 
           # Init project
           cora init
