@@ -10,6 +10,10 @@ inputs:
     description: 'Minimum severity to report (info, minor, major, critical)'
     required: false
     default: 'major'
+  cora-version:
+    description: 'cora-cli version tag (default: latest release)'
+    required: false
+    default: 'v0.1.1'
   infisical-identity-id:
     description: 'Infisical OIDC identity ID (from secret INFISICAL_IDENTITY_ID)'
     required: true
@@ -41,11 +45,30 @@ runs:
         env-slug: ${{ inputs.infisical-env }}
         domain: ${{ inputs.infisical-domain }}
 
-    - name: Run cora review
+    - name: Install cora-cli
       shell: bash
       run: |
-        cargo build --release
-        ./target/release/cora review \
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "x86_64" ]; then
+          ASSET="cora-x86_64-unknown-linux-gnu"
+        elif [ "$ARCH" = "aarch64" ]; then
+          ASSET="cora-aarch64-unknown-linux-gnu"
+        else
+          echo "Unsupported architecture: $ARCH"
+          exit 1
+        fi
+        curl -sL "https://github.com/ajianaz/cora-cli/releases/download/${{ inputs.cora-version }}/${ASSET}-${{ inputs.cora-version }}.tar.gz" | tar xz -C /usr/local/bin cora
+        chmod +x /usr/local/bin/cora
+        cora --version
+
+    - name: Run cora review
+      shell: bash
+      env:
+        CORA_API_KEY: ${{ env.CORA_API_KEY }}
+        CORA_BASE_URL: ${{ env.CORA_BASE_URL }}
+        CORA_MODEL: ${{ env.CORA_MODEL }}
+      run: |
+        cora review \
           --base ${{ inputs.base-branch }} \
           --format sarif \
           --severity ${{ inputs.severity }} \
