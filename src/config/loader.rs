@@ -19,6 +19,9 @@ const AUTH_FILENAME: &str = "auth.toml";
 /// Name of the old auth file (for migration).
 const OLD_AUTH_FILENAME: &str = "config.toml";
 
+/// Marker file created after successful migration.
+const MIGRATION_MARKER: &str = ".migrated";
+
 /// Locate the `.cora.yaml` config by walking parent directories from `start`.
 /// Returns the path and parsed content, or `None` if not found.
 pub fn find_cora_file(start: &Path) -> Result<Option<(PathBuf, CoraFile)>> {
@@ -64,6 +67,7 @@ fn load_global_config() -> Result<Option<CoraFile>> {
 /// - Non-secret keys → `~/.cora/config.yaml`
 /// - api_key → `~/.cora/auth.toml`
 /// - Delete the old file after successful migration.
+/// - Creates `.migrated` marker to prevent re-running.
 fn migrate_old_config() {
     let dir = match cora_dir() {
         Ok(d) => d,
@@ -71,6 +75,11 @@ fn migrate_old_config() {
     };
     let old_path = dir.join(OLD_AUTH_FILENAME);
     if !old_path.is_file() {
+        return;
+    }
+
+    // Check if migration already completed
+    if dir.join(MIGRATION_MARKER).is_file() {
         return;
     }
 
@@ -155,10 +164,13 @@ fn migrate_old_config() {
         }
     }
 
-    // Write api_key to auth.toml if present
+    // Write api_key to auth.toml if present (use TOML library to avoid injection)
     if let Some(key) = api_key {
         let auth_path = dir.join(AUTH_FILENAME);
-        if let Err(e) = std::fs::write(&auth_path, format!("api_key = \"{key}\"\n")) {
+        let mut table = toml::Table::new();
+        table.insert("api_key".to_string(), toml::Value::String(key));
+        let content = table.to_string();
+        if let Err(e) = std::fs::write(&auth_path, content) {
             debug!("failed to write migrated auth.toml: {}", e);
             return;
         }
@@ -188,10 +200,12 @@ fn migrate_old_config() {
         }
     }
 
-    // Delete old file
+    // Delete old file and create migration marker
     if let Err(e) = std::fs::remove_file(&old_path) {
         debug!("failed to remove old config.toml after migration: {}", e);
     } else {
+        // Create marker to prevent re-running migration
+        let _ = std::fs::write(dir.join(MIGRATION_MARKER), "");
         debug!("migrated ~/.cora/config.toml to new format");
     }
 }
