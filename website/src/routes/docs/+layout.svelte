@@ -11,6 +11,7 @@
 		{ href: '/docs/providers', label: 'Providers' },
 		{ href: '/docs/examples', label: 'Examples' },
 		{ href: '/docs/cli-reference', label: 'CLI Reference' },
+		{ href: '/docs/changelog', label: 'Changelog' },
 	];
 </script>
 

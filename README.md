@@ -88,7 +88,7 @@ cora init
 ### 3. Review Staged Changes
 
 ```bash
-cora review
+cora review --staged
 ```
 
 ### 4. Review the Last Commit

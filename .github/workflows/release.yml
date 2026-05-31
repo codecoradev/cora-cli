@@ -129,55 +129,35 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Generate release notes
+      - name: Extract changelog for this version
+        id: changelog
         run: |
-          cat > release-notes.md << 'EOF'
-          ## What's New in VERSION
-
-          ### 🚀 Features
-
-          - **AI Code Review** — diff, branch comparison, full project scan
-          - **BYOK** — bring your own API key (OpenAI, Anthropic, Groq, Ollama, Z.AI)
-          - **Pre-commit Hooks** — `cora hook install` for automatic review on every commit
-          - **Incremental Scan** — `cora scan --incremental` with SHA256 content hash cache
-          - **SARIF Output** — upload findings to GitHub Code Scanning
-          - **Streaming** — real-time review output with `--stream`
-          - **Shell Completions** — `cora completion bash|zsh|fish|powershell`
-          - **5 Providers** — OpenAI, Anthropic, Groq, Ollama, Z.AI with auto-detection
-          - **Project Config** — `.cora.yaml` per-project configuration
-          - **MIT License** — fully open source
-
-          ### 📦 Platforms
-
-          | Platform | File |
-          |----------|------|
-          | Linux (x86_64) | `cora-x86_64-unknown-linux-gnu-VERSION.tar.gz` |
-          | Linux (ARM64) | `cora-aarch64-unknown-linux-gnu-VERSION.tar.gz` |
-          | macOS (Apple Silicon) | `cora-aarch64-apple-darwin-VERSION.tar.gz` |
-          | Windows (x86_64) | `cora-x86_64-pc-windows-msvc-VERSION.zip` |
-
-          ### 🚀 Quick Start
-
-          ```bash
-          # Install via cargo
-          cargo install cora
-
-          # Or download binary (extracts as 'cora')
-          curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-VERSION.tar.gz | tar xz
-          chmod +x cora
-          sudo mv cora /usr/local/bin/
-
-          # Init project
-          cora init
-
-          # Review staged changes
-          CORA_API_KEY=your-key cora review --staged
-          ```
-
-          **Full changelog:** https://github.com/ajianaz/cora-cli/blob/main/CHANGELOG.md
-
-          EOF
-          sed -i "s/VERSION/${{ steps.version.outputs.VERSION }}/g" release-notes.md
+          CHANGELOG_EXCERPT=$(sed -n '/^## \['"${{ steps.version.outputs.VERSION }}"'\]/,/^## \[/p' CHANGELOG.md | sed '$d' | tail -n +2)
+          {
+            printf '## What'\''s New in %s\n\n' "${{ steps.version.outputs.VERSION }}"
+            printf '%s\n\n' "$CHANGELOG_EXCERPT"
+            printf '### 📦 Platforms\n\n'
+            printf '| Platform | File |\n'
+            printf '|----------|------|\n'
+            printf '| Linux (x86_64) | `cora-x86_64-unknown-linux-gnu-%s.tar.gz` |\n' "${{ steps.version.outputs.VERSION }}"
+            printf '| Linux (ARM64) | `cora-aarch64-unknown-linux-gnu-%s.tar.gz` |\n' "${{ steps.version.outputs.VERSION }}"
+            printf '| macOS (Apple Silicon) | `cora-aarch64-apple-darwin-%s.tar.gz` |\n' "${{ steps.version.outputs.VERSION }}"
+            printf '| Windows (x86_64) | `cora-x86_64-pc-windows-msvc-%s.zip` |\n\n' "${{ steps.version.outputs.VERSION }}"
+            printf '### 🚀 Quick Start\n\n'
+            printf '```bash\n'
+            printf '# Install via cargo\n'
+            printf 'cargo install cora\n\n'
+            printf '# Or download binary (extracts as '\''cora'\'')\n'
+            printf 'curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-%s.tar.gz | tar xz\n' "${{ steps.version.outputs.VERSION }}"
+            printf 'chmod +x cora\n'
+            printf 'sudo mv cora /usr/local/bin/\n\n'
+            printf '# Init project\n'
+            printf 'cora init\n\n'
+            printf '# Review staged changes\n'
+            printf 'CORA_API_KEY=your-key cora review --staged\n'
+            printf '```\n\n'
+            printf '**Full changelog:** https://github.com/ajianaz/cora-cli/blob/develop/CHANGELOG.md\n'
+          } > release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
