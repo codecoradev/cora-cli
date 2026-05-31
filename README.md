@@ -167,16 +167,25 @@ cora scan --incremental
 
 ### `cora config`
 
-Manage configuration.
+Manage configuration. Supports both project-level (`.cora.yaml`) and global (`~/.cora/config.yaml`) config.
 
 ```bash
-# Show current configuration
+# Show current resolved configuration
 cora config show
 
-# Set a configuration value
+# Set a project-level value (writes to .cora.yaml)
 cora config set model claude-sonnet-4-20250514
+cora config set base_url https://api.openai.com/v1
 cora config set severity major
+
+# Set a global value (writes to ~/.cora/config.yaml)
+cora config set --global model gpt-4o-mini
+cora config set --global provider anthropic
+
+# Supported keys: model, provider, base_url, format, severity
 ```
+
+**Priority**: CLI flags → env vars → `.cora.yaml` (project) → `~/.cora/config.yaml` (global) → defaults
 
 ### `cora init`
 
@@ -207,7 +216,13 @@ cora hook uninstall
 
 ## ⚙️ Configuration
 
-Create a `.cora.yaml` in your project root or `~/.config/cora/config.yaml` globally:
+Cora reads configuration from multiple sources in priority order:
+
+```
+CLI flags → CORA_* env vars → .cora.yaml (project) → ~/.cora/config.yaml (global) → defaults
+```
+
+Create a `.cora.yaml` in your project root, or use `~/.cora/config.yaml` for global settings. Project config always overrides global.
 
 ```yaml
 # .cora.yaml
@@ -265,37 +280,53 @@ output:
 | `CORA_FORMAT` | Output format (`pretty`, `json`, `compact`, `sarif`) | `pretty` |
 | `CORA_NO_COLOR` | Disable colored output | — |
 
+### Authentication
+
+API keys can be provided via environment variable (`CORA_API_KEY`), provider-specific env vars (`OPENAI_API_KEY`, etc.), or stored in `~/.cora/auth.toml` (auto-created by `cora auth login`, permission `0600`).
+
+```bash
+# Interactive login (stores key in ~/.cora/auth.toml)
+cora auth login
+
+# Or set via environment variable
+export CORA_API_KEY=sk-...
+```
+
 ## 🔗 CI/CD Integration
 
 ### GitHub Actions
 
-```yaml
-# .github/workflows/review.yml
-name: Code Review
+Using the official [cora-review composite action](.github/actions/cora-review):
 
+```yaml
+name: CI
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    branches: [develop]
 
 jobs:
-  review:
+  cora-review:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: ./.github/actions/cora-review
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          infisical-identity-id: ${{ secrets.INFISICAL_IDENTITY_ID }}
+          severity: major
+          upload-sarif: 'true'
+```
 
-      - name: Install cora-cli
-        run: |
-          VERSION=$(curl -s https://api.github.com/repos/ajianaz/cora-cli/releases/latest | grep tag_name | cut -d'"' -f4)
-          curl -L "https://github.com/ajianaz/cora-cli/releases/download/${VERSION}/cora-x86_64-unknown-linux-gnu-${VERSION}.tar.gz" | tar xz
-          sudo mv cora /usr/local/bin/
+Or install manually:
 
-      - name: Run code review
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: cora review --base origin/main --upload
+```yaml
+# Manual install in CI
+- name: Install cora-cli
+  run: |
+    curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu.tar.gz | tar xz
+    sudo mv cora /usr/local/bin/
 ```
 
 ### GitLab CI
