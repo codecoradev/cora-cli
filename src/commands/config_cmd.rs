@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 
 use crate::config::loader;
+use crate::config::schema::{CoraFile, HookSection, OutputSection, ProviderSection};
 
 /// Execute `cora config show` — print the current resolved configuration.
 pub fn execute_config_show() -> Result<()> {
@@ -95,94 +96,78 @@ pub fn execute_config_show() -> Result<()> {
     Ok(())
 }
 
-/// Execute `cora config set <key> <value>` — write a key-value pair to ~/.cora/config.toml.
+/// Execute `cora config set [--global] <key> <value>` — write a key-value pair
+/// to a YAML config file.
 ///
-/// Supported keys: model, provider, format, severity.
-pub fn execute_config_set(key: &str, value: &str) -> Result<()> {
+/// Supported keys: model, provider, base_url, format, severity
+pub fn execute_config_set(key: &str, value: &str, global: bool) -> Result<()> {
     // Validate the key
     match key {
-        "model" | "provider" | "format" | "severity" => {}
+        "model" | "provider" | "base_url" | "format" | "severity" => {}
         _ => {
             anyhow::bail!(
-                "unsupported key: {key}\nSupported keys: model, provider, format, severity"
+                "unsupported key: {key}\nSupported keys: model, provider, base_url, format, severity"
             );
         }
     }
 
-    let dir = cora_config_dir()?;
-    std::fs::create_dir_all(&dir).with_context(|| format!("failed to create {}", dir.display()))?;
-
-    let path = dir.join("config.toml");
-
-    // Load existing config.toml content if it exists
-    let mut table = if path.is_file() {
-        let content = std::fs::read_to_string(&path)
-            .with_context(|| format!("failed to read {}", path.display()))?;
-        content.parse::<toml::Table>().unwrap_or_default()
+    // Determine target path
+    let path = if global {
+        let dir = loader::cora_dir()?;
+        std::fs::create_dir_all(&dir)
+            .with_context(|| format!("failed to create {}", dir.display()))?;
+        dir.join("config.yaml")
     } else {
-        toml::Table::new()
+        PathBuf::from(".cora.yaml")
     };
 
-    // Map the key to the appropriate TOML structure
+    // Load existing file or start fresh
+    let mut cora = if path.is_file() {
+        let content = std::fs::read_to_string(&path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        CoraFile::from_str(&content).unwrap_or_default()
+    } else {
+        CoraFile::default()
+    };
+
+    // Apply the key update
     match key {
         "model" => {
-            let provider = table
-                .entry("provider")
-                .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-            if let toml::Value::Table(p) = provider {
-                p.insert("model".to_string(), toml::Value::String(value.to_string()));
-            }
+            let provider = cora.provider.get_or_insert_with(ProviderSection::default);
+            provider.model = Some(value.to_string());
         }
         "provider" => {
-            let provider = table
-                .entry("provider")
-                .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-            if let toml::Value::Table(p) = provider {
-                p.insert(
-                    "provider".to_string(),
-                    toml::Value::String(value.to_string()),
-                );
-            }
+            let provider = cora.provider.get_or_insert_with(ProviderSection::default);
+            provider.provider = Some(value.to_string());
+        }
+        "base_url" => {
+            let provider = cora.provider.get_or_insert_with(ProviderSection::default);
+            provider.base_url = Some(value.to_string());
         }
         "format" => {
-            let output = table
-                .entry("output")
-                .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-            if let toml::Value::Table(o) = output {
-                o.insert("format".to_string(), toml::Value::String(value.to_string()));
-            }
+            let output = cora.output.get_or_insert_with(OutputSection::default);
+            output.format = Some(value.to_string());
         }
         "severity" => {
-            let hook = table
-                .entry("hook")
-                .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-            if let toml::Value::Table(h) = hook {
-                h.insert(
-                    "min_severity".to_string(),
-                    toml::Value::String(value.to_string()),
-                );
-            }
+            let hook = cora.hook.get_or_insert_with(HookSection::default);
+            hook.min_severity = Some(value.to_string());
         }
         _ => unreachable!(),
     }
 
-    let content = table.to_string();
-    std::fs::write(&path, content)
-        .with_context(|| format!("failed to write {}", path.display()))?;
+    // Write back as YAML
+    let yaml = serde_yaml_ng::to_string(&cora).context("failed to serialize config to YAML")?;
+    std::fs::write(&path, &yaml).with_context(|| format!("failed to write {}", path.display()))?;
 
+    let scope = if global { "global" } else { "project" };
     println!(
-        "{} Set {} = {} in {}",
+        "{} Set {} = {} in {} ({})",
         "✓".green().bold(),
         key.bold(),
         value.green(),
-        path.display()
+        path.display(),
+        scope.dimmed()
     );
 
     Ok(())
-}
-
-/// Get the cora config directory: ~/.cora/
-fn cora_config_dir() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("cannot determine home directory")?;
-    Ok(home.join(".cora"))
 }
