@@ -21,7 +21,7 @@ Be respectful, constructive, and inclusive. We follow the [Rust Code of Conduct]
 
 ### Prerequisites
 
-- **Rust** 1.75+ (stable toolchain recommended)
+- **Rust 1.85+** (stable toolchain recommended)
 - **Git** for version control
 - An **LLM API key** (OpenAI, Anthropic, etc.) for testing review features
 
@@ -47,14 +47,43 @@ cargo clippy -- -D warnings
 ```
 cora-cli/
 ├── src/
-│   ├── main.rs          # CLI entry point
-│   ├── cli.rs           # Argument parsing (clap)
-│   ├── config.rs        # Configuration management
-│   ├── scanner.rs       # File scanning and diff generation
-│   ├── reviewer.rs      # LLM integration for code review
-│   ├── formatter.rs     # Output formatting
-│   └── ci.rs            # CI/CD integration helpers
-├── tests/               # Integration tests
+│   ├── main.rs                  # CLI entry point
+│   ├── commands/                # CLI subcommand handlers
+│   │   ├── mod.rs
+│   │   ├── review.rs            # cora review
+│   │   ├── scan.rs              # cora scan
+│   │   ├── upload.rs            # cora upload-sarif
+│   │   ├── auth.rs              # cora auth
+│   │   ├── hook_cmd.rs          # cora hook
+│   │   ├── init.rs              # cora init
+│   │   ├── completion.rs        # cora completion
+│   │   └── providers.rs         # cora providers
+│   ├── config/                  # Configuration loading & schema
+│   │   ├── mod.rs
+│   │   ├── schema.rs            # Config struct definitions
+│   │   ├── loader.rs            # Config file discovery & loading
+│   │   └── providers.rs         # Provider auto-detection
+│   ├── engine/                  # Core review/scanning engine
+│   │   ├── mod.rs
+│   │   ├── llm.rs               # LLM API client
+│   │   ├── review.rs            # Diff review logic
+│   │   ├── scanner.rs           # Project scanning logic
+│   │   └── types.rs             # Shared types (Severity, Findings, etc.)
+│   ├── formatters/              # Output formatting
+│   │   ├── mod.rs
+│   │   ├── pretty.rs            # Pretty-printed terminal output
+│   │   ├── compact.rs           # Compact single-line output
+│   │   ├── json_fmt.rs          # JSON output
+│   │   └── sarif.rs             # SARIF output
+│   ├── git/                     # Git operations
+│   │   ├── mod.rs
+│   │   ├── diff.rs              # Diff generation
+│   │   └── files.rs             # File discovery
+│   └── hook/                    # Git hook management
+│       ├── mod.rs
+│       ├── install.rs           # Hook install/uninstall
+│       └── template.rs          # Hook script template
+├── tests/                       # Integration tests
 ├── Cargo.toml
 └── README.md
 ```
@@ -68,7 +97,7 @@ cora-cli/
    ```
 3. **Make your changes** and commit with meaningful messages:
    ```bash
-   git commit -s -m "feat: add support for SARIF output format"
+   git commit -m "feat: add support for SARIF output format"
    ```
 4. **Push** to your fork and open a **Pull Request**
 
@@ -94,6 +123,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 4. Ensure `cargo clippy -- -D warnings` is clean
 5. Ensure `cargo fmt` has been applied
 6. Keep PRs focused — one logical change per PR
+7. **CI will automatically run cora on your PR** — all findings must be addressed or the PR will be blocked
 
 ## Coding Standards
 
@@ -124,8 +154,8 @@ Please open a [GitHub Issue](https://github.com/ajianaz/cora-cli/issues/new) wit
 
 - **Description** — What happened vs. what you expected
 - **Steps to reproduce** — Minimal reproduction steps
-- **Environment** — OS, Rust version, cora-cli version
-- **Logs** — Output with `RUST_LOG=debug cora review`
+- **Environment** — OS, Rust version, cora-cli version (`cora --version`)
+- **Logs** — Output with `cora --verbose review`
 
 ## Feature Requests
 
