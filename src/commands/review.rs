@@ -100,6 +100,9 @@ pub async fn execute_review(
     };
 
     let mut filtered_response = response.clone();
+    // Keep issues at or above min_severity (Critical=worst, Info=lowest in Ord but
+    // Ord order is Critical(0) < Major(1) < Minor(2) < Info(3), so we invert: keep
+    // where severity Ord value <= min_severity Ord value).
     filtered_response
         .issues
         .retain(|i| i.severity <= min_severity);

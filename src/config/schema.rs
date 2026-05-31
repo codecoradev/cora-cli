@@ -97,37 +97,53 @@ impl HookConfig {
 /// Serde-compatible schema for the `.cora.yaml` configuration file.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CoraFile {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<ProviderSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub focus: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore: Option<IgnoreSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hook: Option<HookSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<OutputSection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProviderSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct IgnoreSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub files: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HookSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub min_severity: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_diff_size: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OutputSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<bool>,
 }
 

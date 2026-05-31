@@ -130,7 +130,9 @@ pub async fn execute_scan(
     // 5. Build response and format
     let issue_count = all_issues.len();
     let min_severity = config.hook.min_severity_level();
-    let should_block = all_issues.iter().any(|i| i.severity >= min_severity);
+    // Ord order is Critical(0) < Major(1) < Minor(2) < Info(3), so "at or above
+    // min_severity" means Ord value <= min_severity.
+    let should_block = all_issues.iter().any(|i| i.severity <= min_severity);
 
     let response = crate::engine::ScanResponse {
         issues: all_issues,

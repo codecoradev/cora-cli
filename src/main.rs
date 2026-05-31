@@ -235,12 +235,15 @@ enum AuthAction {
 enum ConfigAction {
     /// Show the current resolved configuration
     Show,
-    /// Set a configuration value (keys: model, provider, format, severity)
+    /// Set a configuration value (keys: model, provider, base_url, format, severity)
     Set {
         /// Configuration key to set
         key: String,
         /// Value to assign
         value: String,
+        /// Write to global config (~/.cora/config.yaml) instead of project .cora.yaml
+        #[clap(long)]
+        global: bool,
     },
 }
 
@@ -374,8 +377,8 @@ async fn main() -> Result<()> {
                 config_cmd::execute_config_show()?;
                 0
             }
-            ConfigAction::Set { key, value } => {
-                config_cmd::execute_config_set(&key, &value)?;
+            ConfigAction::Set { key, value, global } => {
+                config_cmd::execute_config_set(&key, &value, global)?;
                 0
             }
         },

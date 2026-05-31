@@ -38,10 +38,7 @@ pub fn execute_auth_login() -> Result<()> {
     }
 
     loader::save_api_key(&key)?;
-    println!(
-        "{} API key saved to ~/.cora/config.toml",
-        "✅".green().bold()
-    );
+    println!("{} API key saved to ~/.cora/auth.toml", "✅".green().bold());
     println!(
         "{}",
         "   This file is local to your machine and not committed to git.".dimmed()

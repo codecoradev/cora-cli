@@ -64,10 +64,12 @@ async fn review_diff_inner(
 
     // Calculate should_block based on min_severity
     let min_severity = config.hook.min_severity_level();
+    // Ord order is Critical(0) < Major(1) < Minor(2) < Info(3), so "at or above
+    // min_severity" means Ord value <= min_severity.
     response.should_block = response
         .issues
         .iter()
-        .any(|issue| issue.severity >= min_severity);
+        .any(|issue| issue.severity <= min_severity);
 
     debug!(
         issues = response.issues.len(),
@@ -115,7 +117,8 @@ pub async fn scan_project(
 
     // Calculate should_block
     let min_severity = config.hook.min_severity_level();
-    let should_block = issues.iter().any(|issue| issue.severity >= min_severity);
+    // Ord order: Critical(0) < Major(1) < Minor(2) < Info(3)
+    let should_block = issues.iter().any(|issue| issue.severity <= min_severity);
 
     let default_summary = format!(
         "Scanned {} files, found {} issues.",
