@@ -37,9 +37,9 @@
 	<div class="flex flex-col gap-2">
 		{#each [
 			{ num: '1', label: 'CLI flags', desc: '--provider, --model, --base-url, etc.', accent: true },
-			{ num: '2', label: '.cora.yaml', desc: 'Project root config file', accent: false },
-			{ num: '3', label: '~/.cora/config.toml', desc: 'User-level config', accent: false },
-			{ num: '4', label: 'Environment variables', desc: 'CORA_API_KEY, CORA_PROVIDER, etc.', accent: false },
+			{ num: '2', label: 'Environment variables', desc: 'CORA_API_KEY, CORA_PROVIDER, CORA_MODEL, etc.', accent: false },
+			{ num: '3', label: '.cora.yaml', desc: 'Project root config file', accent: false },
+			{ num: '4', label: '~/.cora/config.yaml', desc: 'Global config (optional)', accent: false },
 			{ num: '5', label: 'Built-in defaults', desc: 'Sensible defaults for all settings', accent: false }
 		] as item}
 			<div class="docs-card" class:accent={item.accent}>
@@ -69,21 +69,22 @@
 		</div>
 		<div class="terminal-body">
 <pre class="whitespace-pre"><span class="syntax-comment"># cora project config</span>
-<span class="syntax-highlight">review:</span>
-  <span class="syntax-flag">severity:</span> <span class="syntax-string">warning</span>          <span class="syntax-comment"># minimum severity: info, minor, major, critical</span>
-  <span class="syntax-flag">max_issues:</span> <span class="text-[var(--foreground)]">20</span>             <span class="syntax-comment"># max issues to report</span>
-  <span class="syntax-flag">focus:</span> <span class="syntax-string">security,performance</span>  <span class="syntax-comment"># focus areas</span>
+<span class="syntax-highlight">provider:</span>
+  <span class="syntax-flag">provider:</span> <span class="syntax-string">openai</span>
+  <span class="syntax-flag">model:</span> <span class="syntax-string">gpt-4o</span>
+  <span class="syntax-flag">base_url:</span> <span class="syntax-string">https://api.openai.com/v1</span>
+
+<span class="syntax-highlight">focus:</span> <span class="syntax-string">security, performance, bugs</span>
+
+<span class="syntax-highlight">hook:</span>
+  <span class="syntax-flag">mode:</span> <span class="syntax-string">warn</span>
+  <span class="syntax-flag">min_severity:</span> <span class="syntax-string">major</span>
+  <span class="syntax-flag">max_diff_size:</span> <span class="text-[var(--foreground)]">51200</span>
 
 <span class="syntax-highlight">ignore:</span>
-  <span class="syntax-cmd">- "vendor/**"</span>
-  <span class="syntax-cmd">- "*.min.js"</span>
-  <span class="syntax-cmd">- "migrations/**"</span>
-
-<span class="syntax-highlight">providers:</span>
-  <span class="syntax-flag">openai:</span>
-    <span class="syntax-flag">model:</span> <span class="syntax-string">gpt-4o</span>
-  <span class="syntax-flag">anthropic:</span>
-    <span class="syntax-flag">model:</span> <span class="syntax-string">claude-sonnet-4-20250514</span></pre>
+  <span class="syntax-flag">files:</span>
+    <span class="syntax-cmd">- "vendor/**"</span>
+    <span class="syntax-cmd">- "*.min.js"</span></pre>
 		</div>
 	</div>
 </section>

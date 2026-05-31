@@ -10,4 +10,10 @@ declare global {
 	}
 }
 
+// Allow ?raw imports for markdown files
+declare module '*?raw' {
+	const content: string;
+	export default content;
+}
+
 export {};
