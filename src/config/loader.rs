@@ -7,11 +7,20 @@ use crate::config::providers::{PRESETS, detected_presets};
 use crate::config::schema::{Config, CoraFile};
 use crate::engine::LLMConfig;
 
-/// The name of the config file we search for.
+/// The name of the config file we search for in projects.
 const CONFIG_FILENAME: &str = ".cora.yaml";
 
+/// Name of the global config file.
+const GLOBAL_CONFIG_FILENAME: &str = "config.yaml";
+
 /// Name of the secret config file for API keys (never committed).
-const AUTH_FILENAME: &str = "config.toml";
+const AUTH_FILENAME: &str = "auth.toml";
+
+/// Name of the old auth file (for migration).
+const OLD_AUTH_FILENAME: &str = "config.toml";
+
+/// Marker file created after successful migration.
+const MIGRATION_MARKER: &str = ".migrated";
 
 /// Locate the `.cora.yaml` config by walking parent directories from `start`.
 /// Returns the path and parsed content, or `None` if not found.
@@ -39,7 +48,169 @@ pub fn find_cora_file(start: &Path) -> Result<Option<(PathBuf, CoraFile)>> {
     }
 }
 
-/// Load the full resolved config: defaults ← .cora.yaml ← CLI overrides.
+/// Load the global config from `~/.cora/config.yaml`.
+/// Returns `None` if the file doesn't exist or can't be parsed.
+fn load_global_config() -> Result<Option<CoraFile>> {
+    let dir = cora_dir()?;
+    let path = dir.join(GLOBAL_CONFIG_FILENAME);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let cora = CoraFile::from_str(&content)?;
+    debug!(path = %path.display(), "loaded global config");
+    Ok(Some(cora))
+}
+
+/// Migrate old `~/.cora/config.toml` to the new format if it exists.
+/// - Non-secret keys → `~/.cora/config.yaml`
+/// - api_key → `~/.cora/auth.toml`
+/// - Delete the old file after successful migration.
+/// - Creates `.migrated` marker to prevent re-running.
+fn migrate_old_config() {
+    let dir = match cora_dir() {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+    let old_path = dir.join(OLD_AUTH_FILENAME);
+    if !old_path.is_file() {
+        return;
+    }
+
+    // Check if migration already completed
+    if dir.join(MIGRATION_MARKER).is_file() {
+        return;
+    }
+
+    let content = match std::fs::read_to_string(&old_path) {
+        Ok(c) => c,
+        Err(e) => {
+            debug!("failed to read old config for migration: {}", e);
+            return;
+        }
+    };
+
+    let table: toml::Table = match content.parse::<toml::Table>() {
+        Ok(t) => t,
+        Err(e) => {
+            debug!(
+                "old config.toml is not valid TOML, skipping migration: {}",
+                e
+            );
+            return;
+        }
+    };
+
+    // Check if there's an api_key
+    let api_key = table
+        .get("auth")
+        .and_then(|a| a.get("api_key"))
+        .and_then(|k| k.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            table
+                .get("api_key")
+                .and_then(|k| k.as_str())
+                .map(|s| s.to_string())
+        });
+
+    // Extract non-secret config fields into a CoraFile
+    let mut cora = CoraFile::default();
+
+    if let Some(provider) = table.get("provider").and_then(|v| v.as_table()) {
+        let mut ps = crate::config::schema::ProviderSection::default();
+        if let Some(v) = provider.get("provider").and_then(|v| v.as_str()) {
+            ps.provider = Some(v.to_string());
+        }
+        if let Some(v) = provider.get("model").and_then(|v| v.as_str()) {
+            ps.model = Some(v.to_string());
+        }
+        if let Some(v) = provider.get("base_url").and_then(|v| v.as_str()) {
+            ps.base_url = Some(v.to_string());
+        }
+        // Only set if we found something
+        if ps.provider.is_some() || ps.model.is_some() || ps.base_url.is_some() {
+            cora.provider = Some(ps);
+        }
+    }
+
+    if let Some(output) = table.get("output").and_then(|v| v.as_table()) {
+        let mut os = crate::config::schema::OutputSection::default();
+        if let Some(v) = output.get("format").and_then(|v| v.as_str()) {
+            os.format = Some(v.to_string());
+        }
+        if let Some(v) = output.get("color").and_then(|v| v.as_bool()) {
+            os.color = Some(v);
+        }
+        if os.format.is_some() || os.color.is_some() {
+            cora.output = Some(os);
+        }
+    }
+
+    if let Some(hook) = table.get("hook").and_then(|v| v.as_table()) {
+        let mut hs = crate::config::schema::HookSection::default();
+        if let Some(v) = hook.get("mode").and_then(|v| v.as_str()) {
+            hs.mode = Some(v.to_string());
+        }
+        if let Some(v) = hook.get("min_severity").and_then(|v| v.as_str()) {
+            hs.min_severity = Some(v.to_string());
+        }
+        if let Some(v) = hook.get("max_diff_size").and_then(|v| v.as_integer()) {
+            hs.max_diff_size = Some(v as usize);
+        }
+        if hs.mode.is_some() || hs.min_severity.is_some() || hs.max_diff_size.is_some() {
+            cora.hook = Some(hs);
+        }
+    }
+
+    // Write api_key to auth.toml if present (use TOML library to avoid injection)
+    if let Some(key) = api_key {
+        let auth_path = dir.join(AUTH_FILENAME);
+        let mut table = toml::Table::new();
+        table.insert("api_key".to_string(), toml::Value::String(key));
+        let content = table.to_string();
+        if let Err(e) = std::fs::write(&auth_path, content) {
+            debug!("failed to write migrated auth.toml: {}", e);
+            return;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o600);
+            let _ = std::fs::set_permissions(&auth_path, perms);
+        }
+    }
+
+    // Write config to config.yaml if there are non-secret fields
+    let has_config = cora.provider.is_some()
+        || cora.output.is_some()
+        || cora.hook.is_some()
+        || cora.focus.is_some()
+        || cora.rules.is_some()
+        || cora.ignore.is_some();
+
+    if has_config {
+        let config_path = dir.join(GLOBAL_CONFIG_FILENAME);
+        if let Ok(yaml) = serde_yaml_ng::to_string(&cora) {
+            if let Err(e) = std::fs::write(&config_path, yaml) {
+                debug!("failed to write migrated config.yaml: {}", e);
+                return;
+            }
+        }
+    }
+
+    // Delete old file and create migration marker
+    if let Err(e) = std::fs::remove_file(&old_path) {
+        debug!("failed to remove old config.toml after migration: {}", e);
+    } else {
+        // Create marker to prevent re-running migration
+        let _ = std::fs::write(dir.join(MIGRATION_MARKER), "");
+        debug!("migrated ~/.cora/config.toml to new format");
+    }
+}
+
+/// Load the full resolved config: defaults ← global config ← .cora.yaml ← CLI overrides.
 ///
 /// `cli_provider`, `cli_model`, `cli_api_key`, and `cli_format` are `None`
 /// when the user did not pass the corresponding flag.
@@ -54,7 +225,15 @@ pub fn load_config(
 ) -> Result<Config> {
     let mut config = Config::default();
 
-    // 1. Load .cora.yaml
+    // Run migration silently on first access
+    migrate_old_config();
+
+    // 1. Load global config (~/.cora/config.yaml)
+    if let Some(cora) = load_global_config()? {
+        cora.merge_into(&mut config);
+    }
+
+    // 2. Load project config (.cora.yaml)
     if let Some(path) = cli_config_path {
         let path = Path::new(path);
         let content = std::fs::read_to_string(path)
@@ -69,7 +248,7 @@ pub fn load_config(
         debug!("no .cora.yaml found, using defaults");
     }
 
-    // 2. CLI overrides
+    // 3. CLI overrides
     if let Some(p) = cli_provider {
         config.provider.provider = p.to_string();
     }
@@ -90,7 +269,7 @@ pub fn load_config(
 }
 
 /// Build an `LLMConfig` from the resolved `Config`, fetching the API key
-/// from: CLI flag → env CORA_API_KEY → ~/.config/cora/config.toml.
+/// from: CLI flag → env CORA_API_KEY → ~/.cora/auth.toml.
 ///
 /// If none of those are set, auto-detect from known provider env vars (OPENAI_API_KEY, etc.)
 /// and configure provider/model/base_url from the matching preset.
@@ -166,12 +345,12 @@ pub fn build_llm_config(config: &Config, cli_api_key: Option<&str>) -> Result<LL
 }
 
 /// Get the cora config directory: ~/.cora/
-fn cora_dir() -> Result<PathBuf> {
+pub fn cora_dir() -> Result<PathBuf> {
     let home = dirs::home_dir().context("cannot determine home directory")?;
     Ok(home.join(".cora"))
 }
 
-/// Read the stored API key from ~/.cora/config.toml.
+/// Read the stored API key from ~/.cora/auth.toml.
 pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
     let dir = cora_dir()?;
     let path = dir.join(AUTH_FILENAME);
@@ -202,7 +381,7 @@ pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
     Ok(key)
 }
 
-/// Save an API key to ~/.cora/config.toml.
+/// Save an API key to ~/.cora/auth.toml.
 pub fn save_api_key(key: &str) -> Result<()> {
     let dir = cora_dir()?;
     std::fs::create_dir_all(&dir).with_context(|| format!("failed to create {}", dir.display()))?;
@@ -226,7 +405,7 @@ pub fn save_api_key(key: &str) -> Result<()> {
     Ok(())
 }
 
-/// Remove the stored API key from ~/.cora/config.toml.
+/// Remove the stored API key from ~/.cora/auth.toml.
 pub fn remove_api_key() -> Result<()> {
     let dir = cora_dir()?;
     let path = dir.join(AUTH_FILENAME);

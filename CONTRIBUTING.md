@@ -21,7 +21,7 @@ Be respectful, constructive, and inclusive. We follow the [Rust Code of Conduct]
 
 ### Prerequisites
 
-- **Rust** 1.75+ (stable toolchain recommended)
+- **Rust** 1.85+ (stable toolchain recommended)
 - **Git** for version control
 - An **LLM API key** (OpenAI, Anthropic, etc.) for testing review features
 
@@ -47,14 +47,30 @@ cargo clippy -- -D warnings
 ```
 cora-cli/
 ├── src/
-│   ├── main.rs          # CLI entry point
-│   ├── cli.rs           # Argument parsing (clap)
-│   ├── config.rs        # Configuration management
-│   ├── scanner.rs       # File scanning and diff generation
-│   ├── reviewer.rs      # LLM integration for code review
-│   ├── formatter.rs     # Output formatting
-│   └── ci.rs            # CI/CD integration helpers
-├── tests/               # Integration tests
+│   ├── main.rs              # CLI entry point + clap args
+│   ├── cli.rs               # Argument parsing (clap)
+│   ├── commands/            # CLI subcommands
+│   │   ├── review.rs       # cora review
+│   │   ├── scan.rs         # cora scan
+│   │   ├── config_cmd.rs   # cora config show/set
+│   │   ├── auth.rs         # cora auth login/logout
+│   │   └── init.rs         # cora init
+│   ├── config/
+│   │   ├── loader.rs       # Config resolution chain (global → project → env → CLI)
+│   │   ├── schema.rs       # YAML config structs + merge logic
+│   │   └── providers.rs    # Provider presets (OpenAI, Anthropic, etc.)
+│   ├── engine/
+│   │   ├── review.rs       # LLM review + SARIF generation
+│   │   ├── scanner.rs      # File scanning and diff generation
+│   │   ├── types.rs        # Issue, Severity, ScanResponse types
+│   │   └── llm.rs          # LLM API abstraction
+│   └── formatter/
+│       └── mod.rs          # Output formatting (pretty, compact, json, sarif)
+├── .github/
+│   ├── workflows/          # CI, release, deploy workflows
+│   └── actions/
+│       └── cora-review/    # Composite action for GitHub Actions
+├── tests/                   # Integration tests
 ├── Cargo.toml
 └── README.md
 ```
@@ -68,7 +84,7 @@ cora-cli/
    ```
 3. **Make your changes** and commit with meaningful messages:
    ```bash
-   git commit -s -m "feat: add support for SARIF output format"
+   git commit -m "feat: add support for SARIF output format"
    ```
 4. **Push** to your fork and open a **Pull Request**
 
@@ -111,9 +127,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_scan_single_file() {
-        let result = scan_files(vec!["src/main.rs".into()]);
-        assert!(!result.is_empty());
+    fn test_severity_from_str() {
+        use crate::engine::types::Severity;
+        assert_eq!(Severity::from_str_lossy("critical"), Severity::Critical);
+        assert_eq!(Severity::from_str_lossy("info"), Severity::Info);
     }
 }
 ```
