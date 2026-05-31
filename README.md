@@ -11,8 +11,6 @@
 
 **Cora** is a fast, opinionated CLI tool that uses LLMs to review your code changes — directly in your terminal, CI/CD pipeline, or git hooks.
 
-🌐 [Website](https://cora.ajianaz.dev)
-
 </div>
 
 ---
@@ -20,7 +18,7 @@
 ## ✨ Features
 
 - 🔍 **Git-Aware Scanning** — Automatically detects staged, committed, or changed files
-- 🤖 **Multi-LLM Support** — Works with OpenAI, Anthropic, Google, and any OpenAI-compatible API
+- 🤖 **Multi-LLM Support** — Works with OpenAI, Anthropic, Google, Ollama, and any OpenAI-compatible API
 - 🎨 **Beautiful Output** — Colorized, structured review output with severity levels
 - 🏗️ **CI/CD Ready** — Designed for GitHub Actions, GitLab CI, and any pipeline
 - ⚡ **Fast & Lightweight** — Native Rust binary, no runtime dependencies
@@ -42,20 +40,28 @@ cargo install cora-cli
 Download the latest release from [GitHub Releases](https://github.com/ajianaz/cora-cli/releases):
 
 ```bash
-# Linux x86_64
-curl -L https://github.com/ajianaz/cora-cli/releases/latest/download/cora-linux-x86_64.tar.gz | tar xz
+# Determine your platform tag from the releases page, e.g.:
+#   cora-aarch64-unknown-linux-gnu-v0.1.2.tar.gz
+#   cora-x86_64-unknown-linux-gnu-v0.1.2.tar.gz
+#   cora-aarch64-apple-darwin-v0.1.2.tar.gz
+#   cora-x86_64-apple-darwin-v0.1.2.tar.gz
+#   cora-x86_64-pc-windows-msvc-v0.1.2.zip
 
-# macOS ARM (Apple Silicon)
-curl -L https://github.com/ajianaz/cora-cli/releases/latest/download/cora-macos-aarch64.tar.gz | tar xz
-
-# macOS x86_64 (Intel)
-curl -L https://github.com/ajianaz/cora-cli/releases/latest/download/cora-macos-x86_64.tar.gz | tar xz
-
-# Windows x86_64
-curl -L https://github.com/ajianaz/cora-cli/releases/latest/download/cora-windows-x86_64.tar.gz | tar xz
+# Example: Linux aarch64
+VERSION=$(curl -s https://api.github.com/repos/ajianaz/cora-cli/releases/latest | grep tag_name | cut -d'"' -f4)
+curl -L "https://github.com/ajianaz/cora-cli/releases/download/${VERSION}/cora-aarch64-unknown-linux-gnu-${VERSION}.tar.gz" | tar xz
+sudo mv cora /usr/local/bin/
 ```
 
+> **Tip:** Visit the [Releases page](https://github.com/ajianaz/cora-cli/releases) to find the correct asset name for your platform.
+
+### Homebrew
+
+> 🚧 Homebrew tap is planned — check back soon!
+
 ### Build from Source
+
+Requires **Rust 1.85+**.
 
 ```bash
 git clone https://github.com/ajianaz/cora-cli.git
@@ -73,22 +79,28 @@ export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-### 2. Review Staged Changes
+### 2. Initialize Config (Optional)
+
+```bash
+cora init
+```
+
+### 3. Review Staged Changes
 
 ```bash
 cora review
 ```
 
-### 3. Review a Specific Commit
+### 4. Review the Last Commit
 
 ```bash
 cora review --commit HEAD
 ```
 
-### 4. Scan the Entire Project
+### 5. Scan the Entire Project
 
 ```bash
-cora scan .
+cora scan
 ```
 
 ## 📖 Commands
@@ -101,45 +113,35 @@ Review code changes using an LLM.
 # Review staged files (default)
 cora review
 
-# Review staged explicitly
-cora review --staged
-
-# Review unstaged changes
-cora review --unstaged
-
-# Review unpushed commits
+# Review unpushed changes
 cora review --unpushed
 
-# Review against a branch
-cora review --base develop
-
-# Review a commit or range
-cora review --commit HEAD
+# Review a range of commits
 cora review --commit HEAD~3..HEAD
 
-# Review from a diff file
+# Review changes vs a base branch
+cora review --base origin/main
+
+# Review a pull request diff from a file
 cora review --diff-file pr.diff
 
 # Use a specific model
 cora review --model gpt-4o
 
-# Filter by severity
-cora review --severity major
-
-# Quiet mode (minimal output)
-cora review --quiet
-
-# Stream response
-cora review --stream
-
 # Output as SARIF
 cora review --format sarif
 
-# Review and upload SARIF to GitHub Code Scanning
-cora review --base develop --upload
-
 # Output as JSON
 cora review --format json
+
+# Upload SARIF to GitHub Code Scanning (implies --format sarif)
+cora review --upload
+
+# Set severity threshold
+cora review --severity major
+
+# Quiet mode (machine-readable)
+cora review --quiet
 ```
 
 ### `cora scan`
@@ -148,16 +150,19 @@ Scan files for code quality issues without requiring git context.
 
 ```bash
 # Scan current directory
-cora scan .
+cora scan
+
+# Scan a specific directory
+cora scan --path src/
 
 # Scan with focus areas
-cora scan . --focus security,performance
+cora scan --focus security,performance
 
 # Exclude patterns
-cora scan . --exclude "tests/**" --exclude "vendor/**"
+cora scan --exclude "tests/**" --exclude "examples/**"
 
-# Incremental (only changed files)
-cora scan . --incremental
+# Only scan changed files (incremental)
+cora scan --incremental
 ```
 
 ### `cora config`
@@ -168,55 +173,17 @@ Manage configuration.
 # Show current configuration
 cora config show
 
-# Set model
-cora config set model gpt-4o
-
-# Set provider
-cora config set provider anthropic
+# Set a configuration value
+cora config set model claude-sonnet-4-20250514
+cora config set severity major
 ```
 
 ### `cora init`
 
-Create a `.cora.yaml` config file in your project.
+Create a `.cora.yaml` config file in the current directory.
 
 ```bash
 cora init
-cora init --force
-```
-
-### `cora auth`
-
-Manage API key authentication.
-
-```bash
-cora auth login
-cora auth status
-cora auth remove
-```
-
-### `cora hook`
-
-Manage git hooks.
-
-```bash
-cora hook install
-cora hook uninstall
-```
-
-### `cora providers`
-
-List detected AI providers.
-
-```bash
-cora providers
-```
-
-### `cora upload-sarif`
-
-Upload a SARIF file to GitHub Code Scanning.
-
-```bash
-cora upload-sarif results.sarif
 ```
 
 ### `cora completion`
@@ -224,247 +191,111 @@ cora upload-sarif results.sarif
 Generate shell completions.
 
 ```bash
-cora completion bash
-cora completion zsh
-cora completion fish
+cora completion bash > ~/.cora-completion.bash
+cora completion zsh > ~/.cora-completion.zsh
+cora completion fish > ~/.cora-completion.fish
+```
+
+### `cora hook`
+
+Manage pre-commit git hooks.
+
+```bash
+cora hook install
+cora hook uninstall
 ```
 
 ## ⚙️ Configuration
 
-Create a `.cora.yaml` in your project root. API keys are stored at `~/.cora/config.toml`.
+Create a `.cora.yaml` in your project root or `~/.config/cora/config.yaml` globally:
 
 ```yaml
 # .cora.yaml
 
-# Review settings
-review:
-  severity: warning        # minimum severity level
-  max_issues: 20           # max issues to report
-  focus: security,performance  # focus areas
+# Provider configuration
+provider:
+  provider: openai          # openai | anthropic | google | ollama | custom
+  model: gpt-4o-mini
+  base_url: https://api.openai.com/v1   # Override for custom/self-hosted endpoints
 
-# Patterns to ignore
+# Focus areas for review (empty = all)
+focus:
+  - security
+  - performance
+  - bugs
+  - best_practice
+
+# Custom rules
+rules:
+  - "no unwrap"
+
+# Ignore configuration
 ignore:
-  - "vendor/**"
-  - "*.min.js"
-  - "migrations/**"
+  files:
+    - "tests/**"
+    - "vendor/**"
+    - "*.generated.*"
+  rules:
+    - "skip-rule-1"
 
-# Provider-specific model overrides
-providers:
-  openai:
-    model: gpt-4o
-  anthropic:
-    model: claude-sonnet-4-20250514
+# Hook configuration
+hook:
+  mode: warn               # warn | block
+  min_severity: major       # info | minor | major | critical
+  max_diff_size: 51200      # Max diff size in bytes (50 KB)
+
+# Output settings
+output:
+  format: pretty            # pretty | json | compact | sarif
+  color: true
 ```
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `CORA_API_KEY` | Generic API key |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `ANTHROPIC_API_KEY` | Anthropic API key |
-| `GROQ_API_KEY` | Groq API key |
-| `ZAI_API_KEY` | Z.AI API key |
-| `CORA_PROVIDER` | Override provider |
-| `CORA_MODEL` | Override model |
-| `CORA_BASE_URL` | Override API base URL |
-| `CORA_CONFIG` | Config file path |
-| `CORA_FORMAT` | Output format |
-| `CORA_NO_COLOR` | Disable colors |
-| `GITHUB_TOKEN` | GitHub token for SARIF upload |
-| `GITHUB_REPOSITORY` | GitHub repo for SARIF upload |
-| `GITHUB_REF` | GitHub ref for SARIF upload |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENAI_API_KEY` | OpenAI API key | — |
+| `ANTHROPIC_API_KEY` | Anthropic API key | — |
+| `GOOGLE_API_KEY` | Google AI API key | — |
+| `CORA_API_KEY` | API key (overrides provider-specific keys) | — |
+| `CORA_MODEL` | Override model | — |
+| `CORA_PROVIDER` | Override provider | — |
+| `CORA_BASE_URL` | Override API base URL | — |
+| `CORA_CONFIG` | Path to config file | `.cora.yaml` |
+| `CORA_FORMAT` | Output format (`pretty`, `json`, `compact`, `sarif`) | `pretty` |
+| `CORA_NO_COLOR` | Disable colored output | — |
 
 ## 🔗 CI/CD Integration
 
-Cora ships with **two reusable composite actions** for GitHub Actions. Both handle downloading the binary from GitHub Releases, running the review, posting PR comments, and optionally uploading SARIF. The difference is how LLM secrets are provided.
-
-### Which Action to Use?
-
-| | **cora-review** | **cora-review-simple** |
-|--|:--|:--|
-| Secret source | Infisical (OIDC) | GitHub Secrets |
-| Keys in GitHub? | ❌ Zero | ✅ 3 secrets |
-| Setup complexity | Infisical account needed | Copy-paste |
-| Best for | Teams with Infisical | Quick setup, personal repos |
-
----
-
-### Option A: `cora-review` — Infisical OIDC (recommended)
-
-Zero API keys stored in GitHub. Secrets are pulled at runtime from [Infisical](https://infisical.com/) via OIDC.
-
-#### Step 1: Copy the action
-
-```bash
-mkdir -p .github/actions/cora-review
-curl -sL https://raw.githubusercontent.com/ajianaz/cora-cli/develop/.github/actions/cora-review/action.yml \
-  -o .github/actions/cora-review/action.yml
-```
-
-#### Step 2: Add required secrets
-
-| Secret | Description |
-|--------|-------------|
-| `INFISICAL_IDENTITY_ID` | Infisical OIDC identity ID |
-| `CORA_API_KEY` | LLM API key (set in Infisical, not GitHub) |
-| `CORA_BASE_URL` | API base URL (set in Infisical, not GitHub) |
-| `CORA_MODEL` | Model ID (set in Infisical, not GitHub) |
-
-#### Step 3: Add the CI job
+### GitHub Actions
 
 ```yaml
-# .github/workflows/ci.yml
-name: CI
+# .github/workflows/review.yml
+name: Code Review
 
 on:
   pull_request:
-    branches: [develop]
-
-permissions:
-  contents: read
-  security-events: write
-  pull-requests: write
-  id-token: write   # Required for Infisical OIDC
+    types: [opened, synchronize, reopened]
 
 jobs:
-  cora-review:
-    name: Cora Review
+  review:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      security-events: write
-      pull-requests: write
-      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/cora-review
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          infisical-identity-id: ${{ secrets.INFISICAL_IDENTITY_ID }}
-          # Optional:
-          # upload-sarif: 'true'        # Enable GitHub Code Scanning
-          # cora-version: 'v0.1.2'      # Pin version (default: latest)
-          # severity: 'warning'          # Minimum severity (default: major)
-          # base-branch: 'origin/main'   # Diff target (default: origin/develop)
-```
+      - name: Install cora-cli
+        run: |
+          VERSION=$(curl -s https://api.github.com/repos/ajianaz/cora-cli/releases/latest | grep tag_name | cut -d'"' -f4)
+          curl -L "https://github.com/ajianaz/cora-cli/releases/download/${VERSION}/cora-x86_64-unknown-linux-gnu-${VERSION}.tar.gz" | tar xz
+          sudo mv cora /usr/local/bin/
 
----
-
-### Option B: `cora-review-simple` — GitHub Secrets
-
-Set API keys directly as GitHub repository secrets. No external service needed.
-
-#### Step 1: Copy the action
-
-```bash
-mkdir -p .github/actions/cora-review-simple
-curl -sL https://raw.githubusercontent.com/ajianaz/cora-cli/develop/.github/actions/cora-review-simple/action.yml \
-  -o .github/actions/cora-review-simple/action.yml
-```
-
-#### Step 2: Add required secrets
-
-Go to your repo → **Settings → Secrets and variables → Actions → New repository secret**:
-
-| Secret | Example Value |
-|--------|---------------|
-| `CORA_API_KEY` | `sk-...` (OpenAI, Anthropic, etc.) |
-| `CORA_BASE_URL` | `https://api.openai.com/v1` |
-| `CORA_MODEL` | `gpt-4o` |
-
-#### Step 3: Add the CI job
-
-```yaml
-# .github/workflows/ci.yml
-name: CI
-
-on:
-  pull_request:
-    branches: [develop]
-
-permissions:
-  contents: read
-  security-events: write
-  pull-requests: write
-
-jobs:
-  cora-review:
-    name: Cora Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      security-events: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: ./.github/actions/cora-review-simple
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          cora-api-key: ${{ secrets.CORA_API_KEY }}
-          cora-base-url: ${{ secrets.CORA_BASE_URL }}
-          cora-model: ${{ secrets.CORA_MODEL }}
-          # Optional:
-          # upload-sarif: 'true'        # Enable GitHub Code Scanning
-          # cora-version: 'v0.1.2'      # Pin version (default: latest)
-          # severity: 'warning'          # Minimum severity (default: major)
-          # base-branch: 'origin/main'   # Diff target (default: origin/develop)
-```
-
----
-
-### Configuration Reference (both actions)
-
-| Input | Default | Description |
-|-------|---------|-------------|
-| `github-token` | *(required)* | `secrets.GITHUB_TOKEN` for PR comments |
-| `cora-version` | `latest` | Version tag or `latest` for auto-resolve via API |
-| `upload-sarif` | `false` | Upload SARIF to GitHub Code Scanning |
-| `severity` | `major` | Minimum severity: `info`, `minor`, `major`, `critical` |
-| `base-branch` | `origin/develop` | Branch to diff against |
-
-### How It Works
-
-```
-PR opened
-  → Resolve cora version (GitHub API if "latest", or use pinned tag)
-  → Download cora binary from GitHub Releases
-  → Fetch LLM secrets (Infisical OIDC or GitHub Secrets)
-  → Run cora review --base <branch> --format sarif
-  → Parse SARIF → post structured PR comment (updates on re-run)
-  → Optionally upload SARIF to GitHub Code Scanning
-  → Exit 1 if error-level findings found (blocks merge)
-```
-
-### Block Merge on Critical Findings
-
-Add `Cora Review` as a required status check in your **Branch Protection** or **Repository Ruleset**. When cora finds error-level issues, the job fails and merge is blocked.
-
-### Pre-commit Hook
-
-Add cora as a git pre-commit hook for instant feedback:
-
-```bash
-cora hook install
-```
-
-Or add it manually to `.git/hooks/pre-commit`:
-
-```bash
-#!/bin/sh
-cora review --quiet --severity critical
-if [ $? -ne 0 ]; then
-  echo "❌ Code review found critical issues. Commit blocked."
-  exit 1
-fi
+      - name: Run code review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cora review --base origin/main --upload
 ```
 
 ### GitLab CI
@@ -477,48 +308,44 @@ code-review:
   before_script:
     - cargo install cora-cli
   script:
-    - cora review --base origin/develop --severity critical
+    - cora review --base origin/main --severity major
   variables:
     OPENAI_API_KEY: $CI_OPENAI_API_KEY
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 ```
 
-### ⚠️ Troubleshooting
+### Pre-commit Hook
 
-<details>
-<summary>Common issues and solutions</summary>
-
-**Q: `tar: Child returned status 1` — binary download fails**
-
-Release archives contain a binary named `cora` (since v0.1.2). Older releases used the target triple name. Always use `latest` or pin to `>=v0.1.2`.
-
-**Q: `latest` version doesn't resolve**
-
-The action resolves `latest` via GitHub API: `GET /repos/ajianaz/cora-cli/releases/latest` → extracts `tag_name`. This requires internet access on the runner. If rate-limited, pin a specific version instead.
-
-**Q: Branch protection blocks merge but no failing checks visible in UI**
-
-GitHub has two layers: **Branch Protection** (API) and **Repository Rulesets** (UI). Ruleset checks may not appear in the PR checks list. Verify via API:
+Add cora as a git pre-commit hook for instant feedback:
 
 ```bash
-gh api repos/{owner}/{repo}/rulesets/{id}
-gh api repos/{owner}/{repo}/branches/{branch}/protection
+# Install as pre-commit hook
+cora hook install
+
+# Review only staged files before each commit
+# This runs automatically on `git commit`
+
+# Remove the hook
+cora hook uninstall
 ```
 
-**Q: Chicken-and-egg — action needs new binary but can't merge to release it**
+Or add it manually to `.git/hooks/pre-commit`:
 
-Temporarily remove `Cora Review` from your ruleset's required checks, merge the fix, release, then re-add.
+```bash
+#!/bin/sh
+# cora-cli pre-commit hook
+cora review --quiet --severity major
+if [ $? -ne 0 ]; then
+  echo "❌ Code review found critical issues. Commit blocked."
+  echo "   Run 'cora review' to see details, or use 'git commit --no-verify' to skip."
+  exit 1
+fi
+```
 
-**Q: Private repos get 403 on Branch Protection API**
+### With [pre-commit](https://pre-commit.com) framework
 
-GitHub Free doesn't support Branch Protection API for private repos. Use **Repository Rulesets** instead.
-
-**Q: Should cora-cli review itself in CI?**
-
-No — the action downloads the released binary, which doesn't include in-progress changes. Self-review always reviews the *previous* release against itself.
-
-</details>
+> 🚧 Planned — the pre-commit hook repo will be available soon. For now, use `cora hook install` directly.
 
 ## 🆚 Positioning: How Cora Compares
 
@@ -542,6 +369,8 @@ No — the action downloads the released binary, which doesn't include in-progre
 - **vs. AI IDE Agents (Copilot, Cursor)**: Cora is pipeline-first — it runs in CI/CD, pre-commit hooks, and headless environments. It's the tool you use when you want AI review baked into your development workflow, not tied to a specific editor.
 
 ## 🛠️ Development
+
+Requires **Rust 1.85+**.
 
 ```bash
 # Build
