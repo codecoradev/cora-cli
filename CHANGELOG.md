@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `cora config set --global` — write config to `~/.cora/config.yaml` instead of project `.cora.yaml`
+- `cora config set base_url` — set base URL via CLI (previously only in YAML)
+- Global config support (`~/.cora/config.yaml`) with priority chain: CLI flags → env vars → project → global → defaults
+- Auto-migration from old `~/.cora/config.toml` to new YAML + `auth.toml` split
+
+### Changed
+
+- `cora config set` now writes YAML instead of TOML (compatible with config loader)
+- API key storage moved from `~/.cora/config.toml` to `~/.cora/auth.toml` (0600 permissions)
+- YAML serialization uses `skip_serializing_if` — no more `null` values in output
+
+### Fixed
+
+- **Severity comparison inverted** — `Critical` issues no longer silently pass `should_block` check (Ord ordering bug)
+- Hook `mode: block` no longer exits with code 2 when "No issues found" (severity filter mismatch)
+- Consistent severity logic across review, scan, and block mode paths
+
 ## [0.1.2] - 2025-05-29
 
 ### Added
