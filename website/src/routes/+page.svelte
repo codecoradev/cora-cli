@@ -317,6 +317,36 @@
 				<p class="mt-2 text-sm text-[var(--accent)]">Your code stays yours</p>
 				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Runs entirely on your machine. No cloud, no telemetry, no data leaving your network. Perfect for Gitea and air-gapped environments.</p>
 			</div>
+
+			<!-- Feature 7: Deterministic Reviews -->
+			<div class="glass-card scroll-reveal [transition-delay:600ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Deterministic Reviews</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Same diff, same issues</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Temperature defaults to 0. Identical diffs always produce identical findings — perfect for CI reproducibility.</p>
+			</div>
+
+			<!-- Feature 8: Diff-Hash Caching -->
+			<div class="glass-card scroll-reveal [transition-delay:700ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Smart Caching</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Never review the same diff twice</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Reviews are cached by diff hash in <code class="text-[var(--accent)]">~/.cache/cora/reviews/</code>. Re-reviewing an unchanged diff returns cached results instantly. Use <code class="text-[var(--accent)]">--no-cache</code> to bypass.</p>
+			</div>
+
+			<!-- Feature 9: Custom Prompts + Anti-Hallucination -->
+			<div class="glass-card scroll-reveal [transition-delay:800ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Custom Prompts &amp; Anti-Hallucination</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Control the review, trust the output</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Override system prompts for review and scan. File path injection and post-parse filtering ensure the LLM only reports issues that exist in your actual diff.</p>
+			</div>
 		</div>
 	</section>
 

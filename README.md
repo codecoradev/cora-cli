@@ -26,6 +26,11 @@
 - 🔧 **Configurable** — YAML config file with project-level defaults
 - 🪝 **Git Hooks** — Pre-commit integration for instant feedback
 - 📊 **Exit Codes** — Non-zero exit on critical findings for pipeline gating
+- 🧠 **Deterministic Reviews** — Temperature 0 by default: same diff always produces the same issues
+- 💾 **Diff-Hash Caching** — Reviews cached by diff hash in `~/.cache/cora/reviews/` — skip repeat reviews with `--no-cache`
+- 🎯 **Custom System Prompts** — Override review/scan prompts via config or file path
+- 🛡️ **Anti-Hallucination** — File path injection and post-parse filtering keep LLM output grounded
+- 🌡️ **Configurable LLM Params** — Tune temperature, max tokens, timeout, and cache TTL per project
 
 ## 📦 Installation
 
@@ -141,6 +146,9 @@ cora review --severity major
 
 # Quiet mode (machine-readable)
 cora review --quiet
+
+# Skip cached reviews
+cora review --no-cache
 ```
 
 ### `cora scan`
@@ -232,12 +240,30 @@ provider:
   model: gpt-4o-mini
   base_url: https://api.openai.com/v1   # Override for custom/self-hosted endpoints
 
+# LLM parameters
+llm:
+  temperature: 0              # Default: 0 (deterministic — same diff = same issues)
+  max_tokens: 4096            # Default: 4096
+  timeout: 120                # Default: 120 (seconds)
+  cache_ttl: 1440             # Default: 1440 (minutes) — diff-hash cache TTL
+
 # Focus areas for review (empty = all)
 focus:
   - security
   - performance
   - bugs
   - best_practice
+
+# Review options
+review:
+  system_prompt: "You are a senior Rust code reviewer."
+  # system_prompt_file: ./review-prompt.md   # Load prompt from file
+  response_format: json_object              # Opt-in structured JSON output
+
+# Scan options
+# scan:
+#   system_prompt: "Focus on security vulnerabilities."
+#   system_prompt_file: ./scan-prompt.md
 
 # Custom rules
 rules:
@@ -278,6 +304,7 @@ output:
 | `CORA_CONFIG` | Path to config file | `.cora.yaml` |
 | `CORA_FORMAT` | Output format (`pretty`, `json`, `compact`, `sarif`) | `pretty` |
 | `CORA_NO_COLOR` | Disable colored output | — |
+| `CORA_NO_CACHE` | Skip diff-hash cache (same as `--no-cache`) | — |
 
 ### Authentication
 
