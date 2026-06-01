@@ -219,7 +219,6 @@ pub fn load_config(
     cli_provider: Option<&str>,
     cli_model: Option<&str>,
     cli_base_url: Option<&str>,
-    _cli_api_key: Option<&str>,
     cli_format: Option<&str>,
     no_color: bool,
 ) -> Result<Config> {
@@ -387,7 +386,9 @@ pub fn save_api_key(key: &str) -> Result<()> {
     std::fs::create_dir_all(&dir).with_context(|| format!("failed to create {}", dir.display()))?;
 
     let path = dir.join(AUTH_FILENAME);
-    let content = format!("api_key = \"{key}\"\n");
+    let mut table = toml::Table::new();
+    table.insert("api_key".to_string(), toml::Value::String(key.to_string()));
+    let content = table.to_string();
 
     std::fs::write(&path, content)
         .with_context(|| format!("failed to write {}", path.display()))?;

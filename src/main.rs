@@ -429,11 +429,9 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         globals.provider.as_deref(),
         globals.model.as_deref(),
         globals.base_url.as_deref(),
-        globals.api_key.as_deref(),
         globals.format.as_deref(),
         globals.no_color,
     )?;
-
     let llm_config = loader::build_llm_config(&config, globals.api_key.as_deref())?;
 
     // If --upload is set, force SARIF format
@@ -495,7 +493,7 @@ async fn upload_sarif_content(
 
     // Write SARIF to a temp file and upload it
     let tmp_dir = std::env::temp_dir();
-    let tmp_path = tmp_dir.join("cora-sarif-upload.json");
+    let tmp_path = tmp_dir.join(format!("cora-sarif-upload-{}.json", std::process::id()));
 
     {
         let mut file = std::fs::File::create(&tmp_path)?;
@@ -529,11 +527,9 @@ async fn cmd_scan(globals: &GlobalOptions, opts: ScanOpts) -> Result<i32> {
         globals.provider.as_deref(),
         globals.model.as_deref(),
         globals.base_url.as_deref(),
-        globals.api_key.as_deref(),
         globals.format.as_deref(),
         globals.no_color,
     )?;
-
     let llm_config = loader::build_llm_config(&config, globals.api_key.as_deref())?;
 
     let format = resolve_format(globals.format.as_deref(), &config)?;
