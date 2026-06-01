@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-06-01
+
+### Added
+
+- **Diff-hash caching** — review results cached by SHA-256 of diff + model + temperature in `~/.cache/cora/reviews/`. Cache TTL configurable via `llm.cache_ttl` (#100)
+- **`--no-cache` flag** — bypass cache for fresh reviews (#100)
+- **Configurable LLM parameters** — `llm.temperature` (default: 0), `llm.max_tokens` (default: 4096), `llm.timeout` (default: 120s), `llm.cache_ttl` (default: 1440 min) in `.cora.yaml` (#98 #101)
+- **Git ref validation** — rejects refs containing shell metacharacters or path traversal sequences (#73)
+
+### Fixed
+
+- **Temperature default now 0** — eliminates non-deterministic LLM output. Same diff produces identical issues on every run (#98, #97)
+- **HTTP timeout actually works** — per-request timeout via reqwest RequestBuilder (not client-level). Configurable timeout respected (#99)
+- **Connection pooling** — shared reqwest::Client via LazyLock, reused across all requests (#99)
+- **Cache key includes model + temperature** — config changes invalidate cache automatically (#100)
+- **Silent config corruption** — malformed `.cora.yaml` now shows clear error with file path and hint (#78)
+- **Composite action KeyError on API failure** — version resolution retries 3x with 5s delay, falls back to v0.1.6 with warning. Fixed in both `cora-review` and `cora-review-simple` actions (#102)
+
 ## [0.1.6] - 2026-06-01
 
 ### Added
