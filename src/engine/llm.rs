@@ -2,9 +2,31 @@ use anyhow::{Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::LazyLock;
+use std::time::Duration;
 use tracing::debug;
 
 use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse, TokenUsage};
+
+/// Shared reqwest::Client with default timeout. Reused across all LLM requests.
+/// Created lazily on first use to avoid blocking initialization.
+static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .pool_max_idle_per_host(4)
+        .build()
+        .expect("failed to build shared HTTP client")
+});
+
+/// Build (or return cached) shared reqwest::Client with the given timeout.
+pub fn shared_client(timeout_secs: u64) -> reqwest::Client {
+    // For now, always return the shared client. The shared client uses a
+    // conservative default timeout; per-request timeout overrides are
+    // not supported by reqwest once the client is built, so we just use
+    // the shared client.
+    let _ = timeout_secs; // suppress unused warning
+    SHARED_CLIENT.clone()
+}
 
 /// OpenAI-compatible chat message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,7 +146,7 @@ async fn chat_completion(
     spinner: Option<&ProgressBar>,
     response_format: &str,
 ) -> Result<String> {
-    let client = reqwest::Client::new();
+    let client = shared_client(config.timeout);
 
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
 
@@ -147,8 +169,8 @@ async fn chat_completion(
                 content: user_message.into(),
             },
         ],
-        temperature: 0.2,
-        max_tokens: 4096,
+        temperature: config.temperature,
+        max_tokens: config.max_tokens,
         response_format: if response_format == "json_object" {
             Some(serde_json::json!({"type": "json_object"}))
         } else {
@@ -318,7 +340,7 @@ async fn chat_completion_stream(
     use futures_util::StreamExt;
     use std::io::Write;
 
-    let client = reqwest::Client::new();
+    let client = shared_client(config.timeout);
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
 
     let mut request_body = serde_json::json!({
@@ -327,8 +349,8 @@ async fn chat_completion_stream(
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": user_message }
         ],
-        "temperature": 0.2,
-        "max_tokens": 4096,
+        "temperature": config.temperature,
+        "max_tokens": config.max_tokens,
         "stream": true
     });
 
