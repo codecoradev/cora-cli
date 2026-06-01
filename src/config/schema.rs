@@ -18,6 +18,16 @@ pub struct Config {
     pub hook: HookConfig,
     /// Output configuration.
     pub output: OutputConfig,
+    /// Response format for LLM API calls ("none" or "json_object").
+    pub response_format: String,
+    /// Optional custom system prompt that replaces the default for review.
+    pub review_system_prompt_override: Option<String>,
+    /// Optional custom system prompt file path for review.
+    pub review_system_prompt_file: Option<String>,
+    /// Optional custom system prompt that replaces the default for scan.
+    pub scan_system_prompt_override: Option<String>,
+    /// Optional custom system prompt file path for scan.
+    pub scan_system_prompt_file: Option<String>,
 }
 
 /// Provider configuration.
@@ -83,6 +93,11 @@ impl Default for Config {
                 format: "pretty".to_string(),
                 color: true,
             },
+            response_format: "none".to_string(),
+            review_system_prompt_override: None,
+            review_system_prompt_file: None,
+            scan_system_prompt_override: None,
+            scan_system_prompt_file: None,
         }
     }
 }
@@ -109,6 +124,10 @@ pub struct CoraFile {
     pub hook: Option<HookSection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<OutputSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review: Option<ReviewSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan: Option<ScanSection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -145,6 +164,26 @@ pub struct OutputSection {
     pub format: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<bool>,
+}
+
+/// Review-specific configuration section.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ReviewSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt_file: Option<String>,
+}
+
+/// Scan-specific configuration section.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ScanSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt_file: Option<String>,
 }
 
 impl CoraFile {
@@ -196,6 +235,25 @@ impl CoraFile {
             }
             if let Some(v) = o.color {
                 config.output.color = v;
+            }
+        }
+        if let Some(r) = &self.review {
+            if let Some(v) = &r.response_format {
+                config.response_format = v.clone();
+            }
+            if let Some(v) = &r.system_prompt {
+                config.review_system_prompt_override = Some(v.clone());
+            }
+            if let Some(v) = &r.system_prompt_file {
+                config.review_system_prompt_file = Some(v.clone());
+            }
+        }
+        if let Some(s) = &self.scan {
+            if let Some(v) = &s.system_prompt {
+                config.scan_system_prompt_override = Some(v.clone());
+            }
+            if let Some(v) = &s.system_prompt_file {
+                config.scan_system_prompt_file = Some(v.clone());
             }
         }
     }
@@ -467,5 +525,163 @@ output:
         let back: Config = serde_json::from_str(&json).unwrap();
         assert_eq!(back.provider.provider, cfg.provider.provider);
         assert_eq!(back.output.format, cfg.output.format);
+    }
+
+    // ─── Config::default() new fields ───
+
+    #[test]
+    fn config_default_response_format_none() {
+        let cfg = Config::default();
+        assert_eq!(cfg.response_format, "none");
+    }
+
+    #[test]
+    fn config_default_system_prompt_overrides_none() {
+        let cfg = Config::default();
+        assert!(cfg.review_system_prompt_override.is_none());
+        assert!(cfg.review_system_prompt_file.is_none());
+        assert!(cfg.scan_system_prompt_override.is_none());
+        assert!(cfg.scan_system_prompt_file.is_none());
+    }
+
+    // ─── ReviewSection parsing and merge ───
+
+    #[test]
+    fn parse_review_section_with_response_format() {
+        let yaml = r#"
+review:
+  response_format: json_object
+"#;
+        let cora = CoraFile::from_str(yaml).unwrap();
+        assert_eq!(
+            cora.review.as_ref().unwrap().response_format.as_deref(),
+            Some("json_object")
+        );
+    }
+
+    #[test]
+    fn parse_review_section_with_system_prompt() {
+        let yaml = r#"
+review:
+  system_prompt: |
+    You are a security-focused reviewer.
+  system_prompt_file: .cora/prompts/review.md
+"#;
+        let cora = CoraFile::from_str(yaml).unwrap();
+        assert_eq!(
+            cora.review.as_ref().unwrap().system_prompt.as_deref(),
+            Some("You are a security-focused reviewer.\n")
+        );
+        assert_eq!(
+            cora.review.as_ref().unwrap().system_prompt_file.as_deref(),
+            Some(".cora/prompts/review.md")
+        );
+    }
+
+    #[test]
+    fn merge_review_response_format() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            review: Some(ReviewSection {
+                response_format: Some("json_object".to_string()),
+                system_prompt: None,
+                system_prompt_file: None,
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(cfg.response_format, "json_object");
+    }
+
+    #[test]
+    fn merge_review_system_prompt() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            review: Some(ReviewSection {
+                response_format: None,
+                system_prompt: Some("Custom prompt here.".to_string()),
+                system_prompt_file: None,
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(
+            cfg.review_system_prompt_override.as_deref(),
+            Some("Custom prompt here.")
+        );
+    }
+
+    #[test]
+    fn merge_review_system_prompt_file() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            review: Some(ReviewSection {
+                response_format: None,
+                system_prompt: None,
+                system_prompt_file: Some("prompts/review.md".to_string()),
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(
+            cfg.review_system_prompt_file.as_deref(),
+            Some("prompts/review.md")
+        );
+    }
+
+    // ─── ScanSection parsing and merge ───
+
+    #[test]
+    fn parse_scan_section_with_system_prompt() {
+        let yaml = r#"
+scan:
+  system_prompt: |
+    You are a performance-focused scanner.
+"#;
+        let cora = CoraFile::from_str(yaml).unwrap();
+        assert_eq!(
+            cora.scan.as_ref().unwrap().system_prompt.as_deref(),
+            Some("You are a performance-focused scanner.\n")
+        );
+    }
+
+    #[test]
+    fn merge_scan_system_prompt() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            scan: Some(ScanSection {
+                system_prompt: Some("Performance only.".to_string()),
+                system_prompt_file: None,
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(
+            cfg.scan_system_prompt_override.as_deref(),
+            Some("Performance only.")
+        );
+    }
+
+    // ─── Full .cora.yaml with review and scan sections ───
+
+    #[test]
+    fn parse_cora_file_with_review_and_scan() {
+        let yaml = r#"
+review:
+  response_format: json_object
+  system_prompt: |
+    Security only.
+scan:
+  system_prompt: |
+    Performance only.
+  system_prompt_file: scan.md
+"#;
+        let cora = CoraFile::from_str(yaml).unwrap();
+        let review = cora.review.unwrap();
+        assert_eq!(review.response_format.as_deref(), Some("json_object"));
+        assert_eq!(review.system_prompt.as_deref(), Some("Security only.\n"));
+        let scan = cora.scan.unwrap();
+        assert_eq!(scan.system_prompt.as_deref(), Some("Performance only.\n"));
+        assert_eq!(scan.system_prompt_file.as_deref(), Some("scan.md"));
     }
 }

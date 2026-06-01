@@ -44,41 +44,66 @@ struct Usage {
 }
 
 /// System prompt for code review.
-const REVIEW_SYSTEM_PROMPT: &str = r#"You are an expert code reviewer. Your job is to analyze code diffs and identify issues.
+const REVIEW_SYSTEM_PROMPT: &str = r#"You are an expert code reviewer providing actionable feedback on code diffs.
 
-Focus on these categories:
-- Security vulnerabilities (injections, auth issues, data exposure)
-- Performance problems (inefficient algorithms, memory leaks, N+1 queries)
-- Bugs (logic errors, off-by-one, null/undefined handling)
-- Best practices (idiomatic code, error handling, naming)
+CRITICAL CONSTRAINTS:
+1. You MUST ONLY comment on files that appear in the diff. Do NOT invent or hallucinate file paths.
+2. Each issue MUST have a clear, descriptive title (one brief sentence, max 100 chars).
+3. If uncertain whether something is a real issue, omit it rather than guessing.
 
-For each issue found, return a JSON array of objects with these fields:
-- "file": string — the file path
+SEVERITY LEVELS:
+- "critical": Security vulnerabilities, crashes, data loss, breaking bugs
+- "major": Bugs that affect functionality, significant problems
+- "minor": Style issues, small nitpicks, minor improvements
+- "info": Suggestions, optional enhancements
+
+FOCUS AREAS (in priority order):
+1. Security vulnerabilities (SQL injection, XSS, auth issues, data exposure)
+2. Bugs and logic errors (off-by-one, null handling, race conditions)
+3. Performance problems (inefficient algorithms, memory leaks, N+1 queries)
+4. Best practices (idiomatic code, error handling, naming)
+
+RESPONSE FORMAT:
+Return a JSON array of objects with these fields:
+- "file": string — the file path (MUST be from the diff)
 - "line": number or null — the approximate line number
 - "severity": "critical" | "major" | "minor" | "info"
-- "issue_type": string — category (security, performance, bugs, best-practice, style)
+- "issue_type": string — category (security, performance, bugs, best_practice, style, suggestion)
 - "title": string — short description (max 100 chars)
 - "body": string — detailed explanation
 - "suggested_fix": string or null — optional fix suggestion
 
-If no issues are found, return an empty array: []
+If no issues are found, return: []
 
-Return ONLY the JSON array. No markdown, no explanation, just the JSON."#;
+Return ONLY the JSON array. No markdown code fences, no explanation, no conversational text.
+Start with [ and end with ]."#;
 
 /// System prompt for full project scanning.
 const SCAN_SYSTEM_PROMPT: &str = r#"You are an expert code reviewer performing a full project scan. Analyze the provided code files and identify issues.
 
-Focus on these categories:
-- Security vulnerabilities
-- Performance problems
-- Bugs and logic errors
-- Best practices and code quality
+CRITICAL CONSTRAINTS:
+1. You MUST ONLY comment on files that were provided to you. Do NOT invent file paths.
+2. Each issue MUST have a clear, descriptive title (one brief sentence, max 100 chars).
+3. If uncertain whether something is a real issue, omit it rather than guessing.
 
-For each issue found, return a JSON array of objects with these fields:
-- "file": string — the file path
+SEVERITY LEVELS:
+- "critical": Security vulnerabilities, crashes, data loss, breaking bugs
+- "major": Bugs that affect functionality, significant problems
+- "minor": Style issues, small nitpicks, minor improvements
+- "info": Suggestions, optional enhancements
+
+FOCUS AREAS (in priority order):
+1. Security vulnerabilities (SQL injection, XSS, auth issues, data exposure)
+2. Bugs and logic errors (off-by-one, null handling, race conditions)
+3. Performance problems (inefficient algorithms, memory leaks, N+1 queries)
+4. Best practices (idiomatic code, error handling, naming)
+
+RESPONSE FORMAT:
+Return a JSON array of objects with these fields:
+- "file": string — the file path (MUST be from the provided files)
 - "line": number or null — the approximate line number
 - "severity": "critical" | "major" | "minor" | "info"
-- "issue_type": string — category
+- "issue_type": string — category (security, performance, bugs, best_practice, style, suggestion)
 - "title": string — short description (max 100 chars)
 - "body": string — detailed explanation
 - "suggested_fix": string or null — optional fix suggestion
@@ -88,7 +113,8 @@ Also include a "summary" string at the end after a "|||" separator:
 
 If no issues are found, return: []|||No issues found.
 
-Return ONLY this format. No markdown."#;
+Return ONLY this format. No markdown code fences, no conversational text.
+Start the JSON array with [ and end with ]."#;
 
 /// Send a chat completion request to an OpenAI-compatible API.
 async fn chat_completion(
@@ -96,6 +122,7 @@ async fn chat_completion(
     system_prompt: &str,
     user_message: &str,
     spinner: Option<&ProgressBar>,
+    response_format: &str,
 ) -> Result<String> {
     let client = reqwest::Client::new();
 
@@ -122,7 +149,11 @@ async fn chat_completion(
         ],
         temperature: 0.2,
         max_tokens: 4096,
-        response_format: None,
+        response_format: if response_format == "json_object" {
+            Some(serde_json::json!({"type": "json_object"}))
+        } else {
+            None
+        },
     };
 
     debug!(model = %config.model, url = %url, "sending LLM request");
@@ -184,16 +215,21 @@ pub async fn review_diff(
     diff: &str,
     focus: &[String],
     rules: &[String],
+    response_format: &str,
+    system_prompt_override: Option<&str>,
 ) -> Result<ReviewResponse> {
     let spinner = create_spinner("Reviewing diff…");
 
     let user_prompt = build_review_prompt(diff, focus, rules);
 
+    let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
+
     let raw = chat_completion(
         llm_config,
-        REVIEW_SYSTEM_PROMPT,
+        system_prompt,
         &user_prompt,
         Some(&spinner),
+        response_format,
     )
     .await?;
 
@@ -220,9 +256,10 @@ pub async fn review_diff(
             );
             let retry_raw = chat_completion(
                 llm_config,
-                REVIEW_SYSTEM_PROMPT,
+                system_prompt,
                 &strict_prompt,
                 Some(&spinner),
+                response_format,
             )
             .await?;
             let (issues, summary, tokens_used) = parse_review_response(&retry_raw)?;
@@ -246,10 +283,15 @@ pub async fn review_diff_stream(
     diff: &str,
     focus: &[String],
     rules: &[String],
+    response_format: &str,
+    system_prompt_override: Option<&str>,
 ) -> Result<ReviewResponse> {
     let user_prompt = build_review_prompt(diff, focus, rules);
 
-    let raw = chat_completion_stream(llm_config, REVIEW_SYSTEM_PROMPT, &user_prompt).await?;
+    let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
+
+    let raw =
+        chat_completion_stream(llm_config, system_prompt, &user_prompt, response_format).await?;
 
     let (issues, summary, tokens_used) = parse_review_response(&raw)?;
 
@@ -271,6 +313,7 @@ async fn chat_completion_stream(
     config: &LLMConfig,
     system_prompt: &str,
     user_message: &str,
+    response_format: &str,
 ) -> Result<String> {
     use futures_util::StreamExt;
     use std::io::Write;
@@ -278,7 +321,7 @@ async fn chat_completion_stream(
     let client = reqwest::Client::new();
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
 
-    let request_body = serde_json::json!({
+    let mut request_body = serde_json::json!({
         "model": config.model,
         "messages": [
             { "role": "system", "content": system_prompt },
@@ -288,6 +331,10 @@ async fn chat_completion_stream(
         "max_tokens": 4096,
         "stream": true
     });
+
+    if response_format == "json_object" {
+        request_body["response_format"] = serde_json::json!({"type": "json_object"});
+    }
 
     debug!(model = %config.model, url = %url, "sending streaming LLM request");
 
@@ -394,8 +441,12 @@ pub async fn scan_files(
     files_content: &str,
     focus: &[String],
     rules: &[String],
+    response_format: &str,
+    system_prompt_override: Option<&str>,
 ) -> Result<(Vec<ReviewIssue>, Option<String>, Option<TokenUsage>)> {
     let spinner = create_spinner("Scanning files…");
+
+    let system_prompt = system_prompt_override.unwrap_or(SCAN_SYSTEM_PROMPT);
 
     let mut user_prompt = String::new();
     if !focus.is_empty() {
@@ -414,14 +465,73 @@ pub async fn scan_files(
     user_prompt.push_str("Files to review:\n\n");
     user_prompt.push_str(files_content);
 
-    let raw = chat_completion(llm_config, SCAN_SYSTEM_PROMPT, &user_prompt, Some(&spinner)).await?;
+    let raw = chat_completion(
+        llm_config,
+        system_prompt,
+        &user_prompt,
+        Some(&spinner),
+        response_format,
+    )
+    .await?;
 
     parse_scan_response(&raw)
+}
+
+/// Extract file paths from a unified diff string.
+/// Matches lines like `--- a/path/file.rs` and `+++ b/path/file.rs`.
+pub(crate) fn extract_file_paths_from_diff(diff: &str) -> Vec<String> {
+    let mut paths = std::collections::HashSet::new();
+    for line in diff.lines() {
+        let trimmed = line.trim_start();
+        // Match unified diff headers: `--- a/path` or `+++ b/path`
+        // Also handles `--- path` without a/ or b/ prefix (some diffs)
+        let (prefix, strip_ab) = if let Some(rest) = trimmed.strip_prefix("--- a/") {
+            (rest, true)
+        } else if let Some(rest) = trimmed.strip_prefix("+++ b/") {
+            (rest, true)
+        } else if let Some(rest) = trimmed.strip_prefix("--- ") {
+            (rest, false)
+        } else if let Some(rest) = trimmed.strip_prefix("+++ ") {
+            (rest, false)
+        } else {
+            continue;
+        };
+        // Skip /dev/null (binary files, deletes)
+        if prefix.starts_with("/dev/null") {
+            continue;
+        }
+        let path = if strip_ab {
+            prefix.to_string()
+        } else {
+            // Strip a/ or b/ prefix if present
+            prefix
+                .strip_prefix("a/")
+                .or_else(|| prefix.strip_prefix("b/"))
+                .unwrap_or(prefix)
+                .to_string()
+        };
+        // Strip trailing \t (git shows tabs for renamed files)
+        let path = path.split('\t').next().unwrap_or(&path);
+        if !path.is_empty() {
+            paths.insert(path.to_string());
+        }
+    }
+    paths.into_iter().collect()
 }
 
 /// Build the user prompt for diff review.
 fn build_review_prompt(diff: &str, focus: &[String], rules: &[String]) -> String {
     let mut prompt = String::new();
+
+    // Inject valid file paths to reduce hallucination
+    let file_paths = extract_file_paths_from_diff(diff);
+    if !file_paths.is_empty() {
+        prompt.push_str("Valid files in this diff:\n");
+        for path in &file_paths {
+            prompt.push_str(&format!("- \"{}\"\n", path));
+        }
+        prompt.push('\n');
+    }
 
     if !focus.is_empty() {
         prompt.push_str(&format!("Focus areas: {}\n\n", focus.join(", ")));
@@ -904,6 +1014,52 @@ mod tests {
     fn build_prompt_with_rules() {
         let prompt = build_review_prompt("d", &[], &["no unwrap".to_string()]);
         assert!(prompt.contains("no unwrap"));
+    }
+
+    #[test]
+    fn build_prompt_contains_file_paths() {
+        let diff = "diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1 +1 @@\n- old\n+ new";
+        let prompt = build_review_prompt(diff, &[], &[]);
+        assert!(prompt.contains("Valid files in this diff:"));
+        assert!(prompt.contains("src/main.rs"));
+    }
+
+    #[test]
+    fn build_prompt_no_file_paths_for_empty_diff() {
+        let prompt = build_review_prompt("no diff headers here", &[], &[]);
+        assert!(!prompt.contains("Valid files in this diff:"));
+    }
+
+    // ─── extract_file_paths_from_diff ───
+
+    #[test]
+    fn extract_paths_single_file() {
+        let diff = "--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1 +1 @@\n- old\n+ new";
+        let paths = extract_file_paths_from_diff(diff);
+        assert_eq!(paths, vec!["src/main.rs"]);
+    }
+
+    #[test]
+    fn extract_paths_multiple_files() {
+        let diff = "--- a/src/a.rs\n+++ b/src/a.rs\n--- a/src/b.rs\n+++ b/src/b.rs";
+        let paths = extract_file_paths_from_diff(diff);
+        assert!(paths.contains(&"src/a.rs".to_string()));
+        assert!(paths.contains(&"src/b.rs".to_string()));
+    }
+
+    #[test]
+    fn extract_paths_skips_dev_null() {
+        let diff = "--- /dev/null\n+++ b/src/new.rs\n--- a/src/old.rs\n+++ /dev/null";
+        let paths = extract_file_paths_from_diff(diff);
+        assert!(paths.contains(&"src/new.rs".to_string()));
+        assert!(paths.contains(&"src/old.rs".to_string()));
+    }
+
+    #[test]
+    fn extract_paths_deduplicates() {
+        let diff = "--- a/src/main.rs\n+++ b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs";
+        let paths = extract_file_paths_from_diff(diff);
+        assert_eq!(paths.len(), 1);
     }
 
     // ─── repair_json_string ───

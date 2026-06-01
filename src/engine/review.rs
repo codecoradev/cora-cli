@@ -5,6 +5,52 @@ use crate::config::schema::Config;
 use crate::engine::llm;
 use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse, ScanResponse};
 
+/// Load a custom system prompt from a file path.
+/// Returns the file content, or None if the file doesn't exist, can't be read,
+/// or is outside the project root (path traversal guard).
+fn load_system_prompt_file(path: &str) -> Option<String> {
+    let canonical = match std::fs::canonicalize(path) {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::debug!(path = path, "system_prompt_file does not exist");
+            return None;
+        }
+    };
+    let project_root = std::env::current_dir().ok()?;
+    let project_root = std::fs::canonicalize(&project_root).ok()?;
+
+    if !canonical.starts_with(&project_root) {
+        tracing::warn!(
+            path = path,
+            "system_prompt_file is outside project root, ignoring (potential path traversal)"
+        );
+        return None;
+    }
+
+    match std::fs::read_to_string(&canonical) {
+        Ok(content) => Some(content),
+        Err(e) => {
+            tracing::warn!(
+                path = path,
+                error = %e,
+                "failed to read system_prompt_file, using default prompt"
+            );
+            None
+        }
+    }
+}
+
+/// Resolve the effective system prompt: inline override > file override > None (use default).
+pub fn resolve_system_prompt(inline: Option<&str>, file_path: Option<&str>) -> Option<String> {
+    if let Some(prompt) = inline {
+        Some(prompt.to_string())
+    } else if let Some(path) = file_path {
+        load_system_prompt_file(path)
+    } else {
+        None
+    }
+}
+
 /// Run a code review on the given diff string.
 ///
 /// Builds the prompt from the diff + config focus/rules, calls the LLM,
@@ -53,11 +99,52 @@ async fn review_diff_inner(
         });
     }
 
+    // Extract valid file paths for post-parse filtering
+    let valid_files = llm::extract_file_paths_from_diff(diff);
+
+    // Resolve custom system prompt for review
+    let review_prompt = resolve_system_prompt(
+        config.review_system_prompt_override.as_deref(),
+        config.review_system_prompt_file.as_deref(),
+    );
+
     let mut response = if stream {
-        llm::review_diff_stream(llm_config, diff, &config.focus, &config.rules).await?
+        llm::review_diff_stream(
+            llm_config,
+            diff,
+            &config.focus,
+            &config.rules,
+            &config.response_format,
+            review_prompt.as_deref(),
+        )
+        .await?
     } else {
-        llm::review_diff(llm_config, diff, &config.focus, &config.rules).await?
+        llm::review_diff(
+            llm_config,
+            diff,
+            &config.focus,
+            &config.rules,
+            &config.response_format,
+            review_prompt.as_deref(),
+        )
+        .await?
     };
+
+    // Filter out issues with invalid file paths (hallucination guard)
+    if !valid_files.is_empty() {
+        let before = response.issues.len();
+        response
+            .issues
+            .retain(|issue| is_valid_file_path(&issue.file, &valid_files));
+        let filtered = before - response.issues.len();
+        if filtered > 0 {
+            debug!(
+                filtered,
+                remaining = response.issues.len(),
+                "filtered issues with invalid file paths"
+            );
+        }
+    }
 
     // Apply ignore rules: filter out issues matching ignored patterns
     response.issues = apply_ignore_rules(response.issues, &config.ignore.rules);
@@ -109,8 +196,21 @@ pub async fn scan_project(
         });
     }
 
-    let (issues, summary, tokens_used) =
-        llm::scan_files(llm_config, files_content, &config.focus, &config.rules).await?;
+    // Resolve custom system prompt for scan
+    let scan_prompt = resolve_system_prompt(
+        config.scan_system_prompt_override.as_deref(),
+        config.scan_system_prompt_file.as_deref(),
+    );
+
+    let (issues, summary, tokens_used) = llm::scan_files(
+        llm_config,
+        files_content,
+        &config.focus,
+        &config.rules,
+        &config.response_format,
+        scan_prompt.as_deref(),
+    )
+    .await?;
 
     // Apply ignore rules
     let issues = apply_ignore_rules(issues, &config.ignore.rules);
@@ -156,4 +256,53 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
     });
 
     issues
+}
+
+/// Check if a file path from an LLM issue matches any of the valid diff file paths.
+/// Uses exact match only — the LLM should report paths exactly as they appear in the diff.
+fn is_valid_file_path(issue_file: &str, valid_files: &[String]) -> bool {
+    valid_files.iter().any(|f| f == issue_file)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_prompt_inline_takes_priority() {
+        let result = resolve_system_prompt(Some("inline prompt"), Some("file.md"));
+        assert_eq!(result.as_deref(), Some("inline prompt"));
+    }
+
+    #[test]
+    fn resolve_prompt_file_fallback() {
+        // Use a file within the project root so the path traversal guard allows it
+        let test_file = std::path::PathBuf::from(".cora-test-prompt.tmp");
+        std::fs::write(&test_file, "file prompt content").unwrap();
+        let result = resolve_system_prompt(None, Some(".cora-test-prompt.tmp"));
+        assert_eq!(result.as_deref(), Some("file prompt content"));
+        let _ = std::fs::remove_file(&test_file);
+    }
+
+    #[test]
+    fn resolve_prompt_none_when_both_missing() {
+        let result = resolve_system_prompt(None, None);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn resolve_prompt_none_when_file_missing() {
+        let result = resolve_system_prompt(None, Some("/nonexistent/prompt.md"));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn reject_path_traversal_outside_project() {
+        // /etc/passwd exists but is outside project root — should be rejected
+        let result = resolve_system_prompt(None, Some("/etc/passwd"));
+        assert!(
+            result.is_none(),
+            "system_prompt_file outside project root should be rejected"
+        );
+    }
 }
