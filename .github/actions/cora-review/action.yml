@@ -119,11 +119,11 @@ runs:
 
           let body;
           if (!sarifContent || !sarifContent.runs || sarifContent.runs.length === 0) {
-            body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!`;
+            body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!\n\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
           } else {
             const results = sarifContent.runs[0].results || [];
             if (results.length === 0) {
-              body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!`;
+              body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!\n\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
             } else {
               const grouped = {};
               for (const r of results) {
