@@ -34,6 +34,8 @@ pub struct ReviewOptions {
     pub quiet: bool,
     /// Minimum severity level for filtering issues.
     pub severity: Option<String>,
+    /// Disable review caching.
+    pub no_cache: bool,
 }
 
 /// Result of a review command execution.
@@ -88,9 +90,14 @@ pub async fn execute_review(
     );
 
     // 3. Call the LLM engine
-    let response =
-        crate::engine::review::review_diff_with_stream(config, llm_config, &diff, opts.stream)
-            .await?;
+    let response = crate::engine::review::review_diff_with_cache(
+        config,
+        llm_config,
+        &diff,
+        opts.stream,
+        !opts.no_cache,
+    )
+    .await?;
 
     // 4. Filter by severity if specified
     let min_severity = if let Some(ref sev) = opts.severity {
