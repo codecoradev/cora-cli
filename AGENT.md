@@ -75,8 +75,8 @@ src/
 ## Testing
 
 ```bash
-cargo test               # 157 tests total
-                         #   135 unit tests
+cargo test               # 205 tests total
+                         #   183 unit tests
                          #   16 CLI integration tests
                          #    6 config tests
 cargo test --no-verify   # Skip pre-commit hooks (avoids timeout in hooks)
@@ -124,8 +124,24 @@ API keys live in a separate `auth.toml` file (`~/.cora/auth.toml`), not in
   machine that fixes invalid JSON escape sequences produced by some LLMs (e.g.
   `\s`, `\d` → `\\s`, `\\d`). Applied before `serde_json::from_str` in all parse paths.
   `review_diff()` also retries once on parse failure.
+- **Temperature 0 (deterministic)**: Default temperature is 0 (v0.1.7+). Same diff
+  produces identical review output every run. Cache key includes model + temperature.
+- **Per-request HTTP timeout**: `reqwest::Client` shared via `LazyLock` (connection
+  pooling). Timeout set per-request via `.timeout()` on RequestBuilder, not at
+  client construction (client-level is misleading).
+- **Diff-hash caching**: Reviews cached in `~/.cache/cora/reviews/` by SHA-256 of
+  diff + model + temperature. TTL configurable via `llm.cache_ttl`. Bypass with
+  `--no-cache`. Cache stores fully-filtered response (after anti-hallucination).
+- **Anti-hallucination**: File paths extracted from diff headers, injected into
+  prompt. Post-parse filtering removes issues referencing files not in diff.
+  `system_prompt_file` path traversal guard (canonicalized root check).
+- **Composite action resilience**: Version resolution retries 3x with fallback.
+  `curl -sfL` (fail on HTTP errors). `d.get('tag_name', '')` (no KeyError).
 - **Release workflow v-prefix**: `release.yml` strips `v` from git tag to match
   CHANGELOG `[X.Y.Z]` format. `TAG` (with v) for display/URLs, `VERSION` (without)
   for changelog sed matching and asset naming.
 - **Infisical secrets**: All workflows use `secrets.INFISICAL_IDENTITY_ID` — never
   hardcode identity IDs.
+- **Documentation update before release**: README config/features/flags, website
+  configuration docs page, and homepage feature bullets MUST be updated to reflect
+  new features BEFORE version bump and tagging.
