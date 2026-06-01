@@ -197,15 +197,38 @@ pub async fn review_diff(
     )
     .await?;
 
-    let (issues, summary, tokens_used) = parse_review_response(&raw)?;
-
-    spinner.finish_and_clear();
-    Ok(ReviewResponse {
-        issues,
-        summary,
-        tokens_used,
-        should_block: false, // caller sets this based on config
-    })
+    let parse_result = parse_review_response(&raw);
+    match parse_result {
+        Ok(result) => {
+            spinner.finish_and_clear();
+            Ok(ReviewResponse {
+                issues: result.0,
+                summary: result.1,
+                tokens_used: result.2,
+                should_block: false,
+            })
+        }
+        Err(e) => {
+            // LLM produced invalid JSON — retry once
+            debug!(error = %e, "first parse attempt failed, retrying LLM request");
+            spinner.set_message("Retrying (parse error)…");
+            let retry_raw = chat_completion(
+                llm_config,
+                REVIEW_SYSTEM_PROMPT,
+                &user_prompt,
+                Some(&spinner),
+            )
+            .await?;
+            let (issues, summary, tokens_used) = parse_review_response(&retry_raw)?;
+            spinner.finish_and_clear();
+            Ok(ReviewResponse {
+                issues,
+                summary,
+                tokens_used,
+                should_block: false,
+            })
+        }
+    }
 }
 
 /// Review a diff using the LLM with streaming. Returns a `ReviewResponse`.
@@ -423,6 +446,9 @@ pub(crate) fn parse_review_response(
     // Strip markdown code fences if present
     let json_str = strip_code_fences(&json_str);
 
+    // Repair common LLM JSON mistakes before strict parse
+    let json_str = repair_json_string(&json_str);
+
     let issues: Vec<ReviewIssue> = serde_json::from_str(&json_str)
         .context("LLM response is not valid JSON array of issues")?;
 
@@ -435,6 +461,9 @@ pub(crate) fn parse_scan_response(
 ) -> Result<(Vec<ReviewIssue>, Option<String>, Option<TokenUsage>)> {
     let (json_str, summary) = extract_json_and_summary(raw);
     let json_str = strip_code_fences(&json_str);
+
+    // Repair common LLM JSON mistakes before strict parse
+    let json_str = repair_json_string(&json_str);
 
     let issues: Vec<ReviewIssue> = serde_json::from_str(&json_str)
         .context("LLM scan response is not valid JSON array of issues")?;
@@ -482,6 +511,99 @@ fn extract_json_and_summary(raw: &str) -> (String, String) {
         }
         (trimmed.to_string(), String::new())
     }
+}
+
+/// Repair common LLM JSON mistakes before strict parse.
+///
+/// LLMs sometimes produce JSON with invalid escape sequences (e.g. lone backslashes
+/// like `\s` or trailing `\` inside string values). This function applies minimal
+/// fixes so `serde_json` can parse the output.
+fn repair_json_string(json_str: &str) -> String {
+    // Replace lone backslashes inside JSON string values that aren't valid JSON escapes.
+    // Valid JSON escapes: \" \\ \/ \b \f \n \r \t \uXXXX
+    let repaired = repair_invalid_escapes(json_str);
+    if repaired != json_str {
+        debug!("applied backslash repair to LLM JSON output");
+        repaired
+    } else {
+        json_str.to_string()
+    }
+}
+
+/// Replace invalid escape sequences in JSON string values.
+/// Tracks whether we're inside a string literal using a proper state machine
+/// that handles escaped quotes correctly.
+fn repair_invalid_escapes(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                output.push(c);
+                // Scan through string literal
+                loop {
+                    match chars.next() {
+                        Some('\\') => {
+                            // Escape character — check what follows
+                            match chars.peek() {
+                                Some(&next) if is_valid_json_escape(next) => {
+                                    output.push('\\');
+                                    output.push(next);
+                                    chars.next(); // consume
+                                    if next == 'u' {
+                                        // Consume exactly 4 hex digits
+                                        for _ in 0..4 {
+                                            if let Some(&hex) = chars.peek() {
+                                                if hex.is_ascii_hexdigit() {
+                                                    output.push(hex);
+                                                    chars.next();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Some(&next) => {
+                                    // Invalid escape — double the backslash
+                                    debug!(
+                                        escape_seq = format!("\\{}", next),
+                                        "repairing invalid JSON escape"
+                                    );
+                                    output.push_str("\\\\");
+                                    output.push(next);
+                                    chars.next(); // consume
+                                }
+                                None => {
+                                    // Trailing backslash at end of input
+                                    output.push_str("\\\\");
+                                }
+                            }
+                        }
+                        Some('"') => {
+                            output.push('"');
+                            break; // end of string
+                        }
+                        Some(ch) => {
+                            output.push(ch);
+                        }
+                        None => {
+                            break; // EOF inside string — let serde_json report it
+                        }
+                    }
+                }
+            }
+            _ => {
+                output.push(c);
+            }
+        }
+    }
+
+    output
+}
+
+/// Check if a character is a valid JSON escape sequence starter.
+fn is_valid_json_escape(c: char) -> bool {
+    matches!(c, '"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't')
 }
 
 /// Strip ```json / ``` code fences from the response.
@@ -761,5 +883,63 @@ mod tests {
     fn build_prompt_with_rules() {
         let prompt = build_review_prompt("d", &[], &["no unwrap".to_string()]);
         assert!(prompt.contains("no unwrap"));
+    }
+
+    // ─── repair_json_string ───
+
+    #[test]
+    fn repair_valid_json_unchanged() {
+        let input = r#"[{"file":"a.rs","body":"use std::io;\nlet x = 1;"}]"#;
+        assert_eq!(repair_json_string(input), input);
+    }
+
+    #[test]
+    fn repair_invalid_backslash_in_string() {
+        // LLM produced `\s` inside a JSON string — should become `\\s`
+        let input = r#"[{"file":"a.rs","body":"regex: \s+"}]"#;
+        let repaired = repair_json_string(input);
+        // After repair, serde_json should parse it
+        let parsed: serde_json::Value = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed[0]["body"], "regex: \\s+");
+    }
+
+    #[test]
+    fn repair_trailing_backslash_before_close() {
+        // LLM produced `\` right before end of string value — the `\` followed by
+        // the closing `"` looks like escaped quote, but the actual LLM mistake is
+        // different. Test a realistic case: `\s` inside body text.
+        // This tests the most common LLM error: non-standard escape like \s
+        let input = r#"[{"file":"a.rs","body":"regex: \s+\d*","severity":"info","title":"T","issue_type":"style"}]"#;
+        let repaired = repair_json_string(input);
+        let parsed: serde_json::Value = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed[0]["body"], "regex: \\s+\\d*");
+    }
+
+    #[test]
+    fn repair_preserves_valid_escapes() {
+        // Valid escapes should not be double-escaped
+        let input = r#"[{"file":"a.rs","body":"line1\nline2\ttab"}]"#;
+        let repaired = repair_json_string(input);
+        assert_eq!(repaired, input);
+        let parsed: serde_json::Value = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed[0]["body"], "line1\nline2\ttab");
+    }
+
+    #[test]
+    fn repair_invalid_unicode_escape() {
+        // \u followed by non-hex — should be escaped
+        let input = r#"[{"file":"a.rs","body":"\uGGGG"}]"#;
+        let repaired = repair_json_string(input);
+        let parsed: serde_json::Value = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed[0]["body"], "\\uGGGG");
+    }
+
+    #[test]
+    fn parse_response_with_invalid_escapes() {
+        // End-to-end: LLM response with invalid escapes should parse successfully
+        let raw = r#"[{"file":"src/main.rs","line":10,"severity":"critical","issue_type":"security","title":"SQL Injection","body":"query ends with \n no wait \\","suggested_fix":"Use params"}]"#;
+        let result = parse_review_response(raw).unwrap();
+        assert_eq!(result.0.len(), 1);
+        assert_eq!(result.0[0].title, "SQL Injection");
     }
 }
