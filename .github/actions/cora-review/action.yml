@@ -95,7 +95,7 @@ runs:
         curl -sL "https://github.com/ajianaz/cora-cli/releases/download/${CORA_VERSION}/checksums-sha256.txt" \
           -o /tmp/cora-checksums.txt || true
         if [ -f /tmp/cora-checksums.txt ] && [ -s /tmp/cora-checksums.txt ]; then
-          EXPECTED=$(grep "${ASSET}-${CORA_VERSION}.tar.gz" /tmp/cora-checksums.txt | awk '{print $1}')
+          EXPECTED=$(grep "${ASSET}-${CORA_VERSION}.tar.gz" /tmp/cora-checksums.txt | awk '{print $1}' || true)
           ACTUAL=$(sha256sum /tmp/cora.tar.gz | awk '{print $1}')
           if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "::error::Checksum verification failed for ${ASSET}-${CORA_VERSION}.tar.gz"
