@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-06-01
+
+### Added
+
+- **Custom system prompts via config** — `review.system_prompt`, `review.system_prompt_file`, `scan.system_prompt`, `scan.system_prompt_file` fields in `.cora.yaml` (#94)
+- **`response_format` config** — opt-in `json_object` response format for providers that support it, via `review.response_format: json_object` (#92)
+- **File path injection into prompts** — valid diff file paths are injected into the review user prompt to reduce LLM hallucination (#93)
+- **Post-parse file path filtering** — issues referencing non-existent files are filtered out after LLM response parsing (#93)
+- **Enhanced default system prompts** — both review and scan prompts now include explicit anti-hallucination constraints, severity definitions, and format instructions (#95)
+
+### Fixed
+
+- **Path traversal in `system_prompt_file`** — arbitrary file read vulnerability. Now validates file path is within canonicalized project root (#92)
+- **Symlink bypass in path traversal guard** — project root is now canonicalized to match resolved file paths
+
 ## [0.1.5] - 2026-06-01
 
 ### Fixed
