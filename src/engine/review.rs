@@ -53,11 +53,30 @@ async fn review_diff_inner(
         });
     }
 
+    // Extract valid file paths for post-parse filtering
+    let valid_files = llm::extract_file_paths_from_diff(diff);
+
     let mut response = if stream {
         llm::review_diff_stream(llm_config, diff, &config.focus, &config.rules).await?
     } else {
         llm::review_diff(llm_config, diff, &config.focus, &config.rules).await?
     };
+
+    // Filter out issues with invalid file paths (hallucination guard)
+    if !valid_files.is_empty() {
+        let before = response.issues.len();
+        response
+            .issues
+            .retain(|issue| is_valid_file_path(&issue.file, &valid_files));
+        let filtered = before - response.issues.len();
+        if filtered > 0 {
+            debug!(
+                filtered,
+                remaining = response.issues.len(),
+                "filtered issues with invalid file paths"
+            );
+        }
+    }
 
     // Apply ignore rules: filter out issues matching ignored patterns
     response.issues = apply_ignore_rules(response.issues, &config.ignore.rules);
@@ -156,4 +175,18 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
     });
 
     issues
+}
+
+/// Check if a file path from an LLM issue matches any of the valid diff file paths.
+/// Uses exact match or "file contains" heuristic.
+fn is_valid_file_path(issue_file: &str, valid_files: &[String]) -> bool {
+    // Exact match
+    if valid_files.iter().any(|f| f == issue_file) {
+        return true;
+    }
+    // The issue file might be a partial path — check if any valid file ends with it
+    if valid_files.iter().any(|f| f.ends_with(issue_file) || issue_file.ends_with(f)) {
+        return true;
+    }
+    false
 }

@@ -445,9 +445,48 @@ pub async fn scan_files(
     parse_scan_response(&raw)
 }
 
+/// Extract file paths from a unified diff string.
+/// Matches lines like `--- a/path/file.rs` and `+++ b/path/file.rs`.
+pub(crate) fn extract_file_paths_from_diff(diff: &str) -> Vec<String> {
+    let mut paths = std::collections::HashSet::new();
+    for line in diff.lines() {
+        let trimmed = line.trim_start();
+        // Match `--- a/path` or `+++ b/path` or `--- /dev/null` (skip null)
+        for prefix in &["--- a/", "+++ b/", "--- ", "+++ "] {
+            if let Some(rest) = trimmed.strip_prefix(prefix) {
+                // Skip /dev/null (binary files, deletes)
+                if rest.starts_with("/dev/null") || rest.starts_with("a/") || rest.starts_with("b/") {
+                    continue;
+                }
+                // Strip leading a/ or b/ if present after the prefix
+                let path = rest
+                    .strip_prefix("a/")
+                    .or_else(|| rest.strip_prefix("b/"))
+                    .unwrap_or(rest);
+                // Strip trailing \t (git shows tabs for renamed files)
+                let path = path.split('\t').next().unwrap_or(path);
+                if !path.is_empty() {
+                    paths.insert(path.to_string());
+                }
+            }
+        }
+    }
+    paths.into_iter().collect()
+}
+
 /// Build the user prompt for diff review.
 fn build_review_prompt(diff: &str, focus: &[String], rules: &[String]) -> String {
     let mut prompt = String::new();
+
+    // Inject valid file paths to reduce hallucination
+    let file_paths = extract_file_paths_from_diff(diff);
+    if !file_paths.is_empty() {
+        prompt.push_str("Valid files in this diff:\n");
+        for path in &file_paths {
+            prompt.push_str(&format!("- \"{}\"\n", path));
+        }
+        prompt.push('\n');
+    }
 
     if !focus.is_empty() {
         prompt.push_str(&format!("Focus areas: {}\n\n", focus.join(", ")));
@@ -930,6 +969,52 @@ mod tests {
     fn build_prompt_with_rules() {
         let prompt = build_review_prompt("d", &[], &["no unwrap".to_string()]);
         assert!(prompt.contains("no unwrap"));
+    }
+
+    #[test]
+    fn build_prompt_contains_file_paths() {
+        let diff = "diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1 +1 @@\n- old\n+ new";
+        let prompt = build_review_prompt(diff, &[], &[]);
+        assert!(prompt.contains("Valid files in this diff:"));
+        assert!(prompt.contains("src/main.rs"));
+    }
+
+    #[test]
+    fn build_prompt_no_file_paths_for_empty_diff() {
+        let prompt = build_review_prompt("no diff headers here", &[], &[]);
+        assert!(!prompt.contains("Valid files in this diff:"));
+    }
+
+    // ─── extract_file_paths_from_diff ───
+
+    #[test]
+    fn extract_paths_single_file() {
+        let diff = "--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1 +1 @@\n- old\n+ new";
+        let paths = extract_file_paths_from_diff(diff);
+        assert_eq!(paths, vec!["src/main.rs"]);
+    }
+
+    #[test]
+    fn extract_paths_multiple_files() {
+        let diff = "--- a/src/a.rs\n+++ b/src/a.rs\n--- a/src/b.rs\n+++ b/src/b.rs";
+        let paths = extract_file_paths_from_diff(diff);
+        assert!(paths.contains(&"src/a.rs".to_string()));
+        assert!(paths.contains(&"src/b.rs".to_string()));
+    }
+
+    #[test]
+    fn extract_paths_skips_dev_null() {
+        let diff = "--- /dev/null\n+++ b/src/new.rs\n--- a/src/old.rs\n+++ /dev/null";
+        let paths = extract_file_paths_from_diff(diff);
+        assert!(paths.contains(&"src/new.rs".to_string()));
+        assert!(paths.contains(&"src/old.rs".to_string()));
+    }
+
+    #[test]
+    fn extract_paths_deduplicates() {
+        let diff = "--- a/src/main.rs\n+++ b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs";
+        let paths = extract_file_paths_from_diff(diff);
+        assert_eq!(paths.len(), 1);
     }
 
     // ─── repair_json_string ───
