@@ -94,7 +94,7 @@ runs:
           -o /tmp/cora.tar.gz
         curl -sL "https://github.com/ajianaz/cora-cli/releases/download/${CORA_VERSION}/checksums-sha256.txt" \
           -o /tmp/cora-checksums.txt || true
-        if [ -f /tmp/cora-checksums.txt ]; then
+        if [ -f /tmp/cora-checksums.txt ] && [ -s /tmp/cora-checksums.txt ]; then
           EXPECTED=$(grep "${ASSET}-${CORA_VERSION}.tar.gz" /tmp/cora-checksums.txt | awk '{print $1}')
           ACTUAL=$(sha256sum /tmp/cora.tar.gz | awk '{print $1}')
           if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
@@ -102,6 +102,8 @@ runs:
             echo "Expected: $EXPECTED"
             echo "Actual:   $ACTUAL"
             exit 1
+          elif [ -z "$EXPECTED" ]; then
+            echo "::warning::No checksum found for ${ASSET}-${CORA_VERSION}.tar.gz in checksums file"
           fi
           rm -f /tmp/cora-checksums.txt
         else
