@@ -15,7 +15,7 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 ```bash
 cargo build              # Build (debug)
 cargo build --release    # Build (release)
-cargo test               # Run all 151 tests
+cargo test               # Run all 157 tests
 cargo clippy             # Lint
 cargo fmt                # Format check (use -- --check for CI)
 ```
@@ -75,8 +75,8 @@ src/
 ## Testing
 
 ```bash
-cargo test               # 151 tests total
-                         #   129 unit tests
+cargo test               # 157 tests total
+                         #   135 unit tests
                          #   16 CLI integration tests
                          #    6 config tests
 cargo test --no-verify   # Skip pre-commit hooks (avoids timeout in hooks)
@@ -120,3 +120,12 @@ API keys live in a separate `auth.toml` file (`~/.cora/auth.toml`), not in
 - **Auth/config separation**: API keys are deliberately stored in `auth.toml`
   rather than the main config to allow `.cora.yaml` to be safely committed to
   repositories without exposing secrets.
+- **LLM JSON repair**: `engine/llm.rs` includes `repair_invalid_escapes()` — a state
+  machine that fixes invalid JSON escape sequences produced by some LLMs (e.g.
+  `\s`, `\d` → `\\s`, `\\d`). Applied before `serde_json::from_str` in all parse paths.
+  `review_diff()` also retries once on parse failure.
+- **Release workflow v-prefix**: `release.yml` strips `v` from git tag to match
+  CHANGELOG `[X.Y.Z]` format. `TAG` (with v) for display/URLs, `VERSION` (without)
+  for changelog sed matching and asset naming.
+- **Infisical secrets**: All workflows use `secrets.INFISICAL_IDENTITY_ID` — never
+  hardcode identity IDs.
