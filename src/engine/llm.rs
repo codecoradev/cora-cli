@@ -209,13 +209,19 @@ pub async fn review_diff(
             })
         }
         Err(e) => {
-            // LLM produced invalid JSON — retry once
+            // LLM produced invalid JSON — retry once with stricter prompt
             debug!(error = %e, "first parse attempt failed, retrying LLM request");
             spinner.set_message("Retrying (parse error)…");
+            let strict_prompt = format!(
+                "{}\n\nIMPORTANT: Your response MUST contain only valid JSON. \
+                Ensure all strings use proper JSON escape sequences. \
+                Do NOT use raw backslashes in string values.",
+                &user_prompt
+            );
             let retry_raw = chat_completion(
                 llm_config,
                 REVIEW_SYSTEM_PROMPT,
-                &user_prompt,
+                &strict_prompt,
                 Some(&spinner),
             )
             .await?;
@@ -553,10 +559,25 @@ fn repair_invalid_escapes(input: &str) -> String {
                                     chars.next(); // consume
                                     if next == 'u' {
                                         // Consume exactly 4 hex digits
+                                        let mut hex_count = 0;
                                         for _ in 0..4 {
                                             if let Some(&hex) = chars.peek() {
                                                 if hex.is_ascii_hexdigit() {
                                                     output.push(hex);
+                                                    chars.next();
+                                                    hex_count += 1;
+                                                }
+                                            }
+                                        }
+                                        if hex_count < 4 {
+                                            // Invalid \u escape — not enough hex digits
+                                            // Remove the \u we already output and repair
+                                            output.truncate(output.len() - 2);
+                                            output.push_str("\\\\u");
+                                            // Re-peek remaining chars that weren't consumed
+                                            for _ in 0..(4 - hex_count) {
+                                                if let Some(&c) = chars.peek() {
+                                                    output.push(c);
                                                     chars.next();
                                                 }
                                             }
@@ -603,7 +624,7 @@ fn repair_invalid_escapes(input: &str) -> String {
 
 /// Check if a character is a valid JSON escape sequence starter.
 fn is_valid_json_escape(c: char) -> bool {
-    matches!(c, '"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't')
+    matches!(c, '"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | 'u')
 }
 
 /// Strip ```json / ``` code fences from the response.

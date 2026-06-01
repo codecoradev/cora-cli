@@ -8,7 +8,7 @@ use crate::config::schema::{CoraFile, HookSection, OutputSection, ProviderSectio
 
 /// Execute `cora config show` — print the current resolved configuration.
 pub fn execute_config_show() -> Result<()> {
-    let config = loader::load_config(None, None, None, None, None, None, false)?;
+    let config = loader::load_config(None, None, None, None, None, false)?;
 
     println!(
         "{}",

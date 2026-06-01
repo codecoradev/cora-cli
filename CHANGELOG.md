@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-06-01
+
+### Fixed
+
+- **Critical: JSON repair corrupts valid unicode escapes** — `is_valid_json_escape()` missing `'u'`, causing `\uXXXX` to be double-escaped. Now properly validates and handles incomplete `\u` sequences (#89)
+- **Critical: TOML injection in `save_api_key()`** — API key written via `format!` string interpolation. Now uses `toml::Table` serialization (#69)
+- **Retry prompt improvement** — retry on parse failure now includes stricter JSON format instructions (#90)
+- **Temp file race condition** — SARIF upload now uses PID-suffixed temp path instead of fixed filename (#70)
+- **Confusing unused `_cli_api_key` parameter** — removed from `load_config()` signature (#75)
+
+### Security
+
+- `save_api_key()` now uses `toml::Table::insert()` instead of string interpolation (prevents TOML injection)
+- Temp SARIF file path includes process ID (prevents TOCTOU race)
+
 ## [0.1.4] - 2026-06-01
 
 ### Added
