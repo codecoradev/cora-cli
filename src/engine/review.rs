@@ -178,22 +178,7 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
 }
 
 /// Check if a file path from an LLM issue matches any of the valid diff file paths.
-/// Uses exact match or filename suffix match (e.g., issue reports "main.rs" and valid is "src/main.rs").
+/// Uses exact match only — the LLM should report paths exactly as they appear in the diff.
 fn is_valid_file_path(issue_file: &str, valid_files: &[String]) -> bool {
-    // Exact match
-    if valid_files.iter().any(|f| f == issue_file) {
-        return true;
-    }
-    // Filename-based suffix match: extract basename from issue file and check
-    // if any valid file ends with that basename (with path separator boundary)
-    // e.g., LLM reports "main.rs" but valid file is "src/main.rs"
-    if let Some(basename) = issue_file.rsplit('/').next() {
-        if basename.contains('.') && basename == issue_file {
-            // Issue file has no directory — check if any valid file has this basename
-            return valid_files
-                .iter()
-                .any(|f| f.rsplit('/').next() == Some(basename));
-        }
-    }
-    false
+    valid_files.iter().any(|f| f == issue_file)
 }
