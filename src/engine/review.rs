@@ -248,3 +248,37 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
 fn is_valid_file_path(issue_file: &str, valid_files: &[String]) -> bool {
     valid_files.iter().any(|f| f == issue_file)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_prompt_inline_takes_priority() {
+        let result = resolve_system_prompt(Some("inline prompt"), Some("file.md"));
+        assert_eq!(result.as_deref(), Some("inline prompt"));
+    }
+
+    #[test]
+    fn resolve_prompt_file_fallback() {
+        let dir = std::env::temp_dir().join("cora_test_prompt");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("prompt.md");
+        std::fs::write(&path, "file prompt content").unwrap();
+        let result = resolve_system_prompt(None, Some(path.to_str().unwrap()));
+        assert_eq!(result.as_deref(), Some("file prompt content"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resolve_prompt_none_when_both_missing() {
+        let result = resolve_system_prompt(None, None);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn resolve_prompt_none_when_file_missing() {
+        let result = resolve_system_prompt(None, Some("/nonexistent/prompt.md"));
+        assert!(result.is_none());
+    }
+}
