@@ -18,6 +18,16 @@ pub struct Config {
     pub hook: HookConfig,
     /// Output configuration.
     pub output: OutputConfig,
+    /// Response format for LLM API calls ("none" or "json_object").
+    pub response_format: String,
+    /// Optional custom system prompt that replaces the default for review.
+    pub review_system_prompt_override: Option<String>,
+    /// Optional custom system prompt file path for review.
+    pub review_system_prompt_file: Option<String>,
+    /// Optional custom system prompt that replaces the default for scan.
+    pub scan_system_prompt_override: Option<String>,
+    /// Optional custom system prompt file path for scan.
+    pub scan_system_prompt_file: Option<String>,
 }
 
 /// Provider configuration.
@@ -83,6 +93,11 @@ impl Default for Config {
                 format: "pretty".to_string(),
                 color: true,
             },
+            response_format: "none".to_string(),
+            review_system_prompt_override: None,
+            review_system_prompt_file: None,
+            scan_system_prompt_override: None,
+            scan_system_prompt_file: None,
         }
     }
 }
@@ -109,6 +124,10 @@ pub struct CoraFile {
     pub hook: Option<HookSection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<OutputSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review: Option<ReviewSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan: Option<ScanSection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -145,6 +164,26 @@ pub struct OutputSection {
     pub format: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<bool>,
+}
+
+/// Review-specific configuration section.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ReviewSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt_file: Option<String>,
+}
+
+/// Scan-specific configuration section.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ScanSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt_file: Option<String>,
 }
 
 impl CoraFile {
@@ -196,6 +235,25 @@ impl CoraFile {
             }
             if let Some(v) = o.color {
                 config.output.color = v;
+            }
+        }
+        if let Some(r) = &self.review {
+            if let Some(v) = &r.response_format {
+                config.response_format = v.clone();
+            }
+            if let Some(v) = &r.system_prompt {
+                config.review_system_prompt_override = Some(v.clone());
+            }
+            if let Some(v) = &r.system_prompt_file {
+                config.review_system_prompt_file = Some(v.clone());
+            }
+        }
+        if let Some(s) = &self.scan {
+            if let Some(v) = &s.system_prompt {
+                config.scan_system_prompt_override = Some(v.clone());
+            }
+            if let Some(v) = &s.system_prompt_file {
+                config.scan_system_prompt_file = Some(v.clone());
             }
         }
     }

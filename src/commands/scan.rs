@@ -118,6 +118,8 @@ pub async fn execute_scan(
             &files_content,
             &effective_focus,
             &config.rules,
+            &config.response_format,
+            None,
         )
         .await?;
 

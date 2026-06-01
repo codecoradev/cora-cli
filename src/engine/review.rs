@@ -5,6 +5,36 @@ use crate::config::schema::Config;
 use crate::engine::llm;
 use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse, ScanResponse};
 
+/// Load a custom system prompt from a file path.
+/// Returns the file content, or None if the file doesn't exist or can't be read.
+fn load_system_prompt_file(path: &str) -> Option<String> {
+    match std::fs::read_to_string(path) {
+        Ok(content) => Some(content),
+        Err(e) => {
+            tracing::warn!(
+                path = path,
+                error = %e,
+                "failed to read system_prompt_file, using default prompt"
+            );
+            None
+        }
+    }
+}
+
+/// Resolve the effective system prompt: inline override > file override > None (use default).
+pub fn resolve_system_prompt(
+    inline: Option<&str>,
+    file_path: Option<&str>,
+) -> Option<String> {
+    if let Some(prompt) = inline {
+        Some(prompt.to_string())
+    } else if let Some(path) = file_path {
+        load_system_prompt_file(path)
+    } else {
+        None
+    }
+}
+
 /// Run a code review on the given diff string.
 ///
 /// Builds the prompt from the diff + config focus/rules, calls the LLM,
@@ -56,10 +86,32 @@ async fn review_diff_inner(
     // Extract valid file paths for post-parse filtering
     let valid_files = llm::extract_file_paths_from_diff(diff);
 
+    // Resolve custom system prompt for review
+    let review_prompt = resolve_system_prompt(
+        config.review_system_prompt_override.as_deref(),
+        config.review_system_prompt_file.as_deref(),
+    );
+
     let mut response = if stream {
-        llm::review_diff_stream(llm_config, diff, &config.focus, &config.rules).await?
+        llm::review_diff_stream(
+            llm_config,
+            diff,
+            &config.focus,
+            &config.rules,
+            &config.response_format,
+            review_prompt.as_deref(),
+        )
+        .await?
     } else {
-        llm::review_diff(llm_config, diff, &config.focus, &config.rules).await?
+        llm::review_diff(
+            llm_config,
+            diff,
+            &config.focus,
+            &config.rules,
+            &config.response_format,
+            review_prompt.as_deref(),
+        )
+        .await?
     };
 
     // Filter out issues with invalid file paths (hallucination guard)
@@ -128,8 +180,22 @@ pub async fn scan_project(
         });
     }
 
+    // Resolve custom system prompt for scan
+    let scan_prompt = resolve_system_prompt(
+        config.scan_system_prompt_override.as_deref(),
+        config.scan_system_prompt_file.as_deref(),
+    );
+
     let (issues, summary, tokens_used) =
-        llm::scan_files(llm_config, files_content, &config.focus, &config.rules).await?;
+        llm::scan_files(
+            llm_config,
+            files_content,
+            &config.focus,
+            &config.rules,
+            &config.response_format,
+            scan_prompt.as_deref(),
+        )
+        .await?;
 
     // Apply ignore rules
     let issues = apply_ignore_rules(issues, &config.ignore.rules);

@@ -122,6 +122,7 @@ async fn chat_completion(
     system_prompt: &str,
     user_message: &str,
     spinner: Option<&ProgressBar>,
+    response_format: &str,
 ) -> Result<String> {
     let client = reqwest::Client::new();
 
@@ -148,7 +149,11 @@ async fn chat_completion(
         ],
         temperature: 0.2,
         max_tokens: 4096,
-        response_format: None,
+        response_format: if response_format == "json_object" {
+            Some(serde_json::json!({"type": "json_object"}))
+        } else {
+            None
+        },
     };
 
     debug!(model = %config.model, url = %url, "sending LLM request");
@@ -210,16 +215,21 @@ pub async fn review_diff(
     diff: &str,
     focus: &[String],
     rules: &[String],
+    response_format: &str,
+    system_prompt_override: Option<&str>,
 ) -> Result<ReviewResponse> {
     let spinner = create_spinner("Reviewing diff…");
 
     let user_prompt = build_review_prompt(diff, focus, rules);
 
+    let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
+
     let raw = chat_completion(
         llm_config,
-        REVIEW_SYSTEM_PROMPT,
+        system_prompt,
         &user_prompt,
         Some(&spinner),
+        response_format,
     )
     .await?;
 
@@ -246,9 +256,10 @@ pub async fn review_diff(
             );
             let retry_raw = chat_completion(
                 llm_config,
-                REVIEW_SYSTEM_PROMPT,
+                system_prompt,
                 &strict_prompt,
                 Some(&spinner),
+                response_format,
             )
             .await?;
             let (issues, summary, tokens_used) = parse_review_response(&retry_raw)?;
@@ -272,10 +283,14 @@ pub async fn review_diff_stream(
     diff: &str,
     focus: &[String],
     rules: &[String],
+    response_format: &str,
+    system_prompt_override: Option<&str>,
 ) -> Result<ReviewResponse> {
     let user_prompt = build_review_prompt(diff, focus, rules);
 
-    let raw = chat_completion_stream(llm_config, REVIEW_SYSTEM_PROMPT, &user_prompt).await?;
+    let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
+
+    let raw = chat_completion_stream(llm_config, system_prompt, &user_prompt, response_format).await?;
 
     let (issues, summary, tokens_used) = parse_review_response(&raw)?;
 
@@ -297,6 +312,7 @@ async fn chat_completion_stream(
     config: &LLMConfig,
     system_prompt: &str,
     user_message: &str,
+    response_format: &str,
 ) -> Result<String> {
     use futures_util::StreamExt;
     use std::io::Write;
@@ -304,7 +320,7 @@ async fn chat_completion_stream(
     let client = reqwest::Client::new();
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
 
-    let request_body = serde_json::json!({
+    let mut request_body = serde_json::json!({
         "model": config.model,
         "messages": [
             { "role": "system", "content": system_prompt },
@@ -314,6 +330,10 @@ async fn chat_completion_stream(
         "max_tokens": 4096,
         "stream": true
     });
+
+    if response_format == "json_object" {
+        request_body["response_format"] = serde_json::json!({"type": "json_object"});
+    }
 
     debug!(model = %config.model, url = %url, "sending streaming LLM request");
 
@@ -420,8 +440,12 @@ pub async fn scan_files(
     files_content: &str,
     focus: &[String],
     rules: &[String],
+    response_format: &str,
+    system_prompt_override: Option<&str>,
 ) -> Result<(Vec<ReviewIssue>, Option<String>, Option<TokenUsage>)> {
     let spinner = create_spinner("Scanning files…");
+
+    let system_prompt = system_prompt_override.unwrap_or(SCAN_SYSTEM_PROMPT);
 
     let mut user_prompt = String::new();
     if !focus.is_empty() {
@@ -440,7 +464,7 @@ pub async fn scan_files(
     user_prompt.push_str("Files to review:\n\n");
     user_prompt.push_str(files_content);
 
-    let raw = chat_completion(llm_config, SCAN_SYSTEM_PROMPT, &user_prompt, Some(&spinner)).await?;
+    let raw = chat_completion(llm_config, system_prompt, &user_prompt, Some(&spinner), response_format).await?;
 
     parse_scan_response(&raw)
 }
