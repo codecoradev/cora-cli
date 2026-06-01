@@ -12,9 +12,14 @@ fn cache_dir() -> Result<PathBuf> {
     Ok(home.join(".cache").join("cora").join("reviews"))
 }
 
-/// Compute SHA-256 hex digest of the diff content.
-fn sha256_hex(diff: &str) -> String {
-    let result = Sha256::digest(diff.as_bytes());
+/// Compute SHA-256 hex digest of the diff content + config parameters.
+/// Includes model and temperature so config changes invalidate the cache.
+fn cache_key(diff: &str, model: &str, temperature: f32) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(diff.as_bytes());
+    hasher.update(model.as_bytes());
+    hasher.update(temperature.to_le_bytes());
+    let result = hasher.finalize();
     result.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
@@ -22,8 +27,13 @@ fn sha256_hex(diff: &str) -> String {
 ///
 /// Returns `None` if no cache exists or if the cache entry has expired
 /// (based on `ttl` in minutes).
-pub fn get_cached_review(diff: &str, ttl: u64) -> Option<ReviewResponse> {
-    let hash = sha256_hex(diff);
+pub fn get_cached_review(
+    diff: &str,
+    model: &str,
+    temperature: f32,
+    ttl: u64,
+) -> Option<ReviewResponse> {
+    let hash = cache_key(diff, model, temperature);
     let dir = cache_dir().ok()?;
     let path = dir.join(format!("{}.json", hash));
 
@@ -61,12 +71,17 @@ pub fn get_cached_review(diff: &str, ttl: u64) -> Option<ReviewResponse> {
 }
 
 /// Save a review response to the cache.
-pub fn save_cached_review(diff: &str, response: &ReviewResponse) -> Result<()> {
+pub fn save_cached_review(
+    diff: &str,
+    model: &str,
+    temperature: f32,
+    response: &ReviewResponse,
+) -> Result<()> {
     let dir = cache_dir()?;
     std::fs::create_dir_all(&dir)
         .with_context(|| format!("failed to create cache dir {}", dir.display()))?;
 
-    let hash = sha256_hex(diff);
+    let hash = cache_key(diff, model, temperature);
     let path = dir.join(format!("{}.json", hash));
 
     let now = SystemTime::now()
@@ -120,24 +135,33 @@ mod tests {
     }
 
     #[test]
-    fn sha256_hex_is_deterministic() {
-        let hash1 = sha256_hex("hello world");
-        let hash2 = sha256_hex("hello world");
+    fn cache_key_is_deterministic() {
+        let hash1 = cache_key("hello world", "gpt-4", 0.0);
+        let hash2 = cache_key("hello world", "gpt-4", 0.0);
         assert_eq!(hash1, hash2);
         assert_eq!(hash1.len(), 64); // SHA-256 hex = 64 chars
     }
 
     #[test]
-    fn sha256_hex_differs_for_different_inputs() {
-        let hash1 = sha256_hex("hello world");
-        let hash2 = sha256_hex("hello earth");
+    fn cache_key_differs_for_different_inputs() {
+        let hash1 = cache_key("hello world", "gpt-4", 0.0);
+        let hash2 = cache_key("hello earth", "gpt-4", 0.0);
         assert_ne!(hash1, hash2);
     }
 
     #[test]
-    fn cache_hit_on_same_diff() {
+    fn cache_key_includes_model_and_temperature() {
+        let h1 = cache_key("diff", "gpt-4", 0.0);
+        let h2 = cache_key("diff", "gpt-3.5", 0.0);
+        let h3 = cache_key("diff", "gpt-4", 0.7);
+        assert_ne!(h1, h2, "different models should differ");
+        assert_ne!(h1, h3, "different temperatures should differ");
+    }
+
+    #[test]
+    fn cache_key_len_is_64() {
         let diff = "diff --git a/file.txt b/file.txt\n+ hello";
-        let hash = sha256_hex(diff);
+        let hash = cache_key(diff, "model", 0.0);
         assert_eq!(hash.len(), 64);
     }
 
@@ -145,8 +169,8 @@ mod tests {
     fn cache_miss_on_different_diff() {
         let diff1 = "diff --git a/a.txt b/a.txt\n+ hello";
         let diff2 = "diff --git a/b.txt b/b.txt\n+ world";
-        let hash1 = sha256_hex(diff1);
-        let hash2 = sha256_hex(diff2);
+        let hash1 = cache_key(diff1, "model", 0.0);
+        let hash2 = cache_key(diff2, "model", 0.0);
         assert_ne!(hash1, hash2);
     }
 
@@ -222,7 +246,7 @@ mod tests {
 
         // Manually set up a cache entry in the temp dir
         let diff = "test diff content";
-        let hash = sha256_hex(diff);
+        let hash = cache_key(diff, "model", 0.0);
         let path = dir.join(format!("{}.json", hash));
 
         let response = make_response();

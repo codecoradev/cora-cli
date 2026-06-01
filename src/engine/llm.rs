@@ -8,28 +8,21 @@ use tracing::debug;
 
 use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse, TokenUsage};
 
-/// Shared reqwest::Client with default timeout. Reused across all LLM requests.
+/// Shared reqwest::Client with connection pooling. Reused across all LLM requests.
 /// Created lazily on first use to avoid blocking initialization.
+/// Per-request timeout is set via .timeout() on the RequestBuilder.
 static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
-        .timeout(Duration::from_secs(120))
         .pool_max_idle_per_host(4)
         .build()
         .unwrap_or_else(|e| {
             tracing::error!("failed to build shared HTTP client: {}", e);
-            // Fall back to a default client — this should never happen in practice
             reqwest::Client::new()
         })
 });
 
 /// Return the shared reqwest::Client for LLM API requests.
-///
-/// Note: The timeout is set at client construction time (120s default).
-/// Per-request timeout override is not supported by reqwest once the
-/// client is built, so the `timeout_secs` parameter is accepted for
-/// API consistency but the shared client's built-in timeout is used.
-pub fn shared_client(timeout_secs: u64) -> reqwest::Client {
-    let _ = timeout_secs; // accepted for API consistency, shared client has fixed timeout
+pub fn shared_client() -> reqwest::Client {
     SHARED_CLIENT.clone()
 }
 
@@ -151,7 +144,7 @@ async fn chat_completion(
     spinner: Option<&ProgressBar>,
     response_format: &str,
 ) -> Result<String> {
-    let client = shared_client(config.timeout);
+    let client = shared_client();
 
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
 
@@ -190,9 +183,10 @@ async fn chat_completion(
         .header("Authorization", format!("Bearer {}", config.api_key))
         .header("Content-Type", "application/json")
         .json(&request)
+        .timeout(std::time::Duration::from_secs(config.timeout))
         .send()
         .await
-        .context("LLM API request failed")?;
+        .context("LLM API request failed (or timed out)")?;
 
     let status = response.status();
     let body = response
@@ -345,7 +339,7 @@ async fn chat_completion_stream(
     use futures_util::StreamExt;
     use std::io::Write;
 
-    let client = shared_client(config.timeout);
+    let client = shared_client();
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
 
     let mut request_body = serde_json::json!({
@@ -370,9 +364,10 @@ async fn chat_completion_stream(
         .header("Authorization", format!("Bearer {}", config.api_key))
         .header("Content-Type", "application/json")
         .json(&request_body)
+        .timeout(std::time::Duration::from_secs(config.timeout))
         .send()
         .await
-        .context("LLM API streaming request failed")?;
+        .context("LLM API streaming request failed (or timed out)")?;
 
     let status = response.status();
     if !status.is_success() {

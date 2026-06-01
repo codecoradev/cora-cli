@@ -117,7 +117,12 @@ async fn review_diff_inner(
 
     // Check cache before calling LLM
     if use_cache {
-        if let Some(cached) = crate::engine::cache::get_cached_review(diff, config.cache_ttl) {
+        if let Some(cached) = crate::engine::cache::get_cached_review(
+            diff,
+            &llm_config.model,
+            llm_config.temperature,
+            config.cache_ttl,
+        ) {
             debug!("returning cached review response");
             return Ok(cached);
         }
@@ -190,7 +195,12 @@ async fn review_diff_inner(
 
     // Save fully-processed response to cache (after filtering)
     if use_cache {
-        if let Err(e) = crate::engine::cache::save_cached_review(diff, &response) {
+        if let Err(e) = crate::engine::cache::save_cached_review(
+            diff,
+            &llm_config.model,
+            llm_config.temperature,
+            &response,
+        ) {
             debug!("failed to save review to cache: {}", e);
         }
     }
