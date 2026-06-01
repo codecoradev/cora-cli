@@ -6,9 +6,21 @@ use crate::engine::llm;
 use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse, ScanResponse};
 
 /// Load a custom system prompt from a file path.
-/// Returns the file content, or None if the file doesn't exist or can't be read.
+/// Returns the file content, or None if the file doesn't exist, can't be read,
+/// or is outside the project root (path traversal guard).
 fn load_system_prompt_file(path: &str) -> Option<String> {
-    match std::fs::read_to_string(path) {
+    let canonical = std::fs::canonicalize(path).ok()?;
+    let project_root = std::env::current_dir().ok()?;
+
+    if !canonical.starts_with(&project_root) {
+        tracing::warn!(
+            path = path,
+            "system_prompt_file is outside project root, ignoring (potential path traversal)"
+        );
+        return None;
+    }
+
+    match std::fs::read_to_string(&canonical) {
         Ok(content) => Some(content),
         Err(e) => {
             tracing::warn!(
@@ -257,13 +269,12 @@ mod tests {
 
     #[test]
     fn resolve_prompt_file_fallback() {
-        let dir = std::env::temp_dir().join("cora_test_prompt");
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("prompt.md");
-        std::fs::write(&path, "file prompt content").unwrap();
-        let result = resolve_system_prompt(None, Some(path.to_str().unwrap()));
+        // Use a file within the project root so the path traversal guard allows it
+        let test_file = std::path::PathBuf::from(".cora-test-prompt.tmp");
+        std::fs::write(&test_file, "file prompt content").unwrap();
+        let result = resolve_system_prompt(None, Some(".cora-test-prompt.tmp"));
         assert_eq!(result.as_deref(), Some("file prompt content"));
-        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_file(&test_file);
     }
 
     #[test]
@@ -276,5 +287,15 @@ mod tests {
     fn resolve_prompt_none_when_file_missing() {
         let result = resolve_system_prompt(None, Some("/nonexistent/prompt.md"));
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn reject_path_traversal_outside_project() {
+        // /etc/passwd exists but is outside project root — should be rejected
+        let result = resolve_system_prompt(None, Some("/etc/passwd"));
+        assert!(
+            result.is_none(),
+            "system_prompt_file outside project root should be rejected"
+        );
     }
 }
