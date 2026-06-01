@@ -127,28 +127,37 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          SEMVER="${TAG_VERSION#v}"
+          # Validate semver format (digits.digits.digits only — prevents sed injection)
+          if ! echo "$SEMVER" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "ERROR: Invalid semver format: $SEMVER"
+            exit 1
+          fi
+          echo "TAG=$TAG_VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$SEMVER" >> $GITHUB_OUTPUT
 
       - name: Extract changelog for this version
         id: changelog
         run: |
           CHANGELOG_EXCERPT=$(sed -n '/^## \['"${{ steps.version.outputs.VERSION }}"'\]/,/^## \[/p' CHANGELOG.md | sed '$d' | tail -n +2)
           {
-            printf '## What'\''s New in %s\n\n' "${{ steps.version.outputs.VERSION }}"
+            printf '## What'\''s New in %s\n\n' "${{ steps.version.outputs.TAG }}"
             printf '%s\n\n' "$CHANGELOG_EXCERPT"
             printf '### 📦 Platforms\n\n'
             printf '| Platform | File |\n'
             printf '|----------|------|\n'
-            printf '| Linux (x86_64) | `cora-x86_64-unknown-linux-gnu-%s.tar.gz` |\n' "${{ steps.version.outputs.VERSION }}"
-            printf '| Linux (ARM64) | `cora-aarch64-unknown-linux-gnu-%s.tar.gz` |\n' "${{ steps.version.outputs.VERSION }}"
-            printf '| macOS (Apple Silicon) | `cora-aarch64-apple-darwin-%s.tar.gz` |\n' "${{ steps.version.outputs.VERSION }}"
-            printf '| Windows (x86_64) | `cora-x86_64-pc-windows-msvc-%s.zip` |\n\n' "${{ steps.version.outputs.VERSION }}"
+            printf '| Linux (x86_64) | `cora-x86_64-unknown-linux-gnu-%s.tar.gz` |\n' "${{ steps.version.outputs.TAG }}"
+            printf '| Linux (ARM64) | `cora-aarch64-unknown-linux-gnu-%s.tar.gz` |\n' "${{ steps.version.outputs.TAG }}"
+            printf '| macOS (Apple Silicon) | `cora-aarch64-apple-darwin-%s.tar.gz` |\n' "${{ steps.version.outputs.TAG }}"
+            printf '| Windows (x86_64) | `cora-x86_64-pc-windows-msvc-%s.zip` |\n\n' "${{ steps.version.outputs.TAG }}"
             printf '### 🚀 Quick Start\n\n'
             printf '```bash\n'
             printf '# Install via cargo\n'
             printf 'cargo install cora\n\n'
             printf '# Or download binary (extracts as '\''cora'\'')\n'
-            printf 'curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-%s.tar.gz | tar xz\n' "${{ steps.version.outputs.VERSION }}"
+            printf 'curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-%s.tar.gz | tar xz\n' "${{ steps.version.outputs.TAG }}"
             printf 'chmod +x cora\n'
             printf 'sudo mv cora /usr/local/bin/\n\n'
             printf '# Init project\n'
@@ -162,11 +171,11 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.VERSION }}
-          name: Release ${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: Release ${{ steps.version.outputs.TAG }}
           body_path: release-notes.md
           files: release-artifacts/*
           draft: false
-          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+          prerelease: ${{ contains(steps.version.outputs.TAG, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
