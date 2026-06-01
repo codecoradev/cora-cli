@@ -154,13 +154,6 @@ async fn review_diff_inner(
         .await?
     };
 
-    // Save to cache on success
-    if use_cache {
-        if let Err(e) = crate::engine::cache::save_cached_review(diff, &response) {
-            debug!("failed to save review to cache: {}", e);
-        }
-    }
-
     // Filter out issues with invalid file paths (hallucination guard)
     if !valid_files.is_empty() {
         let before = response.issues.len();
@@ -194,6 +187,13 @@ async fn review_diff_inner(
         should_block = response.should_block,
         "review complete"
     );
+
+    // Save fully-processed response to cache (after filtering)
+    if use_cache {
+        if let Err(e) = crate::engine::cache::save_cached_review(diff, &response) {
+            debug!("failed to save review to cache: {}", e);
+        }
+    }
 
     Ok(response)
 }
