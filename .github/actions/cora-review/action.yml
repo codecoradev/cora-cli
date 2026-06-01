@@ -68,7 +68,7 @@ runs:
           # Fallback to a known good version if all retries fail
           if [ -z "$VERSION" ]; then
             echo "::warning::Failed to resolve latest cora-cli version from GitHub API, using fallback"
-            VERSION="v0.1.6"
+            VERSION="v0.1.7"
           fi
         else
           VERSION="${{ inputs.cora-version }}"
@@ -105,8 +105,11 @@ runs:
           --format sarif \
           --severity ${{ inputs.severity }} \
           --quiet \
-          > cora-results.sarif 2>/dev/null
+          > cora-results.sarif 2>cora-stderr.log || true
         echo "Cora review complete ($(wc -c < cora-results.sarif) bytes)"
+        if [ -s cora-stderr.log ]; then
+          echo "::warning::Cora stderr: $(cat cora-stderr.log)"
+        fi
 
     - name: Upload SARIF to GitHub Code Scanning
       if: inputs.upload-sarif == 'true'
@@ -133,8 +136,14 @@ runs:
           }
 
           let body;
+          // Check for empty/invalid SARIF — cora may have failed silently
           if (!sarifContent || !sarifContent.runs || sarifContent.runs.length === 0) {
-            body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!\n\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
+            const fileSize = fs.statSync('cora-results.sarif').size;
+            if (fileSize < 10) {
+              body = `## 🔍 Cora AI Code Review\n\n⚠️ **Review could not complete.** Cora produced an empty result. Check the workflow logs for errors.\n\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
+            } else {
+              body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!\n\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
+            }
           } else {
             const results = sarifContent.runs[0].results || [];
             if (results.length === 0) {
