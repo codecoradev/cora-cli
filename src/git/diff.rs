@@ -4,6 +4,46 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use git2::Repository;
 
+/// Characters that should not appear in git refs passed to our diff commands.
+/// This prevents shell injection and path traversal via crafted ref names.
+const DANGEROUS_REF_CHARS: &[char] = &[
+    ';', '&', '|', '`', '$', '(', ')', '<', '>', '{', '}', '\\', '\n', '\r', '\t',
+];
+
+/// Validate a git ref string for safety before passing it to git commands.
+///
+/// Rejects refs containing shell metacharacters or path traversal sequences (..).
+fn validate_ref(ref_str: &str) -> Result<()> {
+    if ref_str.contains("..") {
+        // ".." is only allowed in the middle of range expressions like "HEAD..HEAD" or "main...HEAD"
+        // But we need to be careful about path traversal. Allow it only for git range syntax.
+        // Actually, git diff ranges use ".." and "..." which are valid git syntax.
+        // The risk is when ".." appears as part of a path (e.g., "../../etc/passwd").
+        // Since git refs shouldn't contain path components with "..", we reject refs
+        // that start with ".." or contain "/.." or ".." at the end.
+        if ref_str.starts_with("..") || ref_str.contains("/..") || ref_str.ends_with("..") {
+            anyhow::bail!(
+                "invalid ref '{}': contains path traversal sequence '..'",
+                ref_str
+            );
+        }
+    }
+
+    if ref_str.contains(DANGEROUS_REF_CHARS) {
+        let found: String = ref_str
+            .chars()
+            .filter(|c| DANGEROUS_REF_CHARS.contains(c))
+            .collect();
+        anyhow::bail!(
+            "invalid ref '{}': contains unsafe characters: '{}'",
+            ref_str,
+            found
+        );
+    }
+
+    Ok(())
+}
+
 /// Open the git repository at or above the current working directory.
 pub fn open_repo() -> Result<Repository> {
     Repository::discover(std::env::current_dir()?).context("not inside a git repository")
@@ -36,6 +76,7 @@ pub fn get_unstaged_diff() -> Result<String> {
 
 /// Get the diff between the current branch and `base_branch`.
 pub fn get_branch_diff(base_branch: &str) -> Result<String> {
+    validate_ref(base_branch)?;
     let arg = format!("{}...HEAD", base_branch);
     git_cmd(&["diff", &arg])
 }
@@ -51,6 +92,7 @@ pub fn get_unpushed_diff() -> Result<String> {
 /// - Otherwise (e.g. `HEAD`, `abc123`), uses `git show <ref> --format=""` to
 ///   get just the diff without commit metadata.
 pub fn get_commit_diff(ref_str: &str) -> Result<String> {
+    validate_ref(ref_str)?;
     if ref_str.contains("..") {
         git_cmd(&["diff", ref_str])
     } else {
@@ -121,4 +163,47 @@ pub fn is_inside_git_repo(dir: Option<&Path>) -> bool {
     let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
     let search_dir = dir.unwrap_or(&cwd);
     Repository::discover(search_dir).is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_ref_simple_name() {
+        assert!(validate_ref("main").is_ok());
+        assert!(validate_ref("HEAD").is_ok());
+        assert!(validate_ref("feature/my-branch").is_ok());
+        assert!(validate_ref("abc123").is_ok());
+    }
+
+    #[test]
+    fn validate_ref_range_syntax() {
+        assert!(validate_ref("HEAD~3..HEAD").is_ok());
+        assert!(validate_ref("main...develop").is_ok());
+        assert!(validate_ref("abc123..def456").is_ok());
+    }
+
+    #[test]
+    fn validate_ref_rejects_path_traversal() {
+        assert!(validate_ref("../../etc/passwd").is_err());
+        assert!(validate_ref("..HEAD").is_err());
+        assert!(validate_ref("HEAD..").is_err());
+        assert!(validate_ref("branch/../other").is_err());
+    }
+
+    #[test]
+    fn validate_ref_rejects_shell_metacharacters() {
+        assert!(validate_ref("main;rm -rf /").is_err());
+        assert!(validate_ref("main`whoami`").is_err());
+        assert!(validate_ref("$(whoami)").is_err());
+        assert!(validate_ref("main && echo pwned").is_err());
+        assert!(validate_ref("main | cat").is_err());
+        assert!(validate_ref("main\nextra").is_err());
+    }
+
+    #[test]
+    fn validate_ref_rejects_angle_brackets() {
+        assert!(validate_ref("main > /etc/passwd").is_err());
+    }
 }
