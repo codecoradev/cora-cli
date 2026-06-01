@@ -3,7 +3,6 @@ use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::LazyLock;
-use std::time::Duration;
 use tracing::debug;
 
 use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse, TokenUsage};
