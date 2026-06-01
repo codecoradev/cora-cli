@@ -9,7 +9,13 @@ use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse, ScanResponse}
 /// Returns the file content, or None if the file doesn't exist, can't be read,
 /// or is outside the project root (path traversal guard).
 fn load_system_prompt_file(path: &str) -> Option<String> {
-    let canonical = std::fs::canonicalize(path).ok()?;
+    let canonical = match std::fs::canonicalize(path) {
+        Ok(p) => p,
+        Err(_) => {
+            tracing::debug!(path = path, "system_prompt_file does not exist");
+            return None;
+        }
+    };
     let project_root = std::env::current_dir().ok()?;
 
     if !canonical.starts_with(&project_root) {
