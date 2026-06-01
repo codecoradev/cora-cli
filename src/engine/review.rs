@@ -178,15 +178,15 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
 }
 
 /// Check if a file path from an LLM issue matches any of the valid diff file paths.
-/// Uses exact match or "file contains" heuristic.
+/// Uses exact match or suffix match (e.g., issue reports "main.rs" and valid is "src/main.rs").
 fn is_valid_file_path(issue_file: &str, valid_files: &[String]) -> bool {
     // Exact match
     if valid_files.iter().any(|f| f == issue_file) {
         return true;
     }
-    // The issue file might be a partial path — check if any valid file ends with it
-    if valid_files.iter().any(|f| f.ends_with(issue_file) || issue_file.ends_with(f)) {
-        return true;
-    }
-    false
+    // The issue file might be a shortened path — check suffix match
+    // e.g., LLM reports "main.rs" but valid file is "src/main.rs"
+    valid_files
+        .iter()
+        .any(|f| f.ends_with(issue_file) && issue_file.contains('.'))
 }

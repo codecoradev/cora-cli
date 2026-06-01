@@ -451,24 +451,37 @@ pub(crate) fn extract_file_paths_from_diff(diff: &str) -> Vec<String> {
     let mut paths = std::collections::HashSet::new();
     for line in diff.lines() {
         let trimmed = line.trim_start();
-        // Match `--- a/path` or `+++ b/path` or `--- /dev/null` (skip null)
-        for prefix in &["--- a/", "+++ b/", "--- ", "+++ "] {
-            if let Some(rest) = trimmed.strip_prefix(prefix) {
-                // Skip /dev/null (binary files, deletes)
-                if rest.starts_with("/dev/null") || rest.starts_with("a/") || rest.starts_with("b/") {
-                    continue;
-                }
-                // Strip leading a/ or b/ if present after the prefix
-                let path = rest
-                    .strip_prefix("a/")
-                    .or_else(|| rest.strip_prefix("b/"))
-                    .unwrap_or(rest);
-                // Strip trailing \t (git shows tabs for renamed files)
-                let path = path.split('\t').next().unwrap_or(path);
-                if !path.is_empty() {
-                    paths.insert(path.to_string());
-                }
-            }
+        // Match unified diff headers: `--- a/path` or `+++ b/path`
+        // Also handles `--- path` without a/ or b/ prefix (some diffs)
+        let (prefix, strip_ab) = if let Some(rest) = trimmed.strip_prefix("--- a/") {
+            (rest, true)
+        } else if let Some(rest) = trimmed.strip_prefix("+++ b/") {
+            (rest, true)
+        } else if let Some(rest) = trimmed.strip_prefix("--- ") {
+            (rest, false)
+        } else if let Some(rest) = trimmed.strip_prefix("+++ ") {
+            (rest, false)
+        } else {
+            continue;
+        };
+        // Skip /dev/null (binary files, deletes)
+        if prefix.starts_with("/dev/null") {
+            continue;
+        }
+        let path = if strip_ab {
+            prefix.to_string()
+        } else {
+            // Strip a/ or b/ prefix if present
+            prefix
+                .strip_prefix("a/")
+                .or_else(|| prefix.strip_prefix("b/"))
+                .unwrap_or(prefix)
+                .to_string()
+        };
+        // Strip trailing \t (git shows tabs for renamed files)
+        let path = path.split('\t').next().unwrap_or(&path);
+        if !path.is_empty() {
+            paths.insert(path.to_string());
         }
     }
     paths.into_iter().collect()
