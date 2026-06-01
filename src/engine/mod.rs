@@ -1,3 +1,4 @@
+pub mod cache;
 pub mod llm;
 pub mod review;
 pub mod scanner;
