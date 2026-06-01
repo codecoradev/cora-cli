@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/icon.png" alt="cora" width="120" />
+<img src="assets/logo.png" alt="CodeCora" width="120" />
 
 **AI-Powered Code Review CLI**
 
