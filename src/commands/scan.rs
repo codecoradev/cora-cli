@@ -67,7 +67,10 @@ pub async fn execute_scan(
         let root_abs = root.canonicalize().unwrap_or_else(|_| root.clone());
         files.retain(|f| {
             let abs_path = root_abs.join(&f.path);
-            let hash = file_content_hash(&abs_path);
+            let hash = match file_content_hash(&abs_path) {
+                Some(h) => h,
+                None => return true, // can't read file, rescan it
+            };
             match cache.get(&root_abs, &f.path) {
                 Some(cached_hash) if cached_hash == hash => {
                     debug!(file = %f.path, "skipping unchanged file (incremental)");
@@ -160,7 +163,10 @@ pub async fn execute_scan(
         let mut cache = ScanCache::load().unwrap_or_default();
         for f in &files {
             let abs_path = root_abs.join(&f.path);
-            let hash = file_content_hash(&abs_path);
+            let hash = match file_content_hash(&abs_path) {
+                Some(h) => h,
+                None => continue, // can't read file, skip cache entry
+            };
             cache.set(&root_abs, &f.path, &hash);
         }
         cache.save()?;
@@ -175,17 +181,13 @@ pub async fn execute_scan(
 }
 
 /// Compute a short SHA256 hash of a file's content for incremental scanning.
-fn file_content_hash(path: &std::path::Path) -> String {
-    match std::fs::read(path) {
-        Ok(bytes) => {
-            use std::hash::{Hash, Hasher};
-            // Use a fast non-crypto hash — we just need change detection, not security.
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            bytes.hash(&mut hasher);
-            format!("{:016x}", hasher.finish())
-        }
-        Err(_) => String::new(),
-    }
+/// Returns None if the file cannot be read (caller should rescan it).
+fn file_content_hash(path: &std::path::Path) -> Option<String> {
+    use sha2::Digest;
+    let bytes = std::fs::read(path).ok()?;
+    let hash = sha2::Sha256::digest(&bytes);
+    // Use first 8 bytes as hex — consistent representation, no truncation
+    Some(hash.iter().take(8).map(|b| format!("{b:02x}")).collect())
 }
 
 /// Cache of file content hashes for incremental scanning.

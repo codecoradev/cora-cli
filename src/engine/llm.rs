@@ -222,7 +222,7 @@ fn create_spinner(message: &str) -> ProgressBar {
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
     spinner.set_style(
         ProgressStyle::with_template("{spinner:.cyan} {msg}")
-            .unwrap()
+            .expect("valid spinner template")
             .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ "),
     );
     spinner.set_message(message.to_string());

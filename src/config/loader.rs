@@ -375,6 +375,22 @@ pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
         return Ok(None);
     }
 
+    // Security: warn if auth file has overly permissive permissions (Unix only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&path) {
+            let mode = meta.permissions().mode();
+            if mode & 0o077 != 0 {
+                tracing::warn!(
+                    "auth file has overly permissive permissions ({:o}). Run: chmod 600 {}",
+                    mode & 0o777,
+                    path.display()
+                );
+            }
+        }
+    }
+
     let content = std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read {}", path.display()))?;
 
