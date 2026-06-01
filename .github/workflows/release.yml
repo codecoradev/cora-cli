@@ -125,6 +125,12 @@ jobs:
       - name: List artifacts
         run: ls -la release-artifacts/
 
+      - name: Generate SHA256 checksums
+        run: |
+          cd release-artifacts
+          sha256sum * > checksums-sha256.txt
+          cat checksums-sha256.txt
+
       - name: Extract version from tag
         id: version
         run: |
