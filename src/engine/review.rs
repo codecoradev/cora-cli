@@ -17,6 +17,7 @@ fn load_system_prompt_file(path: &str) -> Option<String> {
         }
     };
     let project_root = std::env::current_dir().ok()?;
+    let project_root = std::fs::canonicalize(&project_root).ok()?;
 
     if !canonical.starts_with(&project_root) {
         tracing::warn!(
