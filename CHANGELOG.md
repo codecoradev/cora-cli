@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-01
+
+### Added
+
+- LLM JSON repair engine (`repair_invalid_escapes`) — auto-fixes invalid escape sequences in LLM output (e.g. `\s`, `\d`) before JSON parse
+- Retry mechanism in `review_diff` — if first LLM parse fails, automatically retries once
+- Branding footer on "No issues found" PR comment — consistent with issues-found variant
+
+### Fixed
+
+- **Silent false-negative** — cora JSON parse failure previously posted "No issues found" without actual review (LLM invalid escapes)
+- Hardcoded Infisical `identity-id` in `release.yml` and `deploy-website.yml` — migrated to `secrets.INFISICAL_IDENTITY_ID`
+- Release workflow changelog extraction — `v` prefix mismatch (tag `v0.1.3` vs CHANGELOG `[0.1.3]`) now properly stripped
+- `printf` double-escape in release workflow — `\\n` corrected to `\n`
+- Stale `v0.1.2` binary download filenames in README
+- Clippy `unnecessary_map_or` lint — `.map_or(false, |s| s.success())` replaced with `.is_ok_and(|s| s.success())`
+
+### Changed
+
+- All 3 workflows use `secrets.INFISICAL_IDENTITY_ID` (consistent with `ci.yml` pattern)
+- Release workflow validates semver format before sed injection
+- Branch cleanup — removed 14 stale branches
+
 ## [0.1.3] - 2026-06-01
 
 ### Added
