@@ -37,7 +37,14 @@ pub fn find_cora_file(start: &Path) -> Result<Option<(PathBuf, CoraFile)>> {
             debug!(path = %candidate.display(), "found .cora.yaml");
             let content = std::fs::read_to_string(&candidate)
                 .with_context(|| format!("failed to read {}", candidate.display()))?;
-            let cora = CoraFile::from_str(&content)?;
+            let cora = CoraFile::from_str(&content).map_err(|e| {
+                let msg = e.to_string();
+                anyhow::anyhow!(
+                    "{}\n  → file: {}\n  → hint: check for syntax errors (indentation, colons, trailing spaces)",
+                    msg,
+                    candidate.display()
+                )
+            })?;
             return Ok(Some((candidate, cora)));
         }
 
@@ -237,7 +244,15 @@ pub fn load_config(
         let path = Path::new(path);
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("failed to read config at {}", path.display()))?;
-        let cora = CoraFile::from_str(&content)?;
+        let cora = CoraFile::from_str(&content).map_err(|e| {
+            let msg = e.to_string();
+            // Enhance error message with path info and hint about malformed YAML
+            anyhow::anyhow!(
+                "{}\n  → file: {}\n  → hint: check for syntax errors (indentation, colons, trailing spaces)",
+                msg,
+                path.display()
+            )
+        })?;
         cora.merge_into(&mut config);
         debug!(path = %path.display(), "loaded explicit config");
     } else if let Some((path, cora)) = find_cora_file(&std::env::current_dir()?)? {
@@ -340,6 +355,9 @@ pub fn build_llm_config(config: &Config, cli_api_key: Option<&str>) -> Result<LL
         base_url,
         model,
         provider,
+        temperature: config.temperature,
+        max_tokens: config.max_tokens,
+        timeout: config.timeout,
     })
 }
 

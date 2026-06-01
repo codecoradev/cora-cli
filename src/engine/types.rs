@@ -297,6 +297,9 @@ mod tests {
         assert_eq!(cfg.base_url, "https://api.openai.com/v1");
         assert_eq!(cfg.model, "gpt-4o-mini");
         assert_eq!(cfg.provider, "openai");
+        assert_eq!(cfg.temperature, 0.0);
+        assert_eq!(cfg.max_tokens, 4096);
+        assert_eq!(cfg.timeout, 120);
     }
 
     // ─── TokenUsage::default ───
@@ -411,6 +414,9 @@ pub struct LLMConfig {
     pub base_url: String,
     pub model: String,
     pub provider: String,
+    pub temperature: f32,
+    pub max_tokens: u32,
+    pub timeout: u64,
 }
 
 impl Default for LLMConfig {
@@ -420,6 +426,9 @@ impl Default for LLMConfig {
             base_url: "https://api.openai.com/v1".to_string(),
             model: "gpt-4o-mini".to_string(),
             provider: "openai".to_string(),
+            temperature: 0.0,
+            max_tokens: 4096,
+            timeout: 120,
         }
     }
 }

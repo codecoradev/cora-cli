@@ -28,6 +28,14 @@ pub struct Config {
     pub scan_system_prompt_override: Option<String>,
     /// Optional custom system prompt file path for scan.
     pub scan_system_prompt_file: Option<String>,
+    /// LLM temperature for deterministic output.
+    pub temperature: f32,
+    /// Max tokens for LLM responses.
+    pub max_tokens: u32,
+    /// HTTP timeout in seconds for LLM requests.
+    pub timeout: u64,
+    /// Cache TTL in minutes for review caching.
+    pub cache_ttl: u64,
 }
 
 /// Provider configuration.
@@ -98,6 +106,10 @@ impl Default for Config {
             review_system_prompt_file: None,
             scan_system_prompt_override: None,
             scan_system_prompt_file: None,
+            temperature: 0.0,
+            max_tokens: 4096,
+            timeout: 120,
+            cache_ttl: 1440, // 24h in minutes
         }
     }
 }
@@ -128,6 +140,8 @@ pub struct CoraFile {
     pub review: Option<ReviewSection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scan: Option<ScanSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub llm: Option<LlmSection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -184,6 +198,19 @@ pub struct ScanSection {
     pub system_prompt: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_prompt_file: Option<String>,
+}
+
+/// LLM-specific configuration section (temperature, max_tokens, timeout, cache_ttl).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LlmSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_ttl: Option<u64>,
 }
 
 impl CoraFile {
@@ -254,6 +281,20 @@ impl CoraFile {
             }
             if let Some(v) = &s.system_prompt_file {
                 config.scan_system_prompt_file = Some(v.clone());
+            }
+        }
+        if let Some(llm) = &self.llm {
+            if let Some(v) = llm.temperature {
+                config.temperature = v;
+            }
+            if let Some(v) = llm.max_tokens {
+                config.max_tokens = v;
+            }
+            if let Some(v) = llm.timeout {
+                config.timeout = v;
+            }
+            if let Some(v) = llm.cache_ttl {
+                config.cache_ttl = v;
             }
         }
     }
@@ -683,5 +724,176 @@ scan:
         let scan = cora.scan.unwrap();
         assert_eq!(scan.system_prompt.as_deref(), Some("Performance only.\n"));
         assert_eq!(scan.system_prompt_file.as_deref(), Some("scan.md"));
+    }
+
+    // ─── LLM section parsing and merge ───
+
+    #[test]
+    fn config_default_temperature_is_zero() {
+        let cfg = Config::default();
+        assert_eq!(cfg.temperature, 0.0);
+    }
+
+    #[test]
+    fn config_default_max_tokens() {
+        let cfg = Config::default();
+        assert_eq!(cfg.max_tokens, 4096);
+    }
+
+    #[test]
+    fn config_default_timeout() {
+        let cfg = Config::default();
+        assert_eq!(cfg.timeout, 120);
+    }
+
+    #[test]
+    fn config_default_cache_ttl() {
+        let cfg = Config::default();
+        assert_eq!(cfg.cache_ttl, 1440);
+    }
+
+    #[test]
+    fn parse_llm_section() {
+        let yaml = r#"
+llm:
+  temperature: 0.5
+  max_tokens: 8192
+  timeout: 60
+  cache_ttl: 720
+"#;
+        let cora = CoraFile::from_str(yaml).unwrap();
+        let llm = cora.llm.unwrap();
+        assert_eq!(llm.temperature, Some(0.5));
+        assert_eq!(llm.max_tokens, Some(8192));
+        assert_eq!(llm.timeout, Some(60));
+        assert_eq!(llm.cache_ttl, Some(720));
+    }
+
+    #[test]
+    fn parse_llm_section_partial() {
+        let yaml = r#"
+llm:
+  temperature: 0.3
+"#;
+        let cora = CoraFile::from_str(yaml).unwrap();
+        let llm = cora.llm.unwrap();
+        assert_eq!(llm.temperature, Some(0.3));
+        assert_eq!(llm.max_tokens, None);
+        assert_eq!(llm.timeout, None);
+        assert_eq!(llm.cache_ttl, None);
+    }
+
+    #[test]
+    fn merge_llm_temperature() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            llm: Some(LlmSection {
+                temperature: Some(0.7),
+                max_tokens: None,
+                timeout: None,
+                cache_ttl: None,
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(cfg.temperature, 0.7);
+        // Other LLM fields should remain at defaults
+        assert_eq!(cfg.max_tokens, 4096);
+        assert_eq!(cfg.timeout, 120);
+        assert_eq!(cfg.cache_ttl, 1440);
+    }
+
+    #[test]
+    fn merge_llm_max_tokens() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            llm: Some(LlmSection {
+                temperature: None,
+                max_tokens: Some(2048),
+                timeout: None,
+                cache_ttl: None,
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(cfg.max_tokens, 2048);
+    }
+
+    #[test]
+    fn merge_llm_timeout() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            llm: Some(LlmSection {
+                temperature: None,
+                max_tokens: None,
+                timeout: Some(300),
+                cache_ttl: None,
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(cfg.timeout, 300);
+    }
+
+    #[test]
+    fn merge_llm_all_fields() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            llm: Some(LlmSection {
+                temperature: Some(1.0),
+                max_tokens: Some(16384),
+                timeout: Some(240),
+                cache_ttl: Some(2880),
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(cfg.temperature, 1.0);
+        assert_eq!(cfg.max_tokens, 16384);
+        assert_eq!(cfg.timeout, 240);
+        assert_eq!(cfg.cache_ttl, 2880);
+    }
+
+    // ─── Config error on malformed YAML ───
+
+    #[test]
+    fn cora_file_malformed_yaml_returns_error() {
+        let yaml = r#"
+provider:
+  provider: openai
+  model: gpt-4
+  this is not valid yaml: [
+"#;
+        let result = CoraFile::from_str(yaml);
+        assert!(result.is_err(), "malformed YAML should return an error");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("failed to parse .cora.yaml"),
+            "error message should mention parse failure: {err}"
+        );
+    }
+
+    #[test]
+    fn cora_file_empty_yaml_is_ok() {
+        let cora = CoraFile::from_str("").unwrap();
+        assert!(cora.llm.is_none());
+        assert!(cora.provider.is_none());
+    }
+
+    #[test]
+    fn cora_file_yaml_roundtrip_with_llm() {
+        let cora = CoraFile {
+            llm: Some(LlmSection {
+                temperature: Some(0.5),
+                max_tokens: Some(8192),
+                timeout: Some(60),
+                cache_ttl: None,
+            }),
+            ..Default::default()
+        };
+        let yaml = serde_yaml_ng::to_string(&cora).unwrap();
+        let back: CoraFile = serde_yaml_ng::from_str(&yaml).unwrap();
+        assert_eq!(back.llm.as_ref().unwrap().temperature, Some(0.5));
+        assert_eq!(back.llm.as_ref().unwrap().max_tokens, Some(8192));
     }
 }
