@@ -15,16 +15,21 @@ static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .timeout(Duration::from_secs(120))
         .pool_max_idle_per_host(4)
         .build()
-        .expect("failed to build shared HTTP client")
+        .unwrap_or_else(|e| {
+            tracing::error!("failed to build shared HTTP client: {}", e);
+            // Fall back to a default client — this should never happen in practice
+            reqwest::Client::new()
+        })
 });
 
-/// Build (or return cached) shared reqwest::Client with the given timeout.
+/// Return the shared reqwest::Client for LLM API requests.
+///
+/// Note: The timeout is set at client construction time (120s default).
+/// Per-request timeout override is not supported by reqwest once the
+/// client is built, so the `timeout_secs` parameter is accepted for
+/// API consistency but the shared client's built-in timeout is used.
 pub fn shared_client(timeout_secs: u64) -> reqwest::Client {
-    // For now, always return the shared client. The shared client uses a
-    // conservative default timeout; per-request timeout overrides are
-    // not supported by reqwest once the client is built, so we just use
-    // the shared client.
-    let _ = timeout_secs; // suppress unused warning
+    let _ = timeout_secs; // accepted for API consistency, shared client has fixed timeout
     SHARED_CLIENT.clone()
 }
 
