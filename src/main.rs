@@ -115,6 +115,10 @@ enum Command {
         #[clap(long, value_parser = ["info", "minor", "major", "critical"])]
         severity: Option<String>,
 
+        /// Disable review caching
+        #[clap(long)]
+        no_cache: bool,
+
         /// Upload SARIF output to GitHub Code Scanning after review
         /// (implies --format sarif)
         #[clap(long)]
@@ -286,6 +290,7 @@ async fn main() -> Result<()> {
             stream,
             quiet,
             severity,
+            no_cache,
             upload,
             repo,
             ref_name,
@@ -303,6 +308,7 @@ async fn main() -> Result<()> {
                     stream,
                     quiet,
                     severity,
+                    no_cache,
                     upload,
                     repo,
                     ref_name,
@@ -410,6 +416,7 @@ struct ReviewOpts {
     repo: Option<String>,
     ref_name: Option<String>,
     token: Option<String>,
+    no_cache: bool,
 }
 
 /// Struct to hold scan options from CLI.
@@ -452,6 +459,7 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         stream: opts.stream,
         quiet: opts.quiet,
         severity: opts.severity.clone(),
+        no_cache: opts.no_cache,
     };
 
     // When streaming and not quiet, show a simpler message

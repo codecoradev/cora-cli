@@ -62,7 +62,7 @@ pub async fn review_diff(
     llm_config: &LLMConfig,
     diff: &str,
 ) -> Result<ReviewResponse> {
-    review_diff_inner(config, llm_config, diff, false).await
+    review_diff_inner(config, llm_config, diff, false, true).await
 }
 
 /// Run a code review on the given diff string with optional streaming.
@@ -75,7 +75,22 @@ pub async fn review_diff_with_stream(
     diff: &str,
     stream: bool,
 ) -> Result<ReviewResponse> {
-    review_diff_inner(config, llm_config, diff, stream).await
+    review_diff_inner(config, llm_config, diff, stream, true).await
+}
+
+/// Run a code review on the given diff string with optional streaming and cache control.
+///
+/// When `stream` is true, LLM tokens are printed to stdout in real-time.
+/// When `use_cache` is false, the cache is bypassed.
+#[instrument(skip_all)]
+pub async fn review_diff_with_cache(
+    config: &Config,
+    llm_config: &LLMConfig,
+    diff: &str,
+    stream: bool,
+    use_cache: bool,
+) -> Result<ReviewResponse> {
+    review_diff_inner(config, llm_config, diff, stream, use_cache).await
 }
 
 async fn review_diff_inner(
@@ -83,6 +98,7 @@ async fn review_diff_inner(
     llm_config: &LLMConfig,
     diff: &str,
     stream: bool,
+    use_cache: bool,
 ) -> Result<ReviewResponse> {
     debug!(
         diff_len = diff.len(),
@@ -97,6 +113,19 @@ async fn review_diff_inner(
             tokens_used: None,
             should_block: false,
         });
+    }
+
+    // Check cache before calling LLM
+    if use_cache {
+        if let Some(cached) = crate::engine::cache::get_cached_review(
+            diff,
+            &llm_config.model,
+            llm_config.temperature,
+            config.cache_ttl,
+        ) {
+            debug!("returning cached review response");
+            return Ok(cached);
+        }
     }
 
     // Extract valid file paths for post-parse filtering
@@ -163,6 +192,18 @@ async fn review_diff_inner(
         should_block = response.should_block,
         "review complete"
     );
+
+    // Save fully-processed response to cache (after filtering)
+    if use_cache {
+        if let Err(e) = crate::engine::cache::save_cached_review(
+            diff,
+            &llm_config.model,
+            llm_config.temperature,
+            &response,
+        ) {
+            debug!("failed to save review to cache: {}", e);
+        }
+    }
 
     Ok(response)
 }
