@@ -290,7 +290,8 @@ pub async fn review_diff_stream(
 
     let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
 
-    let raw = chat_completion_stream(llm_config, system_prompt, &user_prompt, response_format).await?;
+    let raw =
+        chat_completion_stream(llm_config, system_prompt, &user_prompt, response_format).await?;
 
     let (issues, summary, tokens_used) = parse_review_response(&raw)?;
 
@@ -464,7 +465,14 @@ pub async fn scan_files(
     user_prompt.push_str("Files to review:\n\n");
     user_prompt.push_str(files_content);
 
-    let raw = chat_completion(llm_config, system_prompt, &user_prompt, Some(&spinner), response_format).await?;
+    let raw = chat_completion(
+        llm_config,
+        system_prompt,
+        &user_prompt,
+        Some(&spinner),
+        response_format,
+    )
+    .await?;
 
     parse_scan_response(&raw)
 }

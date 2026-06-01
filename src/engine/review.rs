@@ -22,10 +22,7 @@ fn load_system_prompt_file(path: &str) -> Option<String> {
 }
 
 /// Resolve the effective system prompt: inline override > file override > None (use default).
-pub fn resolve_system_prompt(
-    inline: Option<&str>,
-    file_path: Option<&str>,
-) -> Option<String> {
+pub fn resolve_system_prompt(inline: Option<&str>, file_path: Option<&str>) -> Option<String> {
     if let Some(prompt) = inline {
         Some(prompt.to_string())
     } else if let Some(path) = file_path {
@@ -186,16 +183,15 @@ pub async fn scan_project(
         config.scan_system_prompt_file.as_deref(),
     );
 
-    let (issues, summary, tokens_used) =
-        llm::scan_files(
-            llm_config,
-            files_content,
-            &config.focus,
-            &config.rules,
-            &config.response_format,
-            scan_prompt.as_deref(),
-        )
-        .await?;
+    let (issues, summary, tokens_used) = llm::scan_files(
+        llm_config,
+        files_content,
+        &config.focus,
+        &config.rules,
+        &config.response_format,
+        scan_prompt.as_deref(),
+    )
+    .await?;
 
     // Apply ignore rules
     let issues = apply_ignore_rules(issues, &config.ignore.rules);
