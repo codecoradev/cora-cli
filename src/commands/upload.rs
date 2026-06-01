@@ -43,10 +43,11 @@ pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
     // Validate file size (GitHub limits SARIF uploads to 10MB)
     const MAX_SARIF_SIZE: usize = 10 * 1024 * 1024; // 10MB
     if sarif_content.len() > MAX_SARIF_SIZE {
+        let size_mb = sarif_content.len() as f64 / (1024.0 * 1024.0);
         bail!(
-            "SARIF file is {} bytes ({}MB), exceeding GitHub's 10MB limit. Consider reviewing a smaller diff.",
+            "SARIF file is {} bytes ({:.2}MB), exceeding GitHub's 10MB limit. Consider reviewing a smaller diff.",
             sarif_content.len(),
-            sarif_content.len() / (1024 * 1024)
+            size_mb
         );
     }
 
