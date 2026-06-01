@@ -128,7 +128,10 @@ pub fn walk_project(
         // Read file content (skip binary / unreadable)
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
-            Err(_) => continue,
+            Err(e) => {
+                debug!(file = %relative, error = %e, "skipping unreadable file");
+                continue;
+            }
         };
 
         // Skip empty files

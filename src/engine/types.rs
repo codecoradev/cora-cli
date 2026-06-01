@@ -21,20 +21,7 @@ impl Severity {
             _ => Severity::Info,
         }
     }
-}
 
-impl fmt::Display for Severity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Severity::Critical => write!(f, "critical"),
-            Severity::Major => write!(f, "major"),
-            Severity::Minor => write!(f, "minor"),
-            Severity::Info => write!(f, "info"),
-        }
-    }
-}
-
-impl Severity {
     /// Get the label text for this severity.
     pub fn label(&self) -> &'static str {
         match self {
@@ -52,6 +39,17 @@ impl Severity {
             Severity::Major => "🟠",
             Severity::Minor => "🟡",
             Severity::Info => "ℹ️",
+        }
+    }
+}
+
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Severity::Critical => write!(f, "critical"),
+            Severity::Major => write!(f, "major"),
+            Severity::Minor => write!(f, "minor"),
+            Severity::Info => write!(f, "info"),
         }
     }
 }

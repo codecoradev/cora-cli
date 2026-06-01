@@ -40,6 +40,17 @@ pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
     // Read SARIF content
     let sarif_content = read_sarif(opts.file.as_deref())?;
 
+    // Validate file size (GitHub limits SARIF uploads to 10MB)
+    const MAX_SARIF_SIZE: usize = 10 * 1024 * 1024; // 10MB
+    if sarif_content.len() > MAX_SARIF_SIZE {
+        let size_mb = sarif_content.len() as f64 / (1024.0 * 1024.0);
+        bail!(
+            "SARIF file is {} bytes ({:.2}MB), exceeding GitHub's 10MB limit. Consider reviewing a smaller diff.",
+            sarif_content.len(),
+            size_mb
+        );
+    }
+
     // Validate it's valid JSON (basic sanity check)
     let parsed: serde_json::Value =
         serde_json::from_str(&sarif_content).context("SARIF file does not contain valid JSON")?;

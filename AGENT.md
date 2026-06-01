@@ -29,7 +29,7 @@ src/
 │   ├── mod.rs
 │   ├── review.rs        # cora review (diff-based review)
 │   ├── scan.rs          # cora scan (full-file scan)
-│   ├── config_cmd.rs    # cora config (show/validate)
+│   ├── config_cmd.rs    # cora config (show/set)
 │   ├── auth.rs          # cora auth (API key management)
 │   ├── hook_cmd.rs      # cora hook (pre-commit hook install/uninstall)
 │   ├── init.rs          # cora init (project scaffolding)
@@ -67,7 +67,7 @@ src/
 
 | File | Purpose |
 |---|---|
-| `commands/config_cmd.rs` | Config subcommand — display, validate, path resolution |
+| `commands/config_cmd.rs` | Config subcommand — display, set, path resolution |
 | `config/loader.rs` | Config loading with full priority chain resolution |
 | `config/schema.rs` | All config structs, defaults, serde annotations |
 | `commands/init.rs` | Project scaffolding, `.cora.yaml` generation |
