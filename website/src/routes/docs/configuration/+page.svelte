@@ -74,6 +74,17 @@
   <span class="syntax-flag">model:</span> <span class="syntax-string">gpt-4o</span>
   <span class="syntax-flag">base_url:</span> <span class="syntax-string">https://api.openai.com/v1</span>
 
+<span class="syntax-highlight">llm:</span>
+  <span class="syntax-flag">temperature:</span> <span class="text-[var(--foreground)]">0</span>
+  <span class="syntax-flag">max_tokens:</span> <span class="text-[var(--foreground)]">4096</span>
+  <span class="syntax-flag">timeout:</span> <span class="text-[var(--foreground)]">120</span>
+  <span class="syntax-flag">cache_ttl:</span> <span class="text-[var(--foreground)]">1440</span>
+
+<span class="syntax-highlight">review:</span>
+  <span class="syntax-flag">system_prompt:</span> <span class="syntax-string">"You are a senior code reviewer."</span>
+  <span class="syntax-comment"># system_prompt_file: ./review-prompt.md</span>
+  <span class="syntax-flag">response_format:</span> <span class="syntax-string">json_object</span>
+
 <span class="syntax-highlight">focus:</span> <span class="syntax-string">security, performance, bugs</span>
 
 <span class="syntax-highlight">hook:</span>
@@ -128,10 +139,14 @@
 					<td><code class="syntax-highlight">CORA_FORMAT</code></td>
 					<td>Output format (pretty, json, compact, sarif)</td>
 				</tr>
-				<tr>
-					<td><code class="syntax-highlight">CORA_NO_COLOR</code></td>
-					<td>Disable colored output</td>
-				</tr>
+			<tr>
+				<td><code class="syntax-highlight">CORA_NO_COLOR</code></td>
+				<td>Disable colored output</td>
+			</tr>
+			<tr>
+				<td><code class="syntax-highlight">CORA_NO_CACHE</code></td>
+				<td>Skip diff-hash review cache (same as <code class="syntax-highlight">--no-cache</code>)</td>
+			</tr>
 				<tr>
 					<td><code class="syntax-highlight">GITHUB_TOKEN</code></td>
 					<td>GitHub token for SARIF upload</td>
@@ -182,6 +197,96 @@
 <span class="syntax-comment"># Z.AI</span>
 <span class="syntax-flag">ZAI_API_KEY</span>=<span class="syntax-string">...</span></pre>
 		</div>
+	</div>
+</section>
+
+<!-- Caching Behavior -->
+<section class="docs-section scroll-reveal">
+	<h2 class="flex items-center gap-2">
+		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+		Diff-Hash Caching
+	</h2>
+	<p class="text-[var(--muted-foreground)] mb-4">cora caches review results by diff hash in <code class="syntax-highlight">~/.cache/cora/reviews/</code>. If you re-review the same diff, the cached result is returned instantly.</p>
+	<div class="glass-card p-4 mb-4">
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<div>
+				<div class="text-xs font-semibold text-[var(--foreground)] mb-1">Config</div>
+				<div class="text-sm text-[var(--muted-foreground)]">
+					<code class="syntax-highlight">llm.cache_ttl</code> — TTL in minutes (default: 1440 / 24h)
+				</div>
+			</div>
+			<div>
+				<div class="text-xs font-semibold text-[var(--foreground)] mb-1">CLI / Env</div>
+				<div class="text-sm text-[var(--muted-foreground)]">
+					<code class="syntax-highlight">--no-cache</code> or <code class="syntax-highlight">CORA_NO_CACHE=1</code> to bypass
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!-- Custom System Prompts -->
+<section class="docs-section scroll-reveal">
+	<h2 class="flex items-center gap-2">
+		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+		Custom System Prompts
+	</h2>
+	<p class="text-[var(--muted-foreground)] mb-4">Override the default system prompt for <code class="syntax-highlight">review</code> or <code class="syntax-highlight">scan</code> commands to match your project's coding standards and review criteria.</p>
+	<div class="docs-terminal">
+		<div class="terminal-bar">
+			<span class="terminal-dot terminal-dot-red"></span>
+			<span class="terminal-dot terminal-dot-yellow"></span>
+			<span class="terminal-dot terminal-dot-green"></span>
+			<span class="terminal-title">.cora.yaml</span>
+		</div>
+		<div class="terminal-body">
+<pre class="whitespace-pre"><span class="syntax-highlight">review:</span>
+  <span class="syntax-flag">system_prompt:</span> <span class="syntax-string">"Focus on Rust idioms and error handling."</span>
+  <span class="syntax-comment"># Or load from a file:</span>
+  <span class="syntax-flag">system_prompt_file:</span> <span class="syntax-string">./prompts/review.md</span>
+
+<span class="syntax-highlight">scan:</span>
+  <span class="syntax-flag">system_prompt:</span> <span class="syntax-string">"Check for OWASP Top 10 vulnerabilities."</span>
+  <span class="syntax-flag">system_prompt_file:</span> <span class="syntax-string">./prompts/scan.md</span></pre>
+		</div>
+	</div>
+	<p class="text-[var(--muted-foreground)] mt-3 text-sm">If both <code class="syntax-highlight">system_prompt</code> and <code class="syntax-highlight">system_prompt_file</code> are set, the file takes precedence.</p>
+</section>
+
+<!-- Response Format -->
+<section class="docs-section scroll-reveal">
+	<h2 class="flex items-center gap-2">
+		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+		Response Format (JSON Mode)
+	</h2>
+	<p class="text-[var(--muted-foreground)] mb-4">Opt into structured JSON output from the LLM by setting <code class="syntax-highlight">review.response_format</code> to <code class="syntax-highlight">json_object</code>. This instructs the LLM to return valid JSON, enabling machine-readable parsing and pipeline integration.</p>
+	<div class="docs-terminal">
+		<div class="terminal-bar">
+			<span class="terminal-dot terminal-dot-red"></span>
+			<span class="terminal-dot terminal-dot-yellow"></span>
+			<span class="terminal-dot terminal-dot-green"></span>
+			<span class="terminal-title">.cora.yaml</span>
+		</div>
+		<div class="terminal-body">
+<pre class="whitespace-pre"><span class="syntax-highlight">review:</span>
+  <span class="syntax-flag">response_format:</span> <span class="syntax-string">json_object</span></pre>
+		</div>
+	</div>
+	<p class="text-[var(--muted-foreground)] mt-3 text-sm">Requires provider support for structured output. Works with OpenAI, Anthropic, and compatible APIs.</p>
+</section>
+
+<!-- Anti-Hallucination -->
+<section class="docs-section scroll-reveal">
+	<h2 class="flex items-center gap-2">
+		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+		Anti-Hallucination
+	</h2>
+	<p class="text-[var(--muted-foreground)] mb-4">cora uses two mechanisms to prevent the LLM from fabricating findings:</p>
+	<div class="glass-card p-4">
+		<ul class="text-sm text-[var(--muted-foreground)] space-y-2 list-none pl-0">
+			<li><span class="text-[var(--accent)] font-semibold">File path injection</span> — Actual file paths are embedded in the prompt, anchoring the LLM to real files in the diff.</li>
+			<li><span class="text-[var(--accent)] font-semibold">Post-parse filtering</span> — After parsing, any reported file paths or line numbers that don't exist in the actual diff are discarded.</li>
+		</ul>
 	</div>
 </section>
 </div>
