@@ -40,7 +40,9 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Fetch LLM secrets from Infisical
+    - name: Fetch LLM secrets from Infisical (with fallback to org secrets)
+      id: infisical
+      continue-on-error: true
       uses: Infisical/secrets-action@8a06c1bdcd5b8635d510c52d4b57a92c1ccef785 # v1.0.9
       with:
         method: 'oidc'
@@ -48,6 +50,20 @@ runs:
         project-slug: ${{ inputs.infisical-project }}
         env-slug: ${{ inputs.infisical-env }}
         domain: ${{ inputs.infisical-domain }}
+
+    - name: Fallback to org secrets if Infisical failed
+      shell: bash
+      env:
+        CORA_API_KEY_FALLBACK: ${{ secrets.CORA_API_KEY }}
+        CORA_BASE_URL_FALLBACK: ${{ secrets.CORA_BASE_URL }}
+        CORA_MODEL_FALLBACK: ${{ secrets.CORA_MODEL }}
+      run: |
+        if [ "${{ steps.infisical.outcome }}" != "success" ]; then
+          echo "::warning::Infisical OIDC failed, falling back to org secrets"
+          echo "CORA_API_KEY=$CORA_API_KEY_FALLBACK" >> $GITHUB_ENV
+          echo "CORA_BASE_URL=$CORA_BASE_URL_FALLBACK" >> $GITHUB_ENV
+          echo "CORA_MODEL=$CORA_MODEL_FALLBACK" >> $GITHUB_ENV
+        fi
 
     - name: Resolve cora-cli version
       id: resolve
