@@ -6,10 +6,10 @@ use crate::config::schema::Config;
 use crate::engine::Severity;
 use crate::formatters::{OutputFormat, formatter_for};
 use crate::git;
+use crate::progress::{ProgressReporter, TokenInfo, diff_stats};
 
 /// Exit codes for the review command.
 pub const EXIT_OK: i32 = 0;
-pub const EXIT_ERROR: i32 = 1;
 pub const EXIT_BLOCKED: i32 = 2;
 
 /// Review command options.
@@ -55,6 +55,7 @@ pub async fn execute_review(
     llm_config: &crate::engine::LLMConfig,
     opts: &ReviewOptions,
     format: OutputFormat,
+    progress: &ProgressReporter,
 ) -> Result<ReviewResult> {
     // 1. Get the diff
     let diff = get_diff(opts, config)?;
@@ -73,7 +74,13 @@ pub async fn execute_review(
         });
     }
 
-    // 2. Validate size
+    // 2. Emit parsing_diff event if progress enabled
+    if progress.is_enabled() {
+        let (files_changed, lines_changed) = diff_stats(&diff);
+        progress.parsing_diff(files_changed, lines_changed);
+    }
+
+    // 3. Validate size
     let max_size = opts.max_diff_size.unwrap_or(config.hook.max_diff_size);
     if diff.len() > max_size {
         anyhow::bail!(
@@ -89,17 +96,45 @@ pub async fn execute_review(
         "running review"
     );
 
-    // 3. Call the LLM engine
-    let response = crate::engine::review::review_diff_with_cache(
+    // 4. Emit calling_llm event
+    if progress.is_enabled() {
+        progress.calling_llm(&llm_config.provider, &llm_config.model);
+    }
+
+    let llm_start = std::time::Instant::now();
+
+    // 5. Call the LLM engine
+    let response = match crate::engine::review::review_diff_with_cache(
         config,
         llm_config,
         &diff,
         opts.stream,
         !opts.no_cache,
+        opts.quiet,
     )
-    .await?;
+    .await
+    {
+        Ok(resp) => {
+            if progress.is_enabled() {
+                let duration_ms = llm_start.elapsed().as_millis() as u64;
+                let tokens = resp
+                    .tokens_used
+                    .as_ref()
+                    .map(TokenInfo::from_usage)
+                    .unwrap_or_else(TokenInfo::zero);
+                progress.llm_response(&tokens, duration_ms);
+            }
+            resp
+        }
+        Err(e) => {
+            if progress.is_enabled() {
+                progress.error(&e.to_string(), "calling_llm");
+            }
+            return Err(e);
+        }
+    };
 
-    // 4. Filter by severity if specified
+    // 6. Filter by severity if specified
     let min_severity = if let Some(ref sev) = opts.severity {
         Severity::from_str_lossy(sev)
     } else {
@@ -114,16 +149,30 @@ pub async fn execute_review(
         .issues
         .retain(|i| i.severity <= min_severity);
 
-    // 5. Format output
+    // 7. Format output
     let formatter = formatter_for(format);
     let output = formatter.format_review(&filtered_response)?;
 
-    // 6. Return exit code
+    // 8. Return exit code
     let exit_code = if response.should_block && config.hook.mode == "block" {
         EXIT_BLOCKED
     } else {
         EXIT_OK
     };
+
+    // 9. Emit complete event
+    if progress.is_enabled() {
+        let tokens = response
+            .tokens_used
+            .as_ref()
+            .map(TokenInfo::from_usage)
+            .unwrap_or_else(TokenInfo::zero);
+        progress.complete(
+            filtered_response.issues.len(),
+            exit_code == EXIT_BLOCKED,
+            &tokens,
+        );
+    }
 
     Ok(ReviewResult { exit_code, output })
 }

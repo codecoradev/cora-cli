@@ -10,14 +10,38 @@ use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse, TokenUsage};
 /// Shared reqwest::Client with connection pooling. Reused across all LLM requests.
 /// Created lazily on first use to avoid blocking initialization.
 /// Per-request timeout is set via .timeout() on the RequestBuilder.
+///
+/// Supports `REQUESTS_CA_BUNDLE` env var for custom CA certificates
+/// (corporate proxies with self-signed certs).
 static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .pool_max_idle_per_host(4)
-        .build()
-        .unwrap_or_else(|e| {
-            tracing::error!("failed to build shared HTTP client: {}", e);
-            reqwest::Client::new()
-        })
+    let mut builder = reqwest::Client::builder().pool_max_idle_per_host(4);
+
+    // Support custom CA certificates for corporate proxies.
+    // REQUESTS_CA_BUNDLE is the de-facto standard used by Python requests,
+    // curl, Node.js, and most HTTP tooling.
+    if let Ok(ca_path) = std::env::var("REQUESTS_CA_BUNDLE") {
+        match std::fs::read(&ca_path) {
+            Ok(ca_data) => match reqwest::Certificate::from_pem(&ca_data) {
+                Ok(cert) => {
+                    builder = builder
+                        .tls_built_in_root_certs(false)
+                        .add_root_certificate(cert);
+                    tracing::debug!("loaded custom CA bundle from REQUESTS_CA_BUNDLE");
+                }
+                Err(e) => {
+                    tracing::warn!("failed to parse CA bundle {}: {}", ca_path, e);
+                }
+            },
+            Err(e) => {
+                tracing::warn!("failed to read CA bundle {}: {}", ca_path, e);
+            }
+        }
+    }
+
+    builder.build().unwrap_or_else(|e| {
+        tracing::error!("failed to build shared HTTP client: {}", e);
+        reqwest::Client::new()
+    })
 });
 
 /// Return the shared reqwest::Client for LLM API requests.
@@ -55,6 +79,10 @@ struct ChatChoice {
     message: ChatMessage,
 }
 
+/// Usage statistics from the LLM API response.
+/// `prompt_tokens` and `completion_tokens` are kept for API completeness
+/// (deserialization) even though only `total_tokens` is currently accessed.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 struct Usage {
     prompt_tokens: u32,
@@ -237,8 +265,13 @@ pub async fn review_diff(
     rules: &[String],
     response_format: &str,
     system_prompt_override: Option<&str>,
+    quiet: bool,
 ) -> Result<ReviewResponse> {
-    let spinner = create_spinner("Reviewing diff…");
+    let spinner = if quiet {
+        None
+    } else {
+        Some(create_spinner("Reviewing diff…"))
+    };
 
     let user_prompt = build_review_prompt(diff, focus, rules);
 
@@ -248,7 +281,7 @@ pub async fn review_diff(
         llm_config,
         system_prompt,
         &user_prompt,
-        Some(&spinner),
+        spinner.as_ref(),
         response_format,
     )
     .await?;
@@ -256,7 +289,9 @@ pub async fn review_diff(
     let parse_result = parse_review_response(&raw);
     match parse_result {
         Ok(result) => {
-            spinner.finish_and_clear();
+            if let Some(sp) = spinner {
+                sp.finish_and_clear();
+            }
             Ok(ReviewResponse {
                 issues: result.0,
                 summary: result.1,
@@ -267,7 +302,9 @@ pub async fn review_diff(
         Err(e) => {
             // LLM produced invalid JSON — retry once with stricter prompt
             debug!(error = %e, "first parse attempt failed, retrying LLM request");
-            spinner.set_message("Retrying (parse error)…");
+            if let Some(sp) = &spinner {
+                sp.set_message("Retrying (parse error)…");
+            }
             let strict_prompt = format!(
                 "{}\n\nIMPORTANT: Your response MUST contain only valid JSON. \
                 Ensure all strings use proper JSON escape sequences. \
@@ -278,12 +315,14 @@ pub async fn review_diff(
                 llm_config,
                 system_prompt,
                 &strict_prompt,
-                Some(&spinner),
+                spinner.as_ref(),
                 response_format,
             )
             .await?;
             let (issues, summary, tokens_used) = parse_review_response(&retry_raw)?;
-            spinner.finish_and_clear();
+            if let Some(sp) = spinner {
+                sp.finish_and_clear();
+            }
             Ok(ReviewResponse {
                 issues,
                 summary,

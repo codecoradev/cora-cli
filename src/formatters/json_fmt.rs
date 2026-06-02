@@ -1,21 +1,46 @@
 use anyhow::Result;
+use serde_json::{Value, json};
 
 use crate::engine::{ReviewResponse, ScanResponse};
 use crate::formatters::Formatter;
 
-/// JSON formatter: outputs raw JSON.
+/// JSON formatter: outputs raw JSON with a watermark footer.
 pub struct JsonFormatter;
 
 impl Formatter for JsonFormatter {
     fn format_review(&self, response: &ReviewResponse) -> Result<String> {
-        let json = serde_json::to_string_pretty(response)?;
+        let mut obj = serde_json::to_value(response)?;
+        add_watermark(&mut obj, &response.issues);
+        let json = serde_json::to_string_pretty(&obj)?;
         Ok(json)
     }
 
     fn format_scan(&self, response: &ScanResponse) -> Result<String> {
-        let json = serde_json::to_string_pretty(response)?;
+        let mut obj = serde_json::to_value(response)?;
+        add_watermark_scan(&mut obj, &response.issues);
+        let json = serde_json::to_string_pretty(&obj)?;
         Ok(json)
     }
+}
+
+/// Add a `reviewed_by` watermark field to a JSON value when issues are present.
+fn add_watermark(obj: &mut Value, issues: &[crate::engine::ReviewIssue]) {
+    if !issues.is_empty() {
+        if let Some(map) = obj.as_object_mut() {
+            map.insert(
+                "reviewed_by".to_string(),
+                json!({
+                    "tool": "cora",
+                    "version": env!("CARGO_PKG_VERSION")
+                }),
+            );
+        }
+    }
+}
+
+/// Add a `reviewed_by` watermark field for scan responses.
+fn add_watermark_scan(obj: &mut Value, issues: &[crate::engine::ReviewIssue]) {
+    add_watermark(obj, issues);
 }
 
 #[cfg(test)]
@@ -92,6 +117,19 @@ mod tests {
         let output = fmt.format_review(&empty_response()).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(parsed["issues"].as_array().unwrap().len(), 0);
+        // No watermark when no issues
+        assert!(parsed.get("reviewed_by").is_none());
+    }
+
+    #[test]
+    fn format_review_with_issues_has_watermark() {
+        let fmt = JsonFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        // Watermark should be present when issues exist
+        let reviewed_by = &parsed["reviewed_by"];
+        assert_eq!(reviewed_by["tool"].as_str().unwrap(), "cora");
+        assert!(reviewed_by["version"].as_str().is_some());
     }
 
     #[test]

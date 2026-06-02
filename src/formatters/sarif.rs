@@ -105,6 +105,18 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
         })
         .collect();
 
+    // Build invocations array with watermark
+    let invocations = if !issues.is_empty() {
+        json!([{
+            "executionSuccessful": true,
+            "properties": {
+                "cora.watermark": format!("Reviewed by Cora v{}", env!("CARGO_PKG_VERSION"))
+            }
+        }])
+    } else {
+        json!([])
+    };
+
     json!({
         "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
         "version": "2.1.0",
@@ -117,7 +129,8 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
                     "rules": rules
                 }
             },
-            "results": results
+            "results": results,
+            "invocations": invocations
         }]
     })
 }
@@ -230,6 +243,22 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
         let results = parsed["runs"][0]["results"].as_array().unwrap();
         assert!(results.is_empty());
+        // No watermark invocations when no issues
+        let invocations = parsed["runs"][0]["invocations"].as_array().unwrap();
+        assert!(invocations.is_empty());
+    }
+
+    #[test]
+    fn sarif_with_issues_has_watermark_invocation() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        let invocations = parsed["runs"][0]["invocations"].as_array().unwrap();
+        assert_eq!(invocations.len(), 1);
+        let wm = &invocations[0]["properties"]["cora.watermark"];
+        let wm_str = wm.as_str().unwrap();
+        assert!(wm_str.contains("Cora"));
+        assert!(wm_str.contains("v"));
     }
 
     #[test]

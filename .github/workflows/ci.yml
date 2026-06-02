@@ -47,6 +47,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all-targets -- -D warnings
 
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/audit-check@35b7b53b1e25b55642157ac01b4adceb5b9ebef3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
   test:
     name: Test
     runs-on: ubuntu-latest

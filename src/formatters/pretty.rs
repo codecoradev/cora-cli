@@ -81,6 +81,13 @@ impl Formatter for PrettyFormatter {
             ));
         }
 
+        // Footer watermark (only when issues found)
+        output.push_str(&format!(
+            "\n{}\n{}",
+            "─".repeat(60).dimmed(),
+            format!("Reviewed by Cora v{}", env!("CARGO_PKG_VERSION")).dimmed()
+        ));
+
         Ok(output)
     }
 
@@ -155,6 +162,15 @@ impl Formatter for PrettyFormatter {
                 "\n{}\n{}",
                 "─".repeat(60).dimmed(),
                 response.summary.white().bold()
+            ));
+        }
+
+        // Footer watermark (only when issues found)
+        if !response.issues.is_empty() {
+            output.push_str(&format!(
+                "\n{}\n{}",
+                "─".repeat(60).dimmed(),
+                format!("Reviewed by Cora v{}", env!("CARGO_PKG_VERSION")).dimmed()
             ));
         }
 
@@ -294,6 +310,22 @@ mod tests {
         let fmt = PrettyFormatter;
         let output = fmt.format_review(&empty_response()).unwrap();
         assert!(output.contains("No issues found"));
+        // No watermark when no issues
+        assert!(!output.contains("Reviewed by Cora"));
+    }
+
+    #[test]
+    fn format_review_with_issues_has_watermark() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("Reviewed by Cora v"));
+    }
+
+    #[test]
+    fn format_scan_with_issues_has_watermark() {
+        let fmt = PrettyFormatter;
+        let output = fmt.format_scan(&sample_scan_response()).unwrap();
+        assert!(output.contains("Reviewed by Cora v"));
     }
 
     #[test]
