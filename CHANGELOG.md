@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-03
+
+### Added
+
+- **Static analysis context injection** — optional clippy output injected into review prompt to reduce false positives on verified-intentional changes (#140)
+- **`review.static_analysis.auto_clippy`** config — automatically run `cargo clippy` and filter output to changed files
+- **`review.static_analysis.clippy_output_file`** config — read pre-computed clippy output from file
+- **`cora config validate`** subcommand — validate `.cora.yaml` configuration file and report issues (#88)
+- **`CoraError` enum via thiserror** — structured error types for engine layer with 17 variants (#86)
+
+### Changed
+
+- **Engine layer migrated from `anyhow` to `thiserror`** — structured error handling in engine, `anyhow` retained in CLI layer (#86)
+- **All clippy pedantic warnings resolved** — 175 → 0 warnings across entire codebase (#84)
+- **Repo URLs updated** to `codecoradev/cora-cli` org (#137)
+- **CI actions bumped** — `upload-artifact@v7`, Node 24 strict mode (`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`) (#142)
+
+### Fixed
+
+- **CI Cora Review fails on LLM API errors** — removed `|| true` suppression, added exit code + empty SARIF check (#142)
+- **Match arm merge in `IssueType::from_str`** — clarified documentation (#141)
+
 ## [0.2.0] - 2026-06-02
 
 ### Added
@@ -204,7 +226,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.2.0...develop
+[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.3.0...develop
+[0.3.0]: https://github.com/codecoradev/cora-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/codecoradev/cora-cli/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/codecoradev/cora-cli/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/codecoradev/cora-cli/compare/v0.1.6...v0.1.7
