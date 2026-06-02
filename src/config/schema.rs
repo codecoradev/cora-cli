@@ -18,7 +18,7 @@ pub struct Config {
     pub hook: HookConfig,
     /// Output configuration.
     pub output: OutputConfig,
-    /// Response format for LLM API calls ("none" or "json_object").
+    /// Response format for LLM API calls ("none" or "`json_object`").
     pub response_format: String,
     /// Optional custom system prompt that replaces the default for review.
     pub review_system_prompt_override: Option<String>,
@@ -115,7 +115,7 @@ impl Default for Config {
 }
 
 impl HookConfig {
-    /// Parse the min_severity string into a Severity enum.
+    /// Parse the `min_severity` string into a Severity enum.
     pub fn min_severity_level(&self) -> Severity {
         Severity::from_str_lossy(&self.min_severity)
     }
@@ -200,7 +200,7 @@ pub struct ScanSection {
     pub system_prompt_file: Option<String>,
 }
 
-/// LLM-specific configuration section (temperature, max_tokens, timeout, cache_ttl).
+/// LLM-specific configuration section (temperature, `max_tokens`, timeout, `cache_ttl`).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LlmSection {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn parse_cora_file_full() {
-        let yaml = r#"
+        let yaml = r"
 provider:
   provider: anthropic
   model: claude-3-haiku
@@ -498,7 +498,7 @@ hook:
 output:
   format: json
   color: false
-"#;
+";
         let cora = CoraFile::from_str(yaml).unwrap();
         assert_eq!(
             cora.provider.as_ref().unwrap().provider.as_deref(),
@@ -589,10 +589,10 @@ output:
 
     #[test]
     fn parse_review_section_with_response_format() {
-        let yaml = r#"
+        let yaml = r"
 review:
   response_format: json_object
-"#;
+";
         let cora = CoraFile::from_str(yaml).unwrap();
         assert_eq!(
             cora.review.as_ref().unwrap().response_format.as_deref(),
@@ -602,12 +602,12 @@ review:
 
     #[test]
     fn parse_review_section_with_system_prompt() {
-        let yaml = r#"
+        let yaml = r"
 review:
   system_prompt: |
     You are a security-focused reviewer.
   system_prompt_file: .cora/prompts/review.md
-"#;
+";
         let cora = CoraFile::from_str(yaml).unwrap();
         assert_eq!(
             cora.review.as_ref().unwrap().system_prompt.as_deref(),
@@ -674,11 +674,11 @@ review:
 
     #[test]
     fn parse_scan_section_with_system_prompt() {
-        let yaml = r#"
+        let yaml = r"
 scan:
   system_prompt: |
     You are a performance-focused scanner.
-"#;
+";
         let cora = CoraFile::from_str(yaml).unwrap();
         assert_eq!(
             cora.scan.as_ref().unwrap().system_prompt.as_deref(),
@@ -707,7 +707,7 @@ scan:
 
     #[test]
     fn parse_cora_file_with_review_and_scan() {
-        let yaml = r#"
+        let yaml = r"
 review:
   response_format: json_object
   system_prompt: |
@@ -716,7 +716,7 @@ scan:
   system_prompt: |
     Performance only.
   system_prompt_file: scan.md
-"#;
+";
         let cora = CoraFile::from_str(yaml).unwrap();
         let review = cora.review.unwrap();
         assert_eq!(review.response_format.as_deref(), Some("json_object"));
@@ -754,13 +754,13 @@ scan:
 
     #[test]
     fn parse_llm_section() {
-        let yaml = r#"
+        let yaml = r"
 llm:
   temperature: 0.5
   max_tokens: 8192
   timeout: 60
   cache_ttl: 720
-"#;
+";
         let cora = CoraFile::from_str(yaml).unwrap();
         let llm = cora.llm.unwrap();
         assert_eq!(llm.temperature, Some(0.5));
@@ -771,10 +771,10 @@ llm:
 
     #[test]
     fn parse_llm_section_partial() {
-        let yaml = r#"
+        let yaml = r"
 llm:
   temperature: 0.3
-"#;
+";
         let cora = CoraFile::from_str(yaml).unwrap();
         let llm = cora.llm.unwrap();
         assert_eq!(llm.temperature, Some(0.3));
@@ -858,12 +858,12 @@ llm:
 
     #[test]
     fn cora_file_malformed_yaml_returns_error() {
-        let yaml = r#"
+        let yaml = r"
 provider:
   provider: openai
   model: gpt-4
   this is not valid yaml: [
-"#;
+";
         let result = CoraFile::from_str(yaml);
         assert!(result.is_err(), "malformed YAML should return an error");
         let err = result.unwrap_err().to_string();

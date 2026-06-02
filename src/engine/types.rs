@@ -57,7 +57,7 @@ impl fmt::Display for Severity {
 /// Issue type categories.
 ///
 /// Kept for API completeness — used for deserialization and future typed
-/// issue-type matching. Currently the LLM returns issue_type as a string,
+/// issue-type matching. Currently the LLM returns `issue_type` as a string,
 /// but this enum provides a structured alternative.
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,7 +111,7 @@ pub struct ReviewIssue {
     pub line: Option<u32>,
     pub severity: Severity,
     /// Issue type/category — stored as string since LLM output varies.
-    /// Common values: security, performance, bug, best_practice, style, suggestion
+    /// Common values: security, performance, bug, `best_practice`, style, suggestion
     #[serde(rename = "type", alias = "issue_type")]
     pub issue_type: Option<String>,
     pub title: String,

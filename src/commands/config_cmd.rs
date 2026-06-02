@@ -99,7 +99,7 @@ pub fn execute_config_show() -> Result<()> {
 /// Execute `cora config set [--global] <key> <value>` — write a key-value pair
 /// to a YAML config file.
 ///
-/// Supported keys: model, provider, base_url, format, severity
+/// Supported keys: model, provider, `base_url`, format, severity
 pub fn execute_config_set(key: &str, value: &str, global: bool) -> Result<()> {
     // Validate the key
     match key {

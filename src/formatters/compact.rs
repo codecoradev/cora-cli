@@ -61,7 +61,7 @@ impl Formatter for CompactFormatter {
     }
 }
 
-/// Format a single issue as one line: [SEVERITY] file:line: title
+/// Format a single issue as one line: [SEVERITY] <file:line>: title
 fn format_issue_compact(issue: &ReviewIssue) -> String {
     let sev = match issue.severity {
         Severity::Critical => "CRITICAL".red().bold().to_string(),

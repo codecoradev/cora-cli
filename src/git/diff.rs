@@ -23,8 +23,7 @@ fn validate_ref(ref_str: &str) -> Result<()> {
         // that start with ".." or contain "/.." or ".." at the end.
         if ref_str.starts_with("..") || ref_str.contains("/..") || ref_str.ends_with("..") {
             anyhow::bail!(
-                "invalid ref '{}': contains path traversal sequence '..'",
-                ref_str
+                "invalid ref '{ref_str}': contains path traversal sequence '..'"
             );
         }
     }
@@ -35,9 +34,7 @@ fn validate_ref(ref_str: &str) -> Result<()> {
             .filter(|c| DANGEROUS_REF_CHARS.contains(c))
             .collect();
         anyhow::bail!(
-            "invalid ref '{}': contains unsafe characters: '{}'",
-            ref_str,
-            found
+            "invalid ref '{ref_str}': contains unsafe characters: '{found}'"
         );
     }
 
@@ -77,7 +74,7 @@ pub fn get_unstaged_diff() -> Result<String> {
 /// Get the diff between the current branch and `base_branch`.
 pub fn get_branch_diff(base_branch: &str) -> Result<String> {
     validate_ref(base_branch)?;
-    let arg = format!("{}...HEAD", base_branch);
+    let arg = format!("{base_branch}...HEAD");
     git_cmd(&["diff", &arg])
 }
 
@@ -122,7 +119,7 @@ pub fn get_current_branch() -> Result<String> {
     Ok(name)
 }
 
-/// Try to get repository info: (owner, repo_name, branch).
+/// Try to get repository info: (owner, `repo_name`, branch).
 /// Owner is derived from the remote URL if possible.
 pub fn get_repo_info() -> Result<(String, String, String)> {
     let repo = open_repo()?;
@@ -131,14 +128,14 @@ pub fn get_repo_info() -> Result<(String, String, String)> {
     let remote_url = repo
         .find_remote("origin")
         .ok()
-        .and_then(|r| r.url().map(|s| s.to_string()))
+        .and_then(|r| r.url().map(std::string::ToString::to_string))
         .unwrap_or_default();
 
     let (owner, repo_name) = parse_remote_url(&remote_url);
     Ok((owner, repo_name, branch))
 }
 
-/// Parse a remote URL into (owner, repo_name).
+/// Parse a remote URL into (owner, `repo_name`).
 fn parse_remote_url(url: &str) -> (String, String) {
     // Handle git@host:owner/repo.git, https://host/owner/repo.git, etc.
     let clean = url

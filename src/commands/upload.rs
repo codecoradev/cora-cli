@@ -70,8 +70,7 @@ pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
 
     // Build the upload request
     let url = format!(
-        "https://api.github.com/repos/{}/{}/code-scanning/sarifs",
-        owner, repo
+        "https://api.github.com/repos/{owner}/{repo}/code-scanning/sarifs"
     );
 
     let client = reqwest::Client::new();
@@ -79,7 +78,7 @@ pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
         .post(&url)
         .header("Accept", "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28")
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Authorization", format!("Bearer {token}"))
         .json(&json!({ "commit_sha": ref_name, "sarif": &sarif_content }))
         .send()
         .await
@@ -97,7 +96,7 @@ pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
         // Parse the response for additional info
         if let Ok(resp_json) = serde_json::from_str::<serde_json::Value>(&body) {
             if let Some(id) = resp_json.get("id").and_then(|v| v.as_str()) {
-                println!("   Analysis ID: {}", id);
+                println!("   Analysis ID: {id}");
             }
         }
 
@@ -110,7 +109,7 @@ pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
                 v.get("message")
                     .or_else(|| v.get("errors")?.get(0)?.get("message"))
                     .and_then(|m| m.as_str())
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             })
             .unwrap_or_else(|| body.clone());
 
@@ -143,20 +142,17 @@ pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
 
 /// Read SARIF content from a file or stdin.
 fn read_sarif(file: Option<&str>) -> Result<String> {
-    match file {
-        Some(path) => std::fs::read_to_string(path)
-            .with_context(|| format!("Failed to read SARIF file: {}", path)),
-        None => {
-            eprintln!(
-                "{} Reading SARIF from stdin (Ctrl+D to finish)...",
-                "ℹ".blue()
-            );
-            let mut content = String::new();
-            std::io::stdin()
-                .read_to_string(&mut content)
-                .context("Failed to read from stdin")?;
-            Ok(content)
-        }
+    if let Some(path) = file { std::fs::read_to_string(path)
+    .with_context(|| format!("Failed to read SARIF file: {path}")) } else {
+        eprintln!(
+            "{} Reading SARIF from stdin (Ctrl+D to finish)...",
+            "ℹ".blue()
+        );
+        let mut content = String::new();
+        std::io::stdin()
+            .read_to_string(&mut content)
+            .context("Failed to read from stdin")?;
+        Ok(content)
     }
 }
 
@@ -166,8 +162,7 @@ fn resolve_repo(cli_repo: Option<&str>) -> Result<(String, String)> {
         let parts: Vec<&str> = repo.split('/').collect();
         if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
             bail!(
-                "Invalid repository format '{}'. Expected 'owner/repo'.",
-                repo
+                "Invalid repository format '{repo}'. Expected 'owner/repo'."
             );
         }
         return Ok((parts[0].to_string(), parts[1].to_string()));
@@ -199,24 +194,21 @@ fn resolve_ref(cli_ref: Option<&str>) -> Result<String> {
     }
 
     // Try to get from git
-    match crate::git::get_current_branch() {
-        Ok(branch) => Ok(branch),
-        Err(_) => {
-            // Try to get the current HEAD commit SHA as fallback
-            let output = std::process::Command::new("git")
-                .args(["rev-parse", "HEAD"])
-                .output();
+    if let Ok(branch) = crate::git::get_current_branch() { Ok(branch) } else {
+        // Try to get the current HEAD commit SHA as fallback
+        let output = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .output();
 
-            match output {
-                Ok(out) if out.status.success() => {
-                    let sha = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                    Ok(sha)
-                }
-                _ => {
-                    bail!(
-                        "Could not detect current git ref. Pass --ref-name or run inside a git repo."
-                    );
-                }
+        match output {
+            Ok(out) if out.status.success() => {
+                let sha = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                Ok(sha)
+            }
+            _ => {
+                bail!(
+                    "Could not detect current git ref. Pass --ref-name or run inside a git repo."
+                );
             }
         }
     }

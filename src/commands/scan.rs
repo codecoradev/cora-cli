@@ -93,7 +93,7 @@ pub async fn execute_scan(
         return Ok(0);
     }
 
-    println!("🔍 {} files to review…", files.len().to_string().cyan(),);
+    println!("🔍 {} files to review…", files.len().to_string().cyan());
 
     // 2. Calculate total lines
     let total_lines: usize = files.iter().map(|f| f.lines).sum();
@@ -114,7 +114,7 @@ pub async fn execute_scan(
             String::new()
         };
 
-        println!("  Reviewing{}…", batch_label);
+        println!("  Reviewing{batch_label}…");
 
         let (issues, _summary, tokens) = crate::engine::llm::scan_files(
             llm_config,
@@ -155,7 +155,7 @@ pub async fn execute_scan(
 
     let formatter = formatter_for(format);
     let output = formatter.format_scan(&response)?;
-    println!("{}", output);
+    println!("{output}");
 
     // 6. Save scan cache for incremental mode
     if opts.incremental {
@@ -194,7 +194,7 @@ fn file_content_hash(path: &std::path::Path) -> Option<String> {
 /// Stored as JSON in ~/.cora/scan-cache.json.
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 struct ScanCache {
-    /// Key: canonical root path, Value: { file_path: hash }
+    /// Key: canonical root path, Value: { `file_path`: hash }
     projects: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
 }
 

@@ -116,7 +116,7 @@ impl ProgressReporter {
             return;
         }
         if let Ok(json) = serde_json::to_string(event) {
-            let _ = writeln!(std::io::stderr(), "{}", json);
+            let _ = writeln!(std::io::stderr(), "{json}");
         }
     }
 
@@ -124,12 +124,12 @@ impl ProgressReporter {
     pub fn started(&self, mode: &str, base: Option<&str>) {
         self.emit(&ProgressEvent::Started {
             mode: mode.to_string(),
-            base: base.map(|s| s.to_string()),
+            base: base.map(std::string::ToString::to_string),
             timestamp: Self::now_iso(),
         });
     }
 
-    /// Emit a "parsing_diff" event.
+    /// Emit a "`parsing_diff`" event.
     pub fn parsing_diff(&self, files_changed: usize, lines_changed: usize) {
         self.emit(&ProgressEvent::ParsingDiff {
             files_changed,
@@ -138,7 +138,7 @@ impl ProgressReporter {
         });
     }
 
-    /// Emit a "calling_llm" event.
+    /// Emit a "`calling_llm`" event.
     pub fn calling_llm(&self, provider: &str, model: &str) {
         self.emit(&ProgressEvent::CallingLlm {
             provider: provider.to_string(),
@@ -147,7 +147,7 @@ impl ProgressReporter {
         });
     }
 
-    /// Emit a "llm_response" event.
+    /// Emit a "`llm_response`" event.
     pub fn llm_response(&self, tokens: &TokenInfo, duration_ms: u64) {
         self.emit(&ProgressEvent::LlmResponse {
             tokens: tokens.clone(),
@@ -176,7 +176,7 @@ impl ProgressReporter {
     }
 }
 
-/// Extract diff statistics: (files_changed, lines_changed).
+/// Extract diff statistics: (`files_changed`, `lines_changed`).
 pub fn diff_stats(diff: &str) -> (usize, usize) {
     let mut files_changed = 0;
     let mut lines_changed = 0;

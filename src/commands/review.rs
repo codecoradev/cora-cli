@@ -119,9 +119,7 @@ pub async fn execute_review(
                 let duration_ms = llm_start.elapsed().as_millis() as u64;
                 let tokens = resp
                     .tokens_used
-                    .as_ref()
-                    .map(TokenInfo::from_usage)
-                    .unwrap_or_else(TokenInfo::zero);
+                    .as_ref().map_or_else(TokenInfo::zero, TokenInfo::from_usage);
                 progress.llm_response(&tokens, duration_ms);
             }
             resp
@@ -164,9 +162,7 @@ pub async fn execute_review(
     if progress.is_enabled() {
         let tokens = response
             .tokens_used
-            .as_ref()
-            .map(TokenInfo::from_usage)
-            .unwrap_or_else(TokenInfo::zero);
+            .as_ref().map_or_else(TokenInfo::zero, TokenInfo::from_usage);
         progress.complete(
             filtered_response.issues.len(),
             exit_code == EXIT_BLOCKED,
@@ -182,10 +178,10 @@ fn get_diff(opts: &ReviewOptions, _config: &Config) -> Result<String> {
     if let Some(ref diff_file) = opts.diff_file {
         let path = std::path::Path::new(diff_file);
         if !path.exists() {
-            anyhow::bail!("diff file not found: {}", diff_file);
+            anyhow::bail!("diff file not found: {diff_file}");
         }
         return std::fs::read_to_string(path)
-            .with_context(|| format!("failed to read diff file: {}", diff_file));
+            .with_context(|| format!("failed to read diff file: {diff_file}"));
     }
     if let Some(ref commit_ref) = opts.commit {
         return git::get_commit_diff(commit_ref);

@@ -72,7 +72,7 @@ fn load_global_config() -> Result<Option<CoraFile>> {
 
 /// Migrate old `~/.cora/config.toml` to the new format if it exists.
 /// - Non-secret keys → `~/.cora/config.yaml`
-/// - api_key → `~/.cora/auth.toml`
+/// - `api_key` → `~/.cora/auth.toml`
 /// - Delete the old file after successful migration.
 /// - Creates `.migrated` marker to prevent re-running.
 fn migrate_old_config() {
@@ -114,12 +114,12 @@ fn migrate_old_config() {
         .get("auth")
         .and_then(|a| a.get("api_key"))
         .and_then(|k| k.as_str())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .or_else(|| {
             table
                 .get("api_key")
                 .and_then(|k| k.as_str())
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
         });
 
     // Extract non-secret config fields into a CoraFile
@@ -147,7 +147,7 @@ fn migrate_old_config() {
         if let Some(v) = output.get("format").and_then(|v| v.as_str()) {
             os.format = Some(v.to_string());
         }
-        if let Some(v) = output.get("color").and_then(|v| v.as_bool()) {
+        if let Some(v) = output.get("color").and_then(toml::Value::as_bool) {
             os.color = Some(v);
         }
         if os.format.is_some() || os.color.is_some() {
@@ -163,7 +163,7 @@ fn migrate_old_config() {
         if let Some(v) = hook.get("min_severity").and_then(|v| v.as_str()) {
             hs.min_severity = Some(v.to_string());
         }
-        if let Some(v) = hook.get("max_diff_size").and_then(|v| v.as_integer()) {
+        if let Some(v) = hook.get("max_diff_size").and_then(toml::Value::as_integer) {
             hs.max_diff_size = Some(v as usize);
         }
         if hs.mode.is_some() || hs.min_severity.is_some() || hs.max_diff_size.is_some() {
@@ -283,10 +283,10 @@ pub fn load_config(
 }
 
 /// Build an `LLMConfig` from the resolved `Config`, fetching the API key
-/// from: CLI flag → env CORA_API_KEY → ~/.cora/auth.toml.
+/// from: CLI flag → env `CORA_API_KEY` → ~/.cora/auth.toml.
 ///
-/// If none of those are set, auto-detect from known provider env vars (OPENAI_API_KEY, etc.)
-/// and configure provider/model/base_url from the matching preset.
+/// If none of those are set, auto-detect from known provider env vars (`OPENAI_API_KEY`, etc.)
+/// and configure `provider/model/base_url` from the matching preset.
 pub fn build_llm_config(config: &Config, cli_api_key: Option<&str>) -> Result<LLMConfig> {
     // Resolve the API key and optional auto-detected preset in one pass.
     let (api_key, auto_preset) = if let Some(key) = cli_api_key {
@@ -403,12 +403,12 @@ pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
         .get("auth")
         .and_then(|a| a.get("api_key"))
         .and_then(|k| k.as_str())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .or_else(|| {
             value
                 .get("api_key")
                 .and_then(|k| k.as_str())
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
         });
 
     Ok(key)

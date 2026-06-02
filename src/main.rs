@@ -63,7 +63,7 @@ struct GlobalOptions {
     #[clap(long, global = true, env = "CORA_BASE_URL")]
     pub base_url: Option<String>,
 
-    /// API key (or set CORA_API_KEY env var, or use `cora auth login`)
+    /// API key (or set `CORA_API_KEY` env var, or use `cora auth login`)
     #[clap(long, global = true, env = "CORA_API_KEY")]
     pub api_key: Option<String>,
 
@@ -137,7 +137,7 @@ enum Command {
         #[clap(long, env = "GITHUB_REF")]
         ref_name: Option<String>,
 
-        /// GitHub token for upload (default: GITHUB_TOKEN env var)
+        /// GitHub token for upload (default: `GITHUB_TOKEN` env var)
         #[clap(long, env = "GITHUB_TOKEN")]
         token: Option<String>,
     },
@@ -182,7 +182,7 @@ enum Command {
         #[clap(long, env = "GITHUB_REF")]
         ref_name: Option<String>,
 
-        /// GitHub token (default: GITHUB_TOKEN env var)
+        /// GitHub token (default: `GITHUB_TOKEN` env var)
         #[clap(long, env = "GITHUB_TOKEN")]
         token: Option<String>,
     },
@@ -244,7 +244,7 @@ enum AuthAction {
 enum ConfigAction {
     /// Show the current resolved configuration
     Show,
-    /// Set a configuration value (keys: model, provider, base_url, format, severity)
+    /// Set a configuration value (keys: model, provider, `base_url`, format, severity)
     Set {
         /// Configuration key to set
         key: String,
@@ -317,11 +317,11 @@ async fn main() -> Result<()> {
                     progress,
                     quiet,
                     severity,
-                    no_cache,
                     upload,
                     repo,
                     ref_name,
                     token,
+                    no_cache,
                 },
             )
             .await?
@@ -585,8 +585,6 @@ fn resolve_format(
     cli_format: Option<&str>,
     config: &crate::config::schema::Config,
 ) -> Result<OutputFormat> {
-    let fmt_str = cli_format
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| config.output.format.clone());
+    let fmt_str = cli_format.map_or_else(|| config.output.format.clone(), std::string::ToString::to_string);
     OutputFormat::from_str_loose(&fmt_str)
 }

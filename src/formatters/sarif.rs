@@ -7,7 +7,7 @@ use crate::formatters::Formatter;
 /// SARIF formatter for GitHub Code Scanning integration.
 ///
 /// Output conforms to the SARIF v2.1.0 specification:
-/// https://docs.oasis-open.org/sarif/sarif/v2.1.0/
+/// <https://docs.oasis-open.org/sarif/sarif/v2.1.0>/
 pub struct SarifFormatter;
 
 impl Formatter for SarifFormatter {
@@ -30,9 +30,7 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
     let mut rule_map = serde_json::Map::new();
     for issue in issues {
         let rule_id = issue
-            .issue_type
-            .as_ref()
-            .map(|t| t.to_string())
+            .issue_type.clone()
             .unwrap_or_else(|| "unknown".to_string());
         if !rule_map.contains_key(&rule_id) {
             rule_map.insert(
@@ -58,7 +56,7 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
         .iter()
         .map(|issue| {
             let mut result = json!({
-                "ruleId": issue.issue_type.as_ref().map(|t| t.to_string()).unwrap_or_else(|| "unknown".to_string()),
+                "ruleId": issue.issue_type.clone().unwrap_or_else(|| "unknown".to_string()),
                 "level": severity_to_sarif_level(&issue.severity),
                 "message": {
                     "text": issue.body.clone()
@@ -106,15 +104,15 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
         .collect();
 
     // Build invocations array with watermark
-    let invocations = if !issues.is_empty() {
+    let invocations = if issues.is_empty() {
+        json!([])
+    } else {
         json!([{
             "executionSuccessful": true,
             "properties": {
                 "cora.watermark": format!("Reviewed by Cora v{}", env!("CARGO_PKG_VERSION"))
             }
         }])
-    } else {
-        json!([])
     };
 
     json!({
@@ -258,7 +256,7 @@ mod tests {
         let wm = &invocations[0]["properties"]["cora.watermark"];
         let wm_str = wm.as_str().unwrap();
         assert!(wm_str.contains("Cora"));
-        assert!(wm_str.contains("v"));
+        assert!(wm_str.contains('v'));
     }
 
     #[test]

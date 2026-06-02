@@ -55,10 +55,10 @@ impl Formatter for PrettyFormatter {
             "Found {} issue{}: {} {} {} {} {}\n\n",
             response.issues.len(),
             if response.issues.len() == 1 { "" } else { "s" },
-            format!("{} critical", crit).red(),
-            format!("{} major", maj).yellow(),
-            format!("{} minor", min).blue(),
-            format!("{} info", inf).white(),
+            format!("{crit} critical").red(),
+            format!("{maj} major").yellow(),
+            format!("{min} minor").blue(),
+            format!("{inf} info").white(),
             if response.should_block {
                 format!("\n{}", "⚠ BLOCKED".red().bold())
             } else {
@@ -141,10 +141,10 @@ impl Formatter for PrettyFormatter {
             "Found {} issue{}: {} {} {} {} {}\n\n",
             response.issues.len(),
             if response.issues.len() == 1 { "" } else { "s" },
-            format!("{} critical", crit).red(),
-            format!("{} major", maj).yellow(),
-            format!("{} minor", min).blue(),
-            format!("{} info", inf).white(),
+            format!("{crit} critical").red(),
+            format!("{maj} major").yellow(),
+            format!("{min} minor").blue(),
+            format!("{inf} info").white(),
             if response.should_block {
                 format!("\n{}", "⚠ BLOCKED".red().bold())
             } else {
@@ -193,7 +193,7 @@ fn format_issue_pretty(issue: &ReviewIssue, num: usize) -> String {
 
     out.push_str(&format!("{icon} [{sev_colored}] "));
     if let Some(ref itype) = issue.issue_type {
-        out.push_str(&format!("{}: ", itype));
+        out.push_str(&format!("{itype}: "));
     }
 
     // File:line location
@@ -222,7 +222,7 @@ fn format_issue_pretty(issue: &ReviewIssue, num: usize) -> String {
     if let Some(ref fix) = issue.suggested_fix {
         if !fix.trim().is_empty() {
             out.push_str(&format!("  {}\n", "💡 Suggested fix:".green().bold()));
-            out.push_str(&format!("    {}\n", fix));
+            out.push_str(&format!("    {fix}\n"));
         }
     }
 
