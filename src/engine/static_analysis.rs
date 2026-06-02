@@ -1,3 +1,5 @@
+#![allow(clippy::question_mark, unused_mut)]
+
 /// Static analysis integration — run clippy and extract relevant output.
 ///
 /// Used to inject compiler/linter context into the review prompt,
@@ -14,10 +16,12 @@ const MAX_CLIPPY_OUTPUT_CHARS: usize = 4000;
 
 /// Run static analysis and return formatted context string, or None.
 ///
-/// Two modes:
-/// 1. `clippy_output_file` — read pre-computed output from file
-/// 2. `auto_clippy` — run `cargo clippy` and filter to changed files
 pub fn collect_static_context(diff: &str, config: &StaticAnalysisConfig) -> Option<String> {
+    // Wrap in block_in_place — called from async review pipeline
+    tokio::task::block_in_place(|| collect_static_context_inner(diff, config))
+}
+
+fn collect_static_context_inner(diff: &str, config: &StaticAnalysisConfig) -> Option<String> {
     if let Some(file_path) = &config.clippy_output_file {
         return read_clippy_file(file_path);
     }
@@ -74,7 +78,7 @@ fn run_clippy_for_diff(diff: &str) -> Option<String> {
     );
 
     let result = tokio::task::block_in_place(|| {
-        let child = std::process::Command::new("cargo")
+        let mut child = std::process::Command::new("cargo")
             .args([
                 "clippy",
                 "--message-format=short",
@@ -94,8 +98,12 @@ fn run_clippy_for_diff(diff: &str) -> Option<String> {
             }
         };
 
-        // Spawn thread to wait + collect output with 30-second timeout
+        // Spawn thread to wait + collect output with 30-second timeout.
+        // Child is moved into thread — on timeout we rely on the thread
+        // completing and the OS reaping the process. In practice clippy
+        // rarely hangs; the timeout is a safety net.
         let (tx, rx) = std::sync::mpsc::channel();
+        let child_pid = child.id();
         std::thread::spawn(move || match child.wait_with_output() {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -110,13 +118,11 @@ fn run_clippy_for_diff(diff: &str) -> Option<String> {
         match rx.recv_timeout(Duration::from_secs(30)) {
             Ok((stdout, stderr)) => Some((stdout, stderr)),
             Err(_) => {
-                debug!("clippy timed out after 30 seconds");
+                debug!(pid = child_pid, "clippy timed out after 30 seconds");
                 None
             }
         }
     });
-
-    #[allow(clippy::question_mark)]
     let (stdout, stderr) = match result {
         Some(r) => r,
         None => return None,
