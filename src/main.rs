@@ -255,6 +255,8 @@ enum ConfigAction {
         #[clap(long)]
         global: bool,
     },
+    /// Validate the current configuration and report status
+    Validate,
 }
 
 #[allow(clippy::too_many_lines)]
@@ -398,6 +400,7 @@ async fn main() -> Result<()> {
                 config_cmd::execute_config_set(&key, &value, global)?;
                 0
             }
+            ConfigAction::Validate => config_cmd::execute_config_validate()?,
         },
         Command::Providers => {
             providers::execute_providers();

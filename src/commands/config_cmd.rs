@@ -191,3 +191,233 @@ pub fn execute_config_set(key: &str, value: &str, global: bool) -> Result<()> {
 
     Ok(())
 }
+
+/// Execute `cora config validate` — load config and report validity.
+///
+/// Returns exit code: 0 if valid, 2 if issues found.
+pub fn execute_config_validate() -> Result<i32> {
+    // 1. Load resolved config (same as other commands)
+    let config = loader::load_config(None, None, None, None, None, false)?;
+
+    // 2. Find the raw config file to check which fields were explicitly set
+    let cora_file = loader::find_cora_file(&std::env::current_dir().unwrap_or_default())
+        .unwrap_or_else(|e| {
+            eprintln!(
+                "{} Warning: could not search for config file: {}",
+                "⚠️".yellow(),
+                e
+            );
+            None
+        });
+
+    // Also check global config for fields set there
+    let global_cora = load_global_cora_file();
+
+    // Track how many fields were explicitly set
+    let mut explicitly_set = 0u32;
+    let total_fields = 8u32;
+
+    // ── Check config file ──
+    match &cora_file {
+        Some((path, _)) => {
+            println!("{} Config file: {}", "✅".green().bold(), path.display());
+            explicitly_set += 1;
+        }
+        None => {
+            println!(
+                "{} Config file: not found (using defaults)",
+                "⚠️".yellow().bold()
+            );
+        }
+    }
+
+    // ── Check provider ──
+    let provider_set = is_explicitly_set(
+        &cora_file,
+        &global_cora,
+        |c| c.provider.as_ref(),
+        |g| g.provider.as_ref(),
+    );
+    if provider_set {
+        println!(
+            "{} Provider: {}",
+            "✅".green().bold(),
+            config.provider.provider
+        );
+        explicitly_set += 1;
+    } else {
+        println!(
+            "{} Provider: not set (default: {})",
+            "⚠️".yellow().bold(),
+            config.provider.provider
+        );
+    }
+
+    // ── Check model ──
+    let model_set = is_explicitly_set(
+        &cora_file,
+        &global_cora,
+        |c| c.provider.as_ref().and_then(|p| p.model.as_ref()),
+        |g| g.provider.as_ref().and_then(|p| p.model.as_ref()),
+    );
+    if model_set {
+        println!("{} Model: {}", "✅".green().bold(), config.provider.model);
+        explicitly_set += 1;
+    } else {
+        println!(
+            "{} Model: not set (default: {})",
+            "⚠️".yellow().bold(),
+            config.provider.model
+        );
+    }
+
+    // ── Check API key ──
+    let auth = loader::auth_status().context("failed to check auth status")?;
+    if auth.has_key {
+        let source = if auth.source.contains("env") {
+            "env var".to_string()
+        } else {
+            format!("auth file ({})", auth.source)
+        };
+        println!("{} API key: configured ({})", "✅".green().bold(), source);
+        explicitly_set += 1;
+    } else {
+        println!("{} API key: not configured", "❌".red().bold());
+    }
+
+    // ── Check severity ──
+    let severity_set = is_explicitly_set(
+        &cora_file,
+        &global_cora,
+        |c| c.hook.as_ref().and_then(|h| h.min_severity.as_ref()),
+        |g| g.hook.as_ref().and_then(|h| h.min_severity.as_ref()),
+    );
+    if severity_set {
+        println!(
+            "{} Severity: {}",
+            "✅".green().bold(),
+            config.hook.min_severity
+        );
+        explicitly_set += 1;
+    } else {
+        println!(
+            "{} Severity: not set (default: {})",
+            "⚠️".yellow().bold(),
+            config.hook.min_severity
+        );
+    }
+
+    // ── Check output format ──
+    let format_set = is_explicitly_set(
+        &cora_file,
+        &global_cora,
+        |c| c.output.as_ref().and_then(|o| o.format.as_ref()),
+        |g| g.output.as_ref().and_then(|o| o.format.as_ref()),
+    );
+    if format_set {
+        println!(
+            "{} Output format: {}",
+            "✅".green().bold(),
+            config.output.format
+        );
+        explicitly_set += 1;
+    } else {
+        println!(
+            "{} Output format: not set (default: {})",
+            "⚠️".yellow().bold(),
+            config.output.format
+        );
+    }
+
+    // ── Check temperature ──
+    let temp_set = is_explicitly_set(
+        &cora_file,
+        &global_cora,
+        |c| c.llm.as_ref().and_then(|l| l.temperature.as_ref()),
+        |g| g.llm.as_ref().and_then(|l| l.temperature.as_ref()),
+    );
+    if temp_set {
+        println!(
+            "{} Temperature: {}",
+            "✅".green().bold(),
+            config.temperature
+        );
+        explicitly_set += 1;
+    } else {
+        println!(
+            "{} Temperature: not set (default: {})",
+            "⚠️".yellow().bold(),
+            config.temperature
+        );
+    }
+
+    // ── Check cache TTL ──
+    let cache_set = is_explicitly_set(
+        &cora_file,
+        &global_cora,
+        |c| c.llm.as_ref().and_then(|l| l.cache_ttl.as_ref()),
+        |g| g.llm.as_ref().and_then(|l| l.cache_ttl.as_ref()),
+    );
+    if cache_set {
+        println!("{} Cache TTL: {}", "✅".green().bold(), config.cache_ttl);
+        explicitly_set += 1;
+    } else {
+        println!(
+            "{} Cache TTL: not set (default: {})",
+            "⚠️".yellow().bold(),
+            config.cache_ttl
+        );
+    }
+
+    println!();
+
+    // Determine overall validity
+    let has_issues = !auth.has_key;
+    if has_issues {
+        println!(
+            "{}",
+            "Configuration issues found. Fix the ❌ items above."
+                .red()
+                .bold()
+        );
+        println!(
+            "{}",
+            format!("{}/{} fields explicitly set.", explicitly_set, total_fields).dimmed()
+        );
+        Ok(2)
+    } else {
+        println!("{}", "Configuration valid.".green().bold());
+        println!(
+            "{}",
+            format!("{}/{} fields explicitly set.", explicitly_set, total_fields).dimmed()
+        );
+        Ok(0)
+    }
+}
+
+/// Check if a field was explicitly set in either the project config or global config.
+/// Uses closure extractors to check both config sources.
+fn is_explicitly_set<T>(
+    project: &Option<(PathBuf, CoraFile)>,
+    global: &Option<CoraFile>,
+    project_extractor: impl Fn(&CoraFile) -> Option<&T>,
+    global_extractor: impl Fn(&CoraFile) -> Option<&T>,
+) -> bool {
+    let project_has = project
+        .as_ref()
+        .and_then(|(_, c)| project_extractor(c))
+        .is_some();
+    let global_has = global.as_ref().and_then(global_extractor).is_some();
+    project_has || global_has
+}
+
+/// Load the global config file (same logic as loader::load_global_config but returns Option directly).
+fn load_global_cora_file() -> Option<CoraFile> {
+    let dir = loader::cora_dir().ok()?;
+    let path = dir.join("config.yaml");
+    if !path.is_file() {
+        return None;
+    }
+    let content = std::fs::read_to_string(&path).ok()?;
+    CoraFile::from_str(&content).ok()
+}
