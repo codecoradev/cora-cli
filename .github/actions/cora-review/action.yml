@@ -128,6 +128,7 @@ runs:
           --base "$INPUT_BASE" \
           --format sarif \
           --severity "$INPUT_SEVERITY" \
+          --max-diff-size 200000 \
           --quiet \
           > cora-results.sarif 2>cora-stderr.log || true
         echo "Cora review complete ($(wc -c < cora-results.sarif) bytes)"

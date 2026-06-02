@@ -100,6 +100,10 @@ enum Command {
         #[clap(long)]
         unstaged: bool,
 
+        /// Override max diff size in chars (default: 50000 from config)
+        #[clap(long, name = "CHARS")]
+        max_diff_size: Option<usize>,
+
         /// Stream LLM response tokens in real-time
         #[clap(long)]
         stream: bool,
@@ -288,6 +292,7 @@ async fn main() -> Result<()> {
             commit,
             diff_file,
             unstaged,
+            max_diff_size,
             stream,
             progress,
             quiet,
@@ -307,6 +312,7 @@ async fn main() -> Result<()> {
                     commit,
                     diff_file,
                     unstaged,
+                    max_diff_size,
                     stream,
                     progress,
                     quiet,
@@ -412,6 +418,7 @@ struct ReviewOpts {
     commit: Option<String>,
     diff_file: Option<String>,
     unstaged: bool,
+    max_diff_size: Option<usize>,
     stream: bool,
     progress: bool,
     quiet: bool,
@@ -468,7 +475,7 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         commit: opts.commit.clone(),
         diff_file: opts.diff_file.clone(),
         unstaged: opts.unstaged,
-        max_diff_size: None,
+        max_diff_size: opts.max_diff_size,
         stream: opts.stream,
         quiet: opts.quiet || opts.progress,
         severity: opts.severity.clone(),
