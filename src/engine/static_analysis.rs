@@ -86,7 +86,7 @@ fn run_clippy_for_diff(diff: &str) -> Option<String> {
             .stderr(std::process::Stdio::piped())
             .spawn();
 
-        let mut child = match child {
+        let child = match child {
             Ok(c) => c,
             Err(e) => {
                 debug!("clippy spawn failed: {}", e);
@@ -94,20 +94,17 @@ fn run_clippy_for_diff(diff: &str) -> Option<String> {
             }
         };
 
-        // Wait with 30-second timeout via thread
+        // Spawn thread to wait + collect output with 30-second timeout
         let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = child.wait();
-            let mut stdout_buf = String::new();
-            let mut stderr_buf = String::new();
-            use std::io::Read;
-            if let Some(mut out) = child.stdout {
-                let _ = Read::read_to_string(&mut out, &mut stdout_buf);
+        std::thread::spawn(move || match child.wait_with_output() {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                let _ = tx.send((stdout, stderr));
             }
-            if let Some(mut err) = child.stderr {
-                let _ = Read::read_to_string(&mut err, &mut stderr_buf);
+            Err(e) => {
+                debug!("clippy wait_with_output failed: {}", e);
             }
-            let _ = tx.send((stdout_buf, stderr_buf));
         });
 
         match rx.recv_timeout(Duration::from_secs(30)) {
@@ -119,7 +116,7 @@ fn run_clippy_for_diff(diff: &str) -> Option<String> {
         }
     });
 
-#[allow(clippy::question_mark)]
+    #[allow(clippy::question_mark)]
     let (stdout, stderr) = match result {
         Some(r) => r,
         None => return None,
