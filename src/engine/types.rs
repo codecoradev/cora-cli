@@ -23,7 +23,7 @@ impl Severity {
     }
 
     /// Get the label text for this severity.
-    pub fn label(&self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Severity::Critical => "CRITICAL",
             Severity::Major => "MAJOR",
@@ -33,7 +33,7 @@ impl Severity {
     }
 
     /// Get the icon for this severity.
-    pub fn icon(&self) -> &'static str {
+    pub fn icon(self) -> &'static str {
         match self {
             Severity::Critical => "🔴",
             Severity::Major => "🟠",
@@ -97,8 +97,7 @@ impl IssueType {
                 IssueType::BestPractice
             }
             "style" | "formatting" => IssueType::Style,
-            "suggestion" | "info" => IssueType::Suggestion,
-            _ => IssueType::Suggestion, // fallback
+            _ => IssueType::Suggestion, // fallback (includes suggestion, info)
         }
     }
 }
@@ -121,6 +120,7 @@ pub struct ReviewIssue {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 

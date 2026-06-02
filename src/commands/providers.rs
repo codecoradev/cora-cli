@@ -1,10 +1,9 @@
-use anyhow::Result;
 use colored::Colorize;
 
 use crate::config::providers::{PRESETS, detected_presets};
 
 /// Execute the `cora providers` subcommand.
-pub fn execute_providers() -> Result<()> {
+pub fn execute_providers() {
     let detected = detected_presets();
 
     println!("{}", "Available LLM Providers".bold().underline());
@@ -69,6 +68,4 @@ pub fn execute_providers() -> Result<()> {
             "   Using first detected. Set CORA_PROVIDER or use --provider to choose.".dimmed()
         );
     }
-
-    Ok(())
 }

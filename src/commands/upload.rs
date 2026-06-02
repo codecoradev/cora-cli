@@ -20,6 +20,7 @@ pub struct UploadOptions {
 ///
 /// Reads the SARIF content from the specified file or stdin, then POSTs it
 /// to the GitHub Code Scanning API.
+#[allow(clippy::items_after_statements, clippy::cast_precision_loss)]
 pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
     let token = opts
         .token

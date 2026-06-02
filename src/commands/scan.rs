@@ -28,6 +28,7 @@ pub struct ScanOptions {
 ///
 /// Walks the project directory, filters files, batches them, calls the LLM,
 /// and formats the output.
+#[allow(clippy::too_many_lines)]
 pub async fn execute_scan(
     config: &Config,
     llm_config: &crate::engine::LLMConfig,
@@ -67,9 +68,8 @@ pub async fn execute_scan(
         let root_abs = root.canonicalize().unwrap_or_else(|_| root.clone());
         files.retain(|f| {
             let abs_path = root_abs.join(&f.path);
-            let hash = match file_content_hash(&abs_path) {
-                Some(h) => h,
-                None => return true, // can't read file, rescan it
+            let Some(hash) = file_content_hash(&abs_path) else {
+                return true; // can't read file, rescan it
             };
             match cache.get(&root_abs, &f.path) {
                 Some(cached_hash) if cached_hash == hash => {
@@ -163,9 +163,8 @@ pub async fn execute_scan(
         let mut cache = ScanCache::load().unwrap_or_default();
         for f in &files {
             let abs_path = root_abs.join(&f.path);
-            let hash = match file_content_hash(&abs_path) {
-                Some(h) => h,
-                None => continue, // can't read file, skip cache entry
+            let Some(hash) = file_content_hash(&abs_path) else {
+                continue; // can't read file, skip cache entry
             };
             cache.set(&root_abs, &f.path, &hash);
         }
@@ -182,6 +181,7 @@ pub async fn execute_scan(
 
 /// Compute a short SHA256 hash of a file's content for incremental scanning.
 /// Returns None if the file cannot be read (caller should rescan it).
+#[allow(clippy::format_collect)]
 fn file_content_hash(path: &std::path::Path) -> Option<String> {
     use sha2::Digest;
     let bytes = std::fs::read(path).ok()?;

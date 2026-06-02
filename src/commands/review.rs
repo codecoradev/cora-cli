@@ -13,6 +13,7 @@ pub const EXIT_OK: i32 = 0;
 pub const EXIT_BLOCKED: i32 = 2;
 
 /// Review command options.
+#[allow(clippy::struct_excessive_bools)]
 pub struct ReviewOptions {
     /// Review staged changes.
     pub staged: bool,
@@ -50,6 +51,7 @@ pub struct ReviewResult {
 ///
 /// Gets the diff, validates its size, calls the LLM engine, formats output,
 /// and returns the appropriate exit code along with the formatted output.
+#[allow(clippy::cast_possible_truncation)]
 pub async fn execute_review(
     config: &Config,
     llm_config: &crate::engine::LLMConfig,
@@ -116,6 +118,7 @@ pub async fn execute_review(
     {
         Ok(resp) => {
             if progress.is_enabled() {
+                // SAFETY: elapsed ms fits u64 for any reasonable review duration
                 let duration_ms = llm_start.elapsed().as_millis() as u64;
                 let tokens = resp
                     .tokens_used

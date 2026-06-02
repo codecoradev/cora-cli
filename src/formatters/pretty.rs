@@ -7,6 +7,7 @@ use crate::formatters::Formatter;
 /// Pretty formatter with colored terminal output and severity icons.
 pub struct PrettyFormatter;
 
+#[allow(clippy::format_push_string)]
 impl Formatter for PrettyFormatter {
     fn format_review(&self, response: &ReviewResponse) -> Result<String> {
         let mut output = String::new();
@@ -179,6 +180,7 @@ impl Formatter for PrettyFormatter {
 }
 
 /// Format a single issue with colors and icons.
+#[allow(clippy::format_push_string)]
 fn format_issue_pretty(issue: &ReviewIssue, num: usize) -> String {
     let mut out = String::new();
 

@@ -137,8 +137,7 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
 /// Map our severity to SARIF failure level.
 fn severity_to_sarif_level(severity: &Severity) -> &str {
     match severity {
-        Severity::Critical => "error",
-        Severity::Major => "error",
+        Severity::Critical | Severity::Major => "error",
         Severity::Minor => "warning",
         Severity::Info => "note",
     }

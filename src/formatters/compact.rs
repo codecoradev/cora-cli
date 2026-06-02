@@ -7,6 +7,7 @@ use crate::formatters::Formatter;
 /// Compact formatter: one line per issue. Ideal for git hooks.
 pub struct CompactFormatter;
 
+#[allow(clippy::format_push_string)]
 impl Formatter for CompactFormatter {
     fn format_review(&self, response: &ReviewResponse) -> Result<String> {
         let mut output = String::new();

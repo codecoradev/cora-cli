@@ -75,10 +75,14 @@ fn load_global_config() -> Result<Option<CoraFile>> {
 /// - `api_key` → `~/.cora/auth.toml`
 /// - Delete the old file after successful migration.
 /// - Creates `.migrated` marker to prevent re-running.
+#[allow(
+    clippy::too_many_lines,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 fn migrate_old_config() {
-    let dir = match cora_dir() {
-        Ok(d) => d,
-        Err(_) => return,
+    let Ok(dir) = cora_dir() else {
+        return;
     };
     let old_path = dir.join(OLD_AUTH_FILENAME);
     if !old_path.is_file() {
