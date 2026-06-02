@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::CoraError;
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -7,8 +7,9 @@ use tracing::debug;
 use crate::engine::types::ReviewResponse;
 
 /// Get the cache directory: ~/.cache/cora/reviews/
-fn cache_dir() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("cannot determine home directory")?;
+fn cache_dir() -> std::result::Result<PathBuf, CoraError> {
+    let home = dirs::home_dir()
+        .ok_or_else(|| CoraError::ConfigRead("cannot determine home directory".into()))?;
     Ok(home.join(".cache").join("cora").join("reviews"))
 }
 
@@ -77,10 +78,9 @@ pub fn save_cached_review(
     model: &str,
     temperature: f32,
     response: &ReviewResponse,
-) -> Result<()> {
+) -> std::result::Result<(), CoraError> {
     let dir = cache_dir()?;
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("failed to create cache dir {}", dir.display()))?;
+    std::fs::create_dir_all(&dir).map_err(CoraError::CacheIo)?;
 
     let hash = cache_key(diff, model, temperature);
     let path = dir.join(format!("{hash}.json"));
@@ -95,11 +95,10 @@ pub fn save_cached_review(
         timestamp: now,
     };
 
-    let json =
-        serde_json::to_string_pretty(&cached).context("failed to serialize cached review")?;
+    let json = serde_json::to_string_pretty(&cached)
+        .map_err(|e| CoraError::CacheSerialize(e.to_string()))?;
 
-    std::fs::write(&path, json)
-        .with_context(|| format!("failed to write cache to {}", path.display()))?;
+    std::fs::write(&path, json).map_err(CoraError::CacheIo)?;
 
     debug!(hash = %hash, "saved review to cache");
     Ok(())

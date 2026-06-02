@@ -132,7 +132,7 @@ pub async fn execute_review(
             if progress.is_enabled() {
                 progress.error(&e.to_string(), "calling_llm");
             }
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -189,23 +189,23 @@ fn get_diff(opts: &ReviewOptions, _config: &Config) -> Result<String> {
             .with_context(|| format!("failed to read diff file: {diff_file}"));
     }
     if let Some(ref commit_ref) = opts.commit {
-        return git::get_commit_diff(commit_ref);
+        return git::get_commit_diff(commit_ref).map_err(Into::into);
     }
     if opts.staged {
-        git::get_staged_diff()
+        git::get_staged_diff().map_err(Into::into)
     } else if opts.unpushed {
-        git::get_unpushed_diff()
+        git::get_unpushed_diff().map_err(Into::into)
     } else if let Some(ref base) = opts.base {
-        git::get_branch_diff(base)
+        git::get_branch_diff(base).map_err(Into::into)
     } else if opts.unstaged {
-        git::get_unstaged_diff()
+        git::get_unstaged_diff().map_err(Into::into)
     } else {
         // Default: try staged first, fall back to unpushed, then unstaged
         match git::get_staged_diff() {
             Ok(d) if !d.trim().is_empty() => Ok(d),
             _ => match git::get_unpushed_diff() {
                 Ok(d) if !d.trim().is_empty() => Ok(d),
-                _ => git::get_unstaged_diff(),
+                _ => git::get_unstaged_diff().map_err(Into::into),
             },
         }
     }

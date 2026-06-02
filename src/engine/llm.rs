@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::CoraError;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -169,7 +169,7 @@ async fn chat_completion(
     user_message: &str,
     spinner: Option<&ProgressBar>,
     response_format: &str,
-) -> Result<String> {
+) -> std::result::Result<String, CoraError> {
     let client = shared_client();
 
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
@@ -212,24 +212,24 @@ async fn chat_completion(
         .timeout(std::time::Duration::from_secs(config.timeout))
         .send()
         .await
-        .context("LLM API request failed (or timed out)")?;
+        .map_err(CoraError::LlmRequest)?;
 
     let status = response.status();
-    let body = response
-        .text()
-        .await
-        .context("failed to read LLM response body")?;
+    let body = response.text().await.map_err(CoraError::LlmRequest)?;
 
     if !status.is_success() {
-        anyhow::bail!("LLM API returned status {status}: {body}");
+        return Err(CoraError::LlmStatus {
+            status: status.as_u16(),
+            body,
+        });
     }
 
     if let Some(sp) = spinner {
         sp.set_message("Parsing response…");
     }
 
-    let parsed: ChatResponse = serde_json::from_str(&body)
-        .context(format!("failed to parse LLM JSON response: {body}"))?;
+    let parsed: ChatResponse =
+        serde_json::from_str(&body).map_err(|e| CoraError::LlmParse(format!("{e}: {body}")))?;
 
     let content = parsed
         .choices
@@ -265,7 +265,7 @@ pub async fn review_diff(
     response_format: &str,
     system_prompt_override: Option<&str>,
     quiet: bool,
-) -> Result<ReviewResponse> {
+) -> std::result::Result<ReviewResponse, CoraError> {
     let spinner = if quiet {
         None
     } else {
@@ -343,7 +343,7 @@ pub async fn review_diff_stream(
     rules: &[String],
     response_format: &str,
     system_prompt_override: Option<&str>,
-) -> Result<ReviewResponse> {
+) -> std::result::Result<ReviewResponse, CoraError> {
     let user_prompt = build_review_prompt(diff, focus, rules);
 
     let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
@@ -373,7 +373,7 @@ async fn chat_completion_stream(
     system_prompt: &str,
     user_message: &str,
     response_format: &str,
-) -> Result<String> {
+) -> std::result::Result<String, CoraError> {
     use futures_util::StreamExt;
     use std::io::Write;
 
@@ -405,12 +405,15 @@ async fn chat_completion_stream(
         .timeout(std::time::Duration::from_secs(config.timeout))
         .send()
         .await
-        .context("LLM API streaming request failed (or timed out)")?;
+        .map_err(CoraError::LlmRequest)?;
 
     let status = response.status();
     if !status.is_success() {
         let body = response.text().await.unwrap_or_default();
-        anyhow::bail!("LLM API returned status {status}: {body}");
+        return Err(CoraError::LlmStatus {
+            status: status.as_u16(),
+            body,
+        });
     }
 
     let mut stream = response.bytes_stream();
@@ -420,7 +423,7 @@ async fn chat_completion_stream(
     let mut accumulated = String::new();
 
     while let Some(chunk_result) = stream.next().await {
-        let chunk = chunk_result.context("error reading stream chunk")?;
+        let chunk = chunk_result.map_err(|e| CoraError::LlmStream(e.to_string()))?;
         let chunk_str = String::from_utf8_lossy(&chunk);
 
         // Process the chunk character by character to handle line boundaries
@@ -504,7 +507,7 @@ pub async fn scan_files(
     rules: &[String],
     response_format: &str,
     system_prompt_override: Option<&str>,
-) -> Result<(Vec<ReviewIssue>, Option<String>, Option<TokenUsage>)> {
+) -> std::result::Result<(Vec<ReviewIssue>, Option<String>, Option<TokenUsage>), CoraError> {
     let spinner = create_spinner("Scanning files…");
 
     let system_prompt = system_prompt_override.unwrap_or(SCAN_SYSTEM_PROMPT);
@@ -616,9 +619,10 @@ fn build_review_prompt(diff: &str, focus: &[String], rules: &[String]) -> String
 
 /// Parse the LLM response into review issues.
 /// Handles: raw JSON array, JSON wrapped in markdown fences, array and summary format.
+#[allow(clippy::type_complexity)]
 pub(crate) fn parse_review_response(
     raw: &str,
-) -> Result<(Vec<ReviewIssue>, String, Option<TokenUsage>)> {
+) -> std::result::Result<(Vec<ReviewIssue>, String, Option<TokenUsage>), CoraError> {
     let (json_str, summary) = extract_json_and_summary(raw);
 
     // Strip markdown code fences if present
@@ -627,24 +631,25 @@ pub(crate) fn parse_review_response(
     // Repair common LLM JSON mistakes before strict parse
     let json_str = repair_json_string(&json_str);
 
-    let issues: Vec<ReviewIssue> = serde_json::from_str(&json_str)
-        .context("LLM response is not valid JSON array of issues")?;
+    let issues: Vec<ReviewIssue> =
+        serde_json::from_str(&json_str).map_err(|e| CoraError::LlmParse(e.to_string()))?;
 
     Ok((issues, summary, None))
 }
 
 /// Parse the LLM response for scan mode.
+#[allow(clippy::type_complexity)]
 pub(crate) fn parse_scan_response(
     raw: &str,
-) -> Result<(Vec<ReviewIssue>, Option<String>, Option<TokenUsage>)> {
+) -> std::result::Result<(Vec<ReviewIssue>, Option<String>, Option<TokenUsage>), CoraError> {
     let (json_str, summary) = extract_json_and_summary(raw);
     let json_str = strip_code_fences(&json_str);
 
     // Repair common LLM JSON mistakes before strict parse
     let json_str = repair_json_string(&json_str);
 
-    let issues: Vec<ReviewIssue> = serde_json::from_str(&json_str)
-        .context("LLM scan response is not valid JSON array of issues")?;
+    let issues: Vec<ReviewIssue> =
+        serde_json::from_str(&json_str).map_err(|e| CoraError::LlmParse(e.to_string()))?;
 
     let summary = if summary.is_empty() {
         None

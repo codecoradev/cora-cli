@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::CoraError;
 use serde::{Deserialize, Serialize};
 
 use crate::engine::Severity;
@@ -214,8 +214,8 @@ pub struct LlmSection {
 }
 
 impl CoraFile {
-    pub fn from_str(content: &str) -> Result<Self> {
-        serde_yaml_ng::from_str(content).context("failed to parse .cora.yaml")
+    pub fn from_str(content: &str) -> std::result::Result<Self, CoraError> {
+        serde_yaml_ng::from_str(content).map_err(|e| CoraError::ConfigParse(e.to_string()))
     }
 
     /// Merge this file config into a `Config`, overwriting only fields that are present.
@@ -870,7 +870,7 @@ provider:
         assert!(result.is_err(), "malformed YAML should return an error");
         let err = result.unwrap_err().to_string();
         assert!(
-            err.contains("failed to parse .cora.yaml"),
+            err.contains("config parse error"),
             "error message should mention parse failure: {err}"
         );
     }

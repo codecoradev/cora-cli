@@ -285,6 +285,7 @@ dependencies = [
  "serde_yaml_ng",
  "sha2",
  "tempfile",
+ "thiserror",
  "tokio",
  "tokio-test",
  "toml",
