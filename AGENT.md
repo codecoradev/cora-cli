@@ -7,7 +7,7 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 
 - **License:** MIT
 - **Edition:** Rust 2024 (MSRV 1.85)
-- **Repo:** `ajianaz/cora-cli`
+- **Repo:** `codecoradev/cora-cli`
 - **Default branch:** `develop`
 
 ## Build & Development Commands

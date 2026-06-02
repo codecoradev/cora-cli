@@ -46,19 +46,10 @@ jobs:
             exit 1
           fi
 
-      - name: Fetch secrets from Infisical
-        uses: Infisical/secrets-action@v1.0.9
-        with:
-          method: "oidc"
-          identity-id: "${{ secrets.INFISICAL_IDENTITY_ID }}"
-          project-slug: "github-actions"
-          env-slug: "prod"
-          domain: "https://infisical.ajianaz.dev"
-
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           preCommands: npx wrangler pages project create cora --production-branch=develop || true
           command: pages deploy website/build/ --project-name=cora --commit-dirty=true --branch=develop

@@ -4,7 +4,7 @@
 
 **AI-Powered Code Review CLI**
 
-[![CI](https://github.com/ajianaz/cora-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/ajianaz/cora-cli/actions/workflows/ci.yml)
+[![CI](https://github.com/codecoradev/cora-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/codecoradev/cora-cli/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/cora-cli.svg)](https://crates.io/crates/cora-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/Rust-1.85+-orange.svg)](https://www.rust-lang.org/)
@@ -42,7 +42,7 @@ cargo install cora-cli
 
 ### Binary Download
 
-Download the latest release from [GitHub Releases](https://github.com/ajianaz/cora-cli/releases):
+Download the latest release from [GitHub Releases](https://github.com/codecoradev/cora-cli/releases):
 
 ```bash
 # Determine your platform tag from the releases page, e.g.:
@@ -52,12 +52,12 @@ Download the latest release from [GitHub Releases](https://github.com/ajianaz/co
 #   cora-x86_64-pc-windows-msvc-v0.2.0.zip
 
 # Example: Linux aarch64
-VERSION=$(curl -s https://api.github.com/repos/ajianaz/cora-cli/releases/latest | grep tag_name | cut -d'"' -f4)
-curl -L "https://github.com/ajianaz/cora-cli/releases/download/${VERSION}/cora-aarch64-unknown-linux-gnu-${VERSION}.tar.gz" | tar xz
+VERSION=$(curl -s https://api.github.com/repos/codecoradev/cora-cli/releases/latest | grep tag_name | cut -d'"' -f4)
+curl -L "https://github.com/codecoradev/cora-cli/releases/download/${VERSION}/cora-aarch64-unknown-linux-gnu-${VERSION}.tar.gz" | tar xz
 sudo mv cora /usr/local/bin/
 ```
 
-> **Tip:** Visit the [Releases page](https://github.com/ajianaz/cora-cli/releases) to find the correct asset name for your platform.
+> **Tip:** Visit the [Releases page](https://github.com/codecoradev/cora-cli/releases) to find the correct asset name for your platform.
 
 ### Homebrew
 
@@ -68,7 +68,7 @@ sudo mv cora /usr/local/bin/
 Requires **Rust 1.85+**.
 
 ```bash
-git clone https://github.com/ajianaz/cora-cli.git
+git clone https://github.com/codecoradev/cora-cli.git
 cd cora-cli
 cargo install --path .
 ```
@@ -351,7 +351,7 @@ Or install manually:
 # Manual install in CI
 - name: Install cora-cli
   run: |
-    curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu.tar.gz | tar xz
+    curl -fsSL https://github.com/codecoradev/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu.tar.gz | tar xz
     sudo mv cora /usr/local/bin/
 ```
 

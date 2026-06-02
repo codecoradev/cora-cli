@@ -94,17 +94,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Fetch CARGO_REGISTRY_TOKEN from Infisical
-        uses: Infisical/secrets-action@v1.0.9
-        with:
-          method: "oidc"
-          identity-id: "${{ secrets.INFISICAL_IDENTITY_ID }}"
-          project-slug: "github-actions"
-          env-slug: "prod"
-          domain: "https://infisical.ajianaz.dev"
-
       - name: Publish to crates.io
-        run: cargo publish --token ${{ env.CARGO_REGISTRY_TOKEN }} --allow-dirty
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --allow-dirty
 
   release:
     name: Create GitHub Release
@@ -163,7 +154,7 @@ jobs:
             printf '# Install via cargo\n'
             printf 'cargo install cora\n\n'
             printf '# Or download binary (extracts as '\''cora'\'')\n'
-            printf 'curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-%s.tar.gz | tar xz\n' "${{ steps.version.outputs.TAG }}"
+            printf 'curl -fsSL https://github.com/codecoradev/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-%s.tar.gz | tar xz\n' "${{ steps.version.outputs.TAG }}"
             printf 'chmod +x cora\n'
             printf 'sudo mv cora /usr/local/bin/\n\n'
             printf '# Init project\n'
@@ -171,7 +162,7 @@ jobs:
             printf '# Review staged changes\n'
             printf 'CORA_API_KEY=your-key cora review --staged\n'
             printf '```\n\n'
-            printf '**Full changelog:** https://github.com/ajianaz/cora-cli/blob/develop/CHANGELOG.md\n'
+            printf '**Full changelog:** https://github.com/codecoradev/cora-cli/blob/develop/CHANGELOG.md\n'
           } > release-notes.md
 
       - name: Create GitHub Release

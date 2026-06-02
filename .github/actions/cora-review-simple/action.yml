@@ -42,7 +42,7 @@ runs:
           # Try up to 3 times with delay
           for i in 1 2 3; do
             VERSION=$(curl -sfL --connect-timeout 10 \
-              https://api.github.com/repos/ajianaz/cora-cli/releases/latest \
+              https://api.github.com/repos/codecoradev/cora-cli/releases/latest \
               | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tag_name', ''))" 2>/dev/null)
             if [ -n "$VERSION" ]; then
               break
@@ -73,7 +73,7 @@ runs:
           echo "Unsupported architecture: $ARCH"
           exit 1
         fi
-        curl -sL "https://github.com/ajianaz/cora-cli/releases/download/${{ steps.resolve.outputs.VERSION }}/${ASSET}-${{ steps.resolve.outputs.VERSION }}.tar.gz" | tar xz -C /usr/local/bin cora
+        curl -sL "https://github.com/codecoradev/cora-cli/releases/download/${{ steps.resolve.outputs.VERSION }}/${ASSET}-${{ steps.resolve.outputs.VERSION }}.tar.gz" | tar xz -C /usr/local/bin cora
         chmod +x /usr/local/bin/cora
         cora --version
 
@@ -154,7 +154,7 @@ runs:
                             hasWarnings ? '⚠️ **Review recommended** — warnings found.' :
                             '✅ **Passed** — only informational notes.';
 
-              body = `## 🔍 Cora AI Code Review\n\n${status}\n${table}\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
+              body = `## 🔍 Cora AI Code Review\n\n${status}\n${table}\n---\n_Review powered by [cora-cli](https://github.com/codecoradev/cora-cli) · BYOK · MIT_`;
             }
           }
 

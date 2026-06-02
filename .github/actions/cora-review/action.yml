@@ -1,5 +1,5 @@
 name: 'Cora AI Code Review'
-description: 'Run cora AI code review on a PR diff — posts a PR comment. Uses Infisical OIDC for LLM secrets (zero keys in GitHub). SARIF upload is optional.'
+description: 'Run cora AI code review on a PR diff. Posts PR comment with findings.'
 
 inputs:
   base-branch:
@@ -18,21 +18,15 @@ inputs:
     description: 'Upload SARIF to GitHub Code Scanning (default: false)'
     required: false
     default: 'false'
-  infisical-identity-id:
-    description: 'Infisical OIDC identity ID (from secret INFISICAL_IDENTITY_ID)'
+  cora-api-key:
+    description: 'LLM API key'
     required: true
-  infisical-project:
-    description: 'Infisical project slug'
+  cora-base-url:
+    description: 'LLM API base URL'
     required: false
-    default: 'github-actions'
-  infisical-env:
-    description: 'Infisical environment slug'
+  cora-model:
+    description: 'LLM model ID'
     required: false
-    default: 'prod'
-  infisical-domain:
-    description: 'Infisical domain URL'
-    required: false
-    default: 'https://infisical.ajianaz.dev'
   github-token:
     description: 'GitHub token for PR comments and SARIF upload'
     required: true
@@ -40,15 +34,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Fetch LLM secrets from Infisical
-      uses: Infisical/secrets-action@8a06c1bdcd5b8635d510c52d4b57a92c1ccef785 # v1.0.9
-      with:
-        method: 'oidc'
-        identity-id: ${{ inputs.infisical-identity-id }}
-        project-slug: ${{ inputs.infisical-project }}
-        env-slug: ${{ inputs.infisical-env }}
-        domain: ${{ inputs.infisical-domain }}
-
     - name: Resolve cora-cli version
       id: resolve
       shell: bash
@@ -58,7 +43,7 @@ runs:
         if [ "$INPUT_VERSION" = "latest" ]; then
           for i in 1 2 3; do
             VERSION=$(curl -sfL --connect-timeout 10 \
-              https://api.github.com/repos/ajianaz/cora-cli/releases/latest \
+              https://api.github.com/repos/codecoradev/cora-cli/releases/latest \
               | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tag_name', ''))" 2>/dev/null)
             if [ -n "$VERSION" ]; then
               break
@@ -90,9 +75,9 @@ runs:
           echo "Unsupported architecture: $ARCH"
           exit 1
         fi
-        curl -sL "https://github.com/ajianaz/cora-cli/releases/download/${CORA_VERSION}/${ASSET}-${CORA_VERSION}.tar.gz" \
+        curl -sL "https://github.com/codecoradev/cora-cli/releases/download/${CORA_VERSION}/${ASSET}-${CORA_VERSION}.tar.gz" \
           -o /tmp/cora.tar.gz
-        curl -sL "https://github.com/ajianaz/cora-cli/releases/download/${CORA_VERSION}/checksums-sha256.txt" \
+        curl -sL "https://github.com/codecoradev/cora-cli/releases/download/${CORA_VERSION}/checksums-sha256.txt" \
           -o /tmp/cora-checksums.txt || true
         if [ -f /tmp/cora-checksums.txt ] && [ -s /tmp/cora-checksums.txt ]; then
           EXPECTED=$(grep "${ASSET}-${CORA_VERSION}.tar.gz" /tmp/cora-checksums.txt | awk '{print $1}' || true)
@@ -118,9 +103,9 @@ runs:
       id: review
       shell: bash
       env:
-        CORA_API_KEY: ${{ env.CORA_API_KEY }}
-        CORA_BASE_URL: ${{ env.CORA_BASE_URL }}
-        CORA_MODEL: ${{ env.CORA_MODEL }}
+        CORA_API_KEY: ${{ inputs.cora-api-key }}
+        CORA_BASE_URL: ${{ inputs.cora-base-url }}
+        CORA_MODEL: ${{ inputs.cora-model }}
         INPUT_BASE: ${{ inputs.base-branch }}
         INPUT_SEVERITY: ${{ inputs.severity }}
       run: |
@@ -170,14 +155,14 @@ runs:
               fileSize = 0;
             }
             if (fileSize < 10) {
-              body = `## 🔍 Cora AI Code Review\n\n⚠️ **Review could not complete.** Cora produced an empty result. Check the workflow logs for errors.\n\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
+              body = `## 🔍 Cora AI Code Review\n\n⚠️ **Review could not complete.** Cora produced an empty result. Check the workflow logs for errors.\n\n---\n_Review powered by [cora-cli](https://github.com/codecoradev/cora-cli) · BYOK · MIT_`;
             } else {
-              body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!\n\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
+              body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!\n\n---\n_Review powered by [cora-cli](https://github.com/codecoradev/cora-cli) · BYOK · MIT_`;
             }
           } else {
             const results = sarifContent.runs[0].results || [];
             if (results.length === 0) {
-              body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!\n\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
+              body = `## 🔍 Cora AI Code Review\n\n✅ **No issues found.** Code looks good!\n\n---\n_Review powered by [cora-cli](https://github.com/codecoradev/cora-cli) · BYOK · MIT_`;
             } else {
               const grouped = {};
               for (const r of results) {
@@ -208,7 +193,7 @@ runs:
                             hasWarnings ? '⚠️ **Review recommended** — warnings found.' :
                             '✅ **Passed** — only informational notes.';
 
-              body = `## 🔍 Cora AI Code Review\n\n${status}\n${table}\n---\n_Review powered by [cora-cli](https://github.com/ajianaz/cora-cli) · BYOK · MIT_`;
+              body = `## 🔍 Cora AI Code Review\n\n${status}\n${table}\n---\n_Review powered by [cora-cli](https://github.com/codecoradev/cora-cli) · BYOK · MIT_`;
             }
           }
 

@@ -4,7 +4,7 @@ use tracing::debug;
 
 /// Example .cora.yaml template content.
 const CONFIG_TEMPLATE: &str = r#"# Cora Code Review Configuration
-# See: https://github.com/ajianaz/cora-cli
+# See: https://github.com/codecoradev/cora-cli
 
 # Provider settings
 provider:
