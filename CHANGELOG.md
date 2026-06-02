@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-06-02
+
+### Fixed
+
+- **`unwrap()` → `expect()`** in ProgressStyle templates (llm.rs, scanner.rs) — clearer panic messages on template parse failure (#87)
+- **Consolidated duplicate `impl Severity` blocks** into single implementation (#83)
+- **`file_content_hash` returns `Option<String>`** instead of empty string on read failure — prevents infinite rescan loop on unreadable files (#77)
+- **Permission errors logged in scanner** — file walk now logs permission errors at debug level instead of silently skipping (#76)
+- **Auth file permission warning** — warns if `~/.cora/auth.toml` has overly permissive file permissions (Unix only) (#72)
+- **SARIF upload size validation** — validates SARIF file size against GitHub's 10MB limit before upload (#82)
+- **Float division for MB display** — SARIF size error now shows accurate fractional MB (was integer division truncating to 0) (#82)
+- **Non-deterministic `DefaultHasher` → `sha2`** — scan cache now uses SHA-256 for deterministic hashing across Rust versions (#81)
+
+### Added
+
+- **`checksums-sha256.txt` in release artifacts** — release workflow generates SHA-256 checksums for all platform binaries (#109)
+
+### Changed
+
+- **Official CodeCora branding assets** — logo, favicon, and OG image updated from ajianaz/cora SaaS repo (#110)
+- **Standalone `cora-review.yml` workflow** — CI action extracted from inline `ci.yml` job to dedicated workflow with concurrency control (#107)
+- **Action v2 hardened** — all third-party actions pinned to commit SHA, checksum verification for binary downloads, env var indirection for inputs, `grep` pipefail fix, empty file guard, Node 24 strict mode compatibility (#107)
+
 ## [0.1.7] - 2026-06-01
 
 ### Added
@@ -159,7 +182,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/ajianaz/cora-cli/compare/v0.1.3...develop
+[Unreleased]: https://github.com/ajianaz/cora-cli/compare/v0.1.8...develop
+[0.1.8]: https://github.com/ajianaz/cora-cli/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/ajianaz/cora-cli/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/ajianaz/cora-cli/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/ajianaz/cora-cli/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/ajianaz/cora-cli/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/ajianaz/cora-cli/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/ajianaz/cora-cli/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/ajianaz/cora-cli/compare/v0.1.0...v0.1.1
