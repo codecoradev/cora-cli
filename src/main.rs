@@ -1,7 +1,3 @@
-// Suppress unused warnings for utility functions not yet called from main
-// These will be used as the codebase grows
-#![allow(dead_code)]
-
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -14,6 +10,7 @@ mod engine;
 mod formatters;
 mod git;
 mod hook;
+mod progress;
 
 use commands::{auth, completion, config_cmd, hook_cmd, init, providers, review, scan, upload};
 use config::loader;
@@ -103,9 +100,17 @@ enum Command {
         #[clap(long)]
         unstaged: bool,
 
+        /// Override max diff size in chars (default: 50000 from config)
+        #[clap(long, name = "CHARS")]
+        max_diff_size: Option<usize>,
+
         /// Stream LLM response tokens in real-time
         #[clap(long)]
         stream: bool,
+
+        /// Output structured NDJSON progress events to stderr
+        #[clap(long)]
+        progress: bool,
 
         /// Suppress all output except the formatted review result
         #[clap(long, short)]
@@ -287,7 +292,9 @@ async fn main() -> Result<()> {
             commit,
             diff_file,
             unstaged,
+            max_diff_size,
             stream,
+            progress,
             quiet,
             severity,
             no_cache,
@@ -305,7 +312,9 @@ async fn main() -> Result<()> {
                     commit,
                     diff_file,
                     unstaged,
+                    max_diff_size,
                     stream,
+                    progress,
                     quiet,
                     severity,
                     no_cache,
@@ -409,7 +418,9 @@ struct ReviewOpts {
     commit: Option<String>,
     diff_file: Option<String>,
     unstaged: bool,
+    max_diff_size: Option<usize>,
     stream: bool,
+    progress: bool,
     quiet: bool,
     severity: Option<String>,
     upload: bool,
@@ -448,6 +459,15 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         resolve_format(globals.format.as_deref(), &config)?
     };
 
+    let progress_reporter = if opts.progress {
+        progress::ProgressReporter::new()
+    } else {
+        progress::ProgressReporter::disabled()
+    };
+
+    // Emit started event if progress enabled
+    progress_reporter.started("review", opts.base.as_deref());
+
     let review_opts = review::ReviewOptions {
         staged: opts.staged,
         unpushed: opts.unpushed,
@@ -455,15 +475,15 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         commit: opts.commit.clone(),
         diff_file: opts.diff_file.clone(),
         unstaged: opts.unstaged,
-        max_diff_size: None,
+        max_diff_size: opts.max_diff_size,
         stream: opts.stream,
-        quiet: opts.quiet,
+        quiet: opts.quiet || opts.progress,
         severity: opts.severity.clone(),
         no_cache: opts.no_cache,
     };
 
-    // When streaming and not quiet, show a simpler message
-    if opts.stream && !opts.quiet {
+    // When streaming and not quiet/progress, show a simpler message
+    if opts.stream && !opts.quiet && !opts.progress {
         eprintln!(
             "{}",
             format!(
@@ -475,8 +495,14 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
     }
 
     // Execute the review (returns formatted output)
-    let result =
-        review::execute_review(&config, &llm_config, &review_opts, effective_format).await?;
+    let result = review::execute_review(
+        &config,
+        &llm_config,
+        &review_opts,
+        effective_format,
+        &progress_reporter,
+    )
+    .await?;
 
     // Print the formatted output
     print!("{}", result.output);

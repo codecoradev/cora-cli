@@ -54,7 +54,12 @@ impl fmt::Display for Severity {
     }
 }
 
-/// Issue type categories
+/// Issue type categories.
+///
+/// Kept for API completeness — used for deserialization and future typed
+/// issue-type matching. Currently the LLM returns issue_type as a string,
+/// but this enum provides a structured alternative.
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IssueType {
@@ -66,6 +71,7 @@ pub enum IssueType {
     Suggestion,
 }
 
+#[allow(dead_code)]
 impl fmt::Display for IssueType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -79,6 +85,7 @@ impl fmt::Display for IssueType {
     }
 }
 
+#[allow(dead_code)]
 impl IssueType {
     /// Parse from string with lenient matching (accepts plural forms, etc.)
     pub fn from_str_lossy(s: &str) -> Self {
@@ -431,17 +438,32 @@ impl Default for LLMConfig {
     }
 }
 
-/// CLI exit codes
+/// CLI exit codes.
+///
+/// Kept for API completeness — consumers and tests may reference these.
+#[allow(dead_code)]
 pub const EXIT_OK: i32 = 0;
+#[allow(dead_code)]
 pub const EXIT_ERROR: i32 = 1;
+#[allow(dead_code)]
 pub const EXIT_BLOCKED: i32 = 2;
+#[allow(dead_code)]
 pub const EXIT_AUTH_ERROR: i32 = 3;
 
-/// Maximum diff size in bytes (50KB by default)
+/// Maximum diff size in bytes (50KB by default).
+///
+/// Kept for API completeness — future commands may enforce this limit.
+#[allow(dead_code)]
 pub const MAX_DIFF_SIZE: usize = 50 * 1024;
 
-/// Maximum files per scan batch
+/// Maximum files per scan batch.
+///
+/// Kept for API completeness — scanner uses matching values inline.
+#[allow(dead_code)]
 pub const MAX_SCAN_BATCH_FILES: usize = 20;
 
-/// Maximum characters per scan batch
+/// Maximum characters per scan batch.
+///
+/// Kept for API completeness — scanner uses matching values inline.
+#[allow(dead_code)]
 pub const MAX_SCAN_BATCH_CHARS: usize = 80_000;

@@ -3,9 +3,9 @@ use std::path::Path;
 
 use anyhow::Result;
 use glob::Pattern;
+use ignore::WalkBuilder;
 use indicatif::{ProgressBar, ProgressStyle};
 use tracing::debug;
-use walkdir::WalkDir;
 
 /// A file to be scanned, with its relative path and content.
 #[derive(Debug, Clone)]
@@ -18,12 +18,6 @@ pub struct FileEntry {
     pub lines: usize,
 }
 
-/// Maximum characters per batch to avoid exceeding LLM token limits.
-const MAX_BATCH_CHARS: usize = 60_000;
-
-/// Maximum files per batch.
-const MAX_FILES_PER_BATCH: usize = 20;
-
 /// File extensions to include in scans by default (source code).
 const DEFAULT_EXTENSIONS: &[&str] = &[
     "rs", "py", "js", "ts", "tsx", "jsx", "go", "java", "kt", "rb", "c", "cpp", "h", "hpp", "cs",
@@ -34,6 +28,8 @@ const DEFAULT_EXTENSIONS: &[&str] = &[
 /// Walk a project directory, respecting .gitignore, and collect scannable files.
 ///
 /// Uses `include` and `exclude` glob patterns to filter results.
+/// The `ignore` crate handles .gitignore (including nested), .git/info/exclude,
+/// and hidden-file filtering automatically.
 pub fn walk_project(
     root: &Path,
     include_patterns: &[String],
@@ -62,9 +58,6 @@ pub fn walk_project(
         .filter_map(|p| Pattern::new(p).ok())
         .collect();
 
-    // Load .gitignore if present
-    let gitignore = load_gitignore(root);
-
     let mut entries = Vec::new();
 
     let spinner = ProgressBar::new_spinner();
@@ -76,17 +69,23 @@ pub fn walk_project(
     );
     spinner.set_message("Scanning files…");
 
-    for entry in WalkDir::new(root)
-        .into_iter()
-        .filter_entry(|e| {
-            // Skip hidden files/directories
-            e.file_name()
-                .to_str()
-                .map(|s| !s.starts_with('.'))
-                .unwrap_or(true)
-        })
-        .filter_map(|e| e.ok())
-    {
+    let walker = WalkBuilder::new(root)
+        .hidden(true) // respect hidden files (skip dotfiles)
+        .git_ignore(true) // respect .gitignore at all levels
+        .git_global(true) // respect core.excludesFile
+        .git_exclude(true) // respect .git/info/exclude
+        .require_git(false) // apply gitignore rules even outside git repos
+        .build();
+
+    for result in walker {
+        let entry = match result {
+            Ok(e) => e,
+            Err(err) => {
+                debug!(error = %err, "error during directory walk");
+                continue;
+            }
+        };
+
         let path = entry.path();
 
         // Skip directories
@@ -94,16 +93,12 @@ pub fn walk_project(
             continue;
         }
 
+        // Get relative path (entry.depth() ensures it's under root)
         let relative = path
             .strip_prefix(root)
             .unwrap_or(path)
             .to_string_lossy()
             .to_string();
-
-        // Check gitignore
-        if is_ignored_by_gitignore(&relative, &gitignore) {
-            continue;
-        }
 
         // Check exclude patterns
         if exclude_globs.iter().any(|g| g.matches(&relative)) {
@@ -199,47 +194,4 @@ pub fn format_batch_for_prompt(files: &[FileEntry]) -> String {
     }
 
     output
-}
-
-/// Load .gitignore patterns from a project root.
-fn load_gitignore(root: &Path) -> Vec<String> {
-    let gitignore_path = root.join(".gitignore");
-    if !gitignore_path.is_file() {
-        return Vec::new();
-    }
-
-    std::fs::read_to_string(&gitignore_path)
-        .unwrap_or_default()
-        .lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            !trimmed.is_empty() && !trimmed.starts_with('#')
-        })
-        .map(|s| s.to_string())
-        .collect()
-}
-
-/// Simple check if a path matches any gitignore pattern.
-fn is_ignored_by_gitignore(path: &str, patterns: &[String]) -> bool {
-    for pattern in patterns {
-        let p = pattern.trim();
-        if p.is_empty() {
-            continue;
-        }
-        // Simple glob matching
-        if let Ok(glob) = Pattern::new(&format!("**/{p}")) {
-            if glob.matches(path) {
-                return true;
-            }
-        }
-        // Direct prefix match for directory patterns
-        if p.ends_with('/') && path.starts_with(p) {
-            return true;
-        }
-        // Exact file match
-        if path == p || path.ends_with(&format!("/{p}")) {
-            return true;
-        }
-    }
-    false
 }

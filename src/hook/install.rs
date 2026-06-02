@@ -102,6 +102,10 @@ fn find_git_hooks_dir() -> Result<std::path::PathBuf> {
 }
 
 /// Check whether the cora pre-commit hook is installed.
+///
+/// Kept for API completeness — useful for future `cora hook status` and
+/// guard logic in pre-commit hook template.
+#[allow(dead_code)]
 pub fn is_hook_installed() -> Result<bool> {
     let hooks_dir = find_git_hooks_dir()?;
     let hook_path = hooks_dir.join("pre-commit");

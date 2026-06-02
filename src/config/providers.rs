@@ -62,8 +62,3 @@ pub fn preset_has_key(preset: &ProviderPreset) -> bool {
 pub fn detected_presets() -> Vec<&'static ProviderPreset> {
     PRESETS.iter().filter(|p| preset_has_key(p)).collect()
 }
-
-/// Find the first detected provider preset.
-pub fn first_detected_preset() -> Option<&'static ProviderPreset> {
-    PRESETS.iter().find(|p| preset_has_key(p))
-}

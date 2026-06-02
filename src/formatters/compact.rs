@@ -26,6 +26,12 @@ impl Formatter for CompactFormatter {
             output.push_str(&format_issue_compact(issue));
         }
 
+        // Footer watermark (only when issues found)
+        output.push_str(&format!(
+            "Reviewed by Cora v{}\n",
+            env!("CARGO_PKG_VERSION")
+        ));
+
         Ok(output)
     }
 
@@ -41,6 +47,14 @@ impl Formatter for CompactFormatter {
 
         for issue in &response.issues {
             output.push_str(&format_issue_compact(issue));
+        }
+
+        // Footer watermark (only when issues found)
+        if !response.issues.is_empty() {
+            output.push_str(&format!(
+                "Reviewed by Cora v{}\n",
+                env!("CARGO_PKG_VERSION")
+            ));
         }
 
         Ok(output)
@@ -136,6 +150,15 @@ mod tests {
         let fmt = CompactFormatter;
         let output = fmt.format_review(&empty_response()).unwrap();
         assert!(output.contains("No issues found"));
+        // No watermark when no issues
+        assert!(!output.contains("Reviewed by Cora"));
+    }
+
+    #[test]
+    fn format_review_with_issues_has_watermark() {
+        let fmt = CompactFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        assert!(output.contains("Reviewed by Cora v"));
     }
 
     #[test]

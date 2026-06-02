@@ -124,7 +124,9 @@ runs:
         INPUT_BASE: ${{ inputs.base-branch }}
         INPUT_SEVERITY: ${{ inputs.severity }}
       run: |
-        cora review \
+        # Set higher diff limit for CI (default 50K is too small for large PRs)
+        printf 'hook:\n  max_diff_size: 200000\n' > .cora-ci.yaml
+        CORA_CONFIG=".cora-ci.yaml" cora review \
           --base "$INPUT_BASE" \
           --format sarif \
           --severity "$INPUT_SEVERITY" \
