@@ -7,9 +7,9 @@ use tracing::debug;
 
 use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse, TokenUsage};
 
-/// Shared reqwest::Client with connection pooling. Reused across all LLM requests.
+/// Shared `reqwest::Client` with connection pooling. Reused across all LLM requests.
 /// Created lazily on first use to avoid blocking initialization.
-/// Per-request timeout is set via .timeout() on the RequestBuilder.
+/// Per-request timeout is set via .`timeout()` on the `RequestBuilder`.
 ///
 /// Supports `REQUESTS_CA_BUNDLE` env var for custom CA certificates
 /// (corporate proxies with self-signed certs).
@@ -42,7 +42,7 @@ static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     })
 });
 
-/// Return the shared reqwest::Client for LLM API requests.
+/// Return the shared `reqwest::Client` for LLM API requests.
 pub fn shared_client() -> reqwest::Client {
     SHARED_CLIENT.clone()
 }
@@ -220,7 +220,7 @@ async fn chat_completion(
         .context("failed to read LLM response body")?;
 
     if !status.is_success() {
-        anyhow::bail!("LLM API returned status {status}: {body}",);
+        anyhow::bail!("LLM API returned status {status}: {body}");
     }
 
     if let Some(sp) = spinner {
@@ -515,7 +515,7 @@ pub async fn scan_files(
             "Additional rules:\n{}\n\n",
             rules
                 .iter()
-                .map(|r| format!("- {}", r))
+                .map(|r| format!("- {r}"))
                 .collect::<Vec<_>>()
                 .join("\n")
         ));
@@ -586,7 +586,7 @@ fn build_review_prompt(diff: &str, focus: &[String], rules: &[String]) -> String
     if !file_paths.is_empty() {
         prompt.push_str("Valid files in this diff:\n");
         for path in &file_paths {
-            prompt.push_str(&format!("- \"{}\"\n", path));
+            prompt.push_str(&format!("- \"{path}\"\n"));
         }
         prompt.push('\n');
     }
@@ -696,11 +696,11 @@ fn repair_json_string(json_str: &str) -> String {
     // Replace lone backslashes inside JSON string values that aren't valid JSON escapes.
     // Valid JSON escapes: \" \\ \/ \b \f \n \r \t \uXXXX
     let repaired = repair_invalid_escapes(json_str);
-    if repaired != json_str {
+    if repaired == json_str {
+        json_str.to_string()
+    } else {
         debug!("applied backslash repair to LLM JSON output");
         repaired
-    } else {
-        json_str.to_string()
     }
 }
 

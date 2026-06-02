@@ -20,7 +20,7 @@ fn cache_key(diff: &str, model: &str, temperature: f32) -> String {
     hasher.update(model.as_bytes());
     hasher.update(temperature.to_le_bytes());
     let result = hasher.finalize();
-    result.iter().map(|b| format!("{:02x}", b)).collect()
+    result.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// Get cached review response if available and not expired.
@@ -35,7 +35,7 @@ pub fn get_cached_review(
 ) -> Option<ReviewResponse> {
     let hash = cache_key(diff, model, temperature);
     let dir = cache_dir().ok()?;
-    let path = dir.join(format!("{}.json", hash));
+    let path = dir.join(format!("{hash}.json"));
 
     if !path.is_file() {
         debug!("cache miss: file not found");
@@ -82,7 +82,7 @@ pub fn save_cached_review(
         .with_context(|| format!("failed to create cache dir {}", dir.display()))?;
 
     let hash = cache_key(diff, model, temperature);
-    let path = dir.join(format!("{}.json", hash));
+    let path = dir.join(format!("{hash}.json"));
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -247,7 +247,7 @@ mod tests {
         // Manually set up a cache entry in the temp dir
         let diff = "test diff content";
         let hash = cache_key(diff, "model", 0.0);
-        let path = dir.join(format!("{}.json", hash));
+        let path = dir.join(format!("{hash}.json"));
 
         let response = make_response();
         let now = SystemTime::now()

@@ -11,7 +11,7 @@ fn cora_cmd() -> Command {
 /// Helper: write content to a temp file and return its path.
 fn write_temp_yaml(content: &str) -> NamedTempFile {
     let mut file = tempfile::Builder::new().suffix(".yaml").tempfile().unwrap();
-    write!(file, "{}", content).unwrap();
+    write!(file, "{content}").unwrap();
     file.flush().unwrap();
     file
 }
@@ -47,7 +47,7 @@ fn init_creates_valid_yaml() {
 
 #[test]
 fn config_file_with_custom_provider() {
-    let yaml = r#"
+    let yaml = r"
 provider:
   provider: anthropic
   model: claude-3-haiku
@@ -56,7 +56,7 @@ focus:
   - security
 output:
   format: json
-"#;
+";
     let file = write_temp_yaml(yaml);
 
     // Parse and verify using serde_yaml_ng directly
@@ -71,7 +71,7 @@ output:
 
 #[test]
 fn config_file_roundtrip_yaml() {
-    let yaml = r#"
+    let yaml = r"
 provider:
   provider: ollama
   model: llama3
@@ -83,7 +83,7 @@ ignore:
   files:
     - vendor/**
     - generated/**
-"#;
+";
     let file = write_temp_yaml(yaml);
     let content = std::fs::read_to_string(file.path()).unwrap();
 
@@ -112,10 +112,10 @@ fn config_file_empty_yaml_is_valid() {
 
 #[test]
 fn config_file_minimal_sections() {
-    let yaml = r#"
+    let yaml = r"
 focus:
   - security
-"#;
+";
     let file = write_temp_yaml(yaml);
     let content = std::fs::read_to_string(file.path()).unwrap();
     let parsed: serde_yaml_ng::Value = serde_yaml_ng::from_str(&content).unwrap();
@@ -126,11 +126,11 @@ focus:
 #[test]
 fn cli_uses_config_file_via_flag() {
     // Create a temp config and verify the CLI at least accepts the flag
-    let yaml = r#"
+    let yaml = r"
 provider:
   provider: test-provider
 model: test-model
-"#;
+";
     let file = write_temp_yaml(yaml);
 
     // We can't run a full review without an API key, but we can verify
