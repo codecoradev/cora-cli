@@ -97,7 +97,9 @@ impl IssueType {
                 IssueType::BestPractice
             }
             "style" | "formatting" => IssueType::Style,
-            _ => IssueType::Suggestion, // fallback (includes suggestion, info)
+            // suggestion/info merged into wildcard — all three arms returned
+            // identical IssueType::Suggestion, verified by clippy match_same_arms
+            _ => IssueType::Suggestion,
         }
     }
 }
