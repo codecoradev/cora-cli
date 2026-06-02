@@ -257,6 +257,7 @@ fn create_spinner(message: &str) -> ProgressBar {
 }
 
 /// Review a diff using the LLM. Returns a `ReviewResponse`.
+#[allow(clippy::too_many_arguments)]
 pub async fn review_diff(
     llm_config: &LLMConfig,
     diff: &str,
@@ -265,6 +266,7 @@ pub async fn review_diff(
     response_format: &str,
     system_prompt_override: Option<&str>,
     quiet: bool,
+    static_context: Option<&str>,
 ) -> std::result::Result<ReviewResponse, CoraError> {
     let spinner = if quiet {
         None
@@ -272,7 +274,7 @@ pub async fn review_diff(
         Some(create_spinner("Reviewing diff…"))
     };
 
-    let user_prompt = build_review_prompt(diff, focus, rules);
+    let user_prompt = build_review_prompt(diff, focus, rules, static_context);
 
     let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
 
@@ -336,6 +338,7 @@ pub async fn review_diff(
 ///
 /// Streams tokens from the LLM and prints them to stdout in real-time,
 /// then collects the full response for parsing.
+#[allow(clippy::too_many_arguments)]
 pub async fn review_diff_stream(
     llm_config: &LLMConfig,
     diff: &str,
@@ -343,8 +346,9 @@ pub async fn review_diff_stream(
     rules: &[String],
     response_format: &str,
     system_prompt_override: Option<&str>,
+    static_context: Option<&str>,
 ) -> std::result::Result<ReviewResponse, CoraError> {
-    let user_prompt = build_review_prompt(diff, focus, rules);
+    let user_prompt = build_review_prompt(diff, focus, rules, static_context);
 
     let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
 
@@ -585,7 +589,12 @@ pub(crate) fn extract_file_paths_from_diff(diff: &str) -> Vec<String> {
 
 /// Build the user prompt for diff review.
 #[allow(clippy::format_push_string)]
-fn build_review_prompt(diff: &str, focus: &[String], rules: &[String]) -> String {
+fn build_review_prompt(
+    diff: &str,
+    focus: &[String],
+    rules: &[String],
+    static_context: Option<&str>,
+) -> String {
     let mut prompt = String::new();
 
     // Inject valid file paths to reduce hallucination
@@ -596,6 +605,16 @@ fn build_review_prompt(diff: &str, focus: &[String], rules: &[String]) -> String
             prompt.push_str(&format!("- \"{path}\"\n"));
         }
         prompt.push('\n');
+    }
+
+    // Inject static analysis context (clippy output, etc.)
+    if let Some(ctx) = static_context {
+        if !ctx.is_empty() {
+            prompt.push_str("Static analysis context (pre-verified by compiler/linter):\n");
+            prompt.push_str("---\n");
+            prompt.push_str(ctx);
+            prompt.push_str("\n---\n\n");
+        }
     }
 
     if !focus.is_empty() {
@@ -1066,34 +1085,34 @@ mod tests {
 
     #[test]
     fn build_prompt_basic() {
-        let prompt = build_review_prompt("diff content", &[], &[]);
+        let prompt = build_review_prompt("diff content", &[], &[], None);
         assert!(prompt.contains("diff content"));
         assert!(prompt.contains("```diff"));
     }
 
     #[test]
     fn build_prompt_with_focus() {
-        let prompt = build_review_prompt("d", &["security".to_string()], &[]);
+        let prompt = build_review_prompt("d", &["security".to_string()], &[], None);
         assert!(prompt.contains("Focus areas: security"));
     }
 
     #[test]
     fn build_prompt_with_rules() {
-        let prompt = build_review_prompt("d", &[], &["no unwrap".to_string()]);
+        let prompt = build_review_prompt("d", &[], &["no unwrap".to_string()], None);
         assert!(prompt.contains("no unwrap"));
     }
 
     #[test]
     fn build_prompt_contains_file_paths() {
         let diff = "diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1 +1 @@\n- old\n+ new";
-        let prompt = build_review_prompt(diff, &[], &[]);
+        let prompt = build_review_prompt(diff, &[], &[], None);
         assert!(prompt.contains("Valid files in this diff:"));
         assert!(prompt.contains("src/main.rs"));
     }
 
     #[test]
     fn build_prompt_no_file_paths_for_empty_diff() {
-        let prompt = build_review_prompt("no diff headers here", &[], &[]);
+        let prompt = build_review_prompt("no diff headers here", &[], &[], None);
         assert!(!prompt.contains("Valid files in this diff:"));
     }
 
