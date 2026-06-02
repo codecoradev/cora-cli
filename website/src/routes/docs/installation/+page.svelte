@@ -60,7 +60,7 @@
 
 <div class="docs-section scroll-reveal">
 	<h2>Download Binary</h2>
-	<p>Pre-built binaries are available from the <a href="https://github.com/ajianaz/cora-cli/releases" target="_blank" rel="noopener">GitHub Releases</a> page.</p>
+	<p>Pre-built binaries are available from the <a href="https://github.com/codecoradev/cora-cli/releases" target="_blank" rel="noopener">GitHub Releases</a> page.</p>
 
 	<div class="text-sm text-[var(--muted-foreground)] mb-4">
 		<p>Supported platforms:</p>
@@ -80,7 +80,7 @@
 		</div>
 		<div class="terminal-body">
 			<div><span class="syntax-comment"># Download and extract</span></div>
-			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">curl</span> -sL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-linux-x86_64.tar.gz | <span class="syntax-highlight">tar</span> xz</div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">curl</span> -sL https://github.com/codecoradev/cora-cli/releases/latest/download/cora-linux-x86_64.tar.gz | <span class="syntax-highlight">tar</span> xz</div>
 			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">mv</span> cora ~/.local/bin/cora</div>
 		</div>
 	</div>
@@ -97,7 +97,7 @@
 			<span class="terminal-dot-green"></span>
 		</div>
 		<div class="terminal-body">
-			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">git clone</span> <span class="syntax-string">https://github.com/ajianaz/cora-cli.git</span></div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">git clone</span> <span class="syntax-string">https://github.com/codecoradev/cora-cli.git</span></div>
 			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cd</span> cora-cli</div>
 			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cargo build</span> <span class="syntax-flag">--release</span></div>
 			<div><span class="syntax-comment"># Binary at target/release/cora</span></div>

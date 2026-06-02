@@ -9,7 +9,7 @@
 		categories: { type: string; items: string[] }[];
 	}
 
-	const REPO = 'https://github.com/ajianaz/cora-cli';
+	const REPO = 'https://github.com/codecoradev/cora-cli';
 
 	function parseChangelog(md: string): ChangelogSection[] {
 		const sections: ChangelogSection[] = [];

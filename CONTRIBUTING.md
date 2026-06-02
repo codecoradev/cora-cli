@@ -29,7 +29,7 @@ Be respectful, constructive, and inclusive. We follow the [Rust Code of Conduct]
 
 ```bash
 # Clone the repository
-git clone https://github.com/ajianaz/cora-cli.git
+git clone https://github.com/codecoradev/cora-cli.git
 cd cora-cli
 
 # Build in debug mode
@@ -137,7 +137,7 @@ mod tests {
 
 ## Reporting Bugs
 
-Please open a [GitHub Issue](https://github.com/ajianaz/cora-cli/issues/new) with:
+Please open a [GitHub Issue](https://github.com/codecoradev/cora-cli/issues/new) with:
 
 - **Description** — What happened vs. what you expected
 - **Steps to reproduce** — Minimal reproduction steps

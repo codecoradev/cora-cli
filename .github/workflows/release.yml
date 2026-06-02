@@ -163,7 +163,7 @@ jobs:
             printf '# Install via cargo\n'
             printf 'cargo install cora\n\n'
             printf '# Or download binary (extracts as '\''cora'\'')\n'
-            printf 'curl -fsSL https://github.com/ajianaz/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-%s.tar.gz | tar xz\n' "${{ steps.version.outputs.TAG }}"
+            printf 'curl -fsSL https://github.com/codecoradev/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-%s.tar.gz | tar xz\n' "${{ steps.version.outputs.TAG }}"
             printf 'chmod +x cora\n'
             printf 'sudo mv cora /usr/local/bin/\n\n'
             printf '# Init project\n'
@@ -171,7 +171,7 @@ jobs:
             printf '# Review staged changes\n'
             printf 'CORA_API_KEY=your-key cora review --staged\n'
             printf '```\n\n'
-            printf '**Full changelog:** https://github.com/ajianaz/cora-cli/blob/develop/CHANGELOG.md\n'
+            printf '**Full changelog:** https://github.com/codecoradev/cora-cli/blob/develop/CHANGELOG.md\n'
           } > release-notes.md
 
       - name: Create GitHub Release
