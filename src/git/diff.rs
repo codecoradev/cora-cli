@@ -22,9 +22,7 @@ fn validate_ref(ref_str: &str) -> Result<()> {
         // Since git refs shouldn't contain path components with "..", we reject refs
         // that start with ".." or contain "/.." or ".." at the end.
         if ref_str.starts_with("..") || ref_str.contains("/..") || ref_str.ends_with("..") {
-            anyhow::bail!(
-                "invalid ref '{ref_str}': contains path traversal sequence '..'"
-            );
+            anyhow::bail!("invalid ref '{ref_str}': contains path traversal sequence '..'");
         }
     }
 
@@ -33,9 +31,7 @@ fn validate_ref(ref_str: &str) -> Result<()> {
             .chars()
             .filter(|c| DANGEROUS_REF_CHARS.contains(c))
             .collect();
-        anyhow::bail!(
-            "invalid ref '{ref_str}': contains unsafe characters: '{found}'"
-        );
+        anyhow::bail!("invalid ref '{ref_str}': contains unsafe characters: '{found}'");
     }
 
     Ok(())

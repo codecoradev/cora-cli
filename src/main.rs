@@ -585,6 +585,9 @@ fn resolve_format(
     cli_format: Option<&str>,
     config: &crate::config::schema::Config,
 ) -> Result<OutputFormat> {
-    let fmt_str = cli_format.map_or_else(|| config.output.format.clone(), std::string::ToString::to_string);
+    let fmt_str = cli_format.map_or_else(
+        || config.output.format.clone(),
+        std::string::ToString::to_string,
+    );
     OutputFormat::from_str_loose(&fmt_str)
 }

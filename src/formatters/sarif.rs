@@ -30,7 +30,8 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
     let mut rule_map = serde_json::Map::new();
     for issue in issues {
         let rule_id = issue
-            .issue_type.clone()
+            .issue_type
+            .clone()
             .unwrap_or_else(|| "unknown".to_string());
         if !rule_map.contains_key(&rule_id) {
             rule_map.insert(

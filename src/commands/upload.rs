@@ -69,9 +69,7 @@ pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
     );
 
     // Build the upload request
-    let url = format!(
-        "https://api.github.com/repos/{owner}/{repo}/code-scanning/sarifs"
-    );
+    let url = format!("https://api.github.com/repos/{owner}/{repo}/code-scanning/sarifs");
 
     let client = reqwest::Client::new();
     let response = client
@@ -142,8 +140,9 @@ pub async fn execute_upload(opts: &UploadOptions) -> Result<i32> {
 
 /// Read SARIF content from a file or stdin.
 fn read_sarif(file: Option<&str>) -> Result<String> {
-    if let Some(path) = file { std::fs::read_to_string(path)
-    .with_context(|| format!("Failed to read SARIF file: {path}")) } else {
+    if let Some(path) = file {
+        std::fs::read_to_string(path).with_context(|| format!("Failed to read SARIF file: {path}"))
+    } else {
         eprintln!(
             "{} Reading SARIF from stdin (Ctrl+D to finish)...",
             "ℹ".blue()
@@ -161,9 +160,7 @@ fn resolve_repo(cli_repo: Option<&str>) -> Result<(String, String)> {
     if let Some(repo) = cli_repo {
         let parts: Vec<&str> = repo.split('/').collect();
         if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
-            bail!(
-                "Invalid repository format '{repo}'. Expected 'owner/repo'."
-            );
+            bail!("Invalid repository format '{repo}'. Expected 'owner/repo'.");
         }
         return Ok((parts[0].to_string(), parts[1].to_string()));
     }
@@ -194,7 +191,9 @@ fn resolve_ref(cli_ref: Option<&str>) -> Result<String> {
     }
 
     // Try to get from git
-    if let Ok(branch) = crate::git::get_current_branch() { Ok(branch) } else {
+    if let Ok(branch) = crate::git::get_current_branch() {
+        Ok(branch)
+    } else {
         // Try to get the current HEAD commit SHA as fallback
         let output = std::process::Command::new("git")
             .args(["rev-parse", "HEAD"])

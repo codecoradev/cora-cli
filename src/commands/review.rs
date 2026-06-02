@@ -119,7 +119,8 @@ pub async fn execute_review(
                 let duration_ms = llm_start.elapsed().as_millis() as u64;
                 let tokens = resp
                     .tokens_used
-                    .as_ref().map_or_else(TokenInfo::zero, TokenInfo::from_usage);
+                    .as_ref()
+                    .map_or_else(TokenInfo::zero, TokenInfo::from_usage);
                 progress.llm_response(&tokens, duration_ms);
             }
             resp
@@ -162,7 +163,8 @@ pub async fn execute_review(
     if progress.is_enabled() {
         let tokens = response
             .tokens_used
-            .as_ref().map_or_else(TokenInfo::zero, TokenInfo::from_usage);
+            .as_ref()
+            .map_or_else(TokenInfo::zero, TokenInfo::from_usage);
         progress.complete(
             filtered_response.issues.len(),
             exit_code == EXIT_BLOCKED,

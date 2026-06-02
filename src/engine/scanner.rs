@@ -42,8 +42,10 @@ pub fn walk_project(
     );
 
     // Build extension set
-    let mut extensions: BTreeSet<String> =
-        DEFAULT_EXTENSIONS.iter().map(std::string::ToString::to_string).collect();
+    let mut extensions: BTreeSet<String> = DEFAULT_EXTENSIONS
+        .iter()
+        .map(std::string::ToString::to_string)
+        .collect();
     for ext in extra_extensions {
         extensions.insert(ext.trim_start_matches('.').to_lowercase());
     }

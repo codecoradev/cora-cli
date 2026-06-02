@@ -9,7 +9,9 @@ use crate::engine::types::{LLMConfig, ReviewIssue, ReviewResponse};
 /// Returns the file content, or None if the file doesn't exist, can't be read,
 /// or is outside the project root (path traversal guard).
 fn load_system_prompt_file(path: &str) -> Option<String> {
-    let canonical = if let Ok(p) = std::fs::canonicalize(path) { p } else {
+    let canonical = if let Ok(p) = std::fs::canonicalize(path) {
+        p
+    } else {
         tracing::debug!(path = path, "system_prompt_file does not exist");
         return None;
     };
@@ -190,10 +192,7 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
     issues.retain(|issue| {
         !ignore_rules.iter().any(|pattern| {
             let pattern_lower = pattern.to_lowercase();
-            let issue_type_lower = issue
-                .issue_type.clone()
-                .unwrap_or_default()
-                .to_lowercase();
+            let issue_type_lower = issue.issue_type.clone().unwrap_or_default().to_lowercase();
             issue_type_lower.contains(&pattern_lower)
                 || issue.title.to_lowercase().contains(&pattern_lower)
         })
