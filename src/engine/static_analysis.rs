@@ -2,6 +2,7 @@
 ///
 /// Used to inject compiler/linter context into the review prompt,
 /// reducing false positives on verified-intentional changes.
+use std::time::Duration;
 use tracing::debug;
 
 use crate::config::schema::StaticAnalysisConfig;
@@ -28,9 +29,25 @@ pub fn collect_static_context(diff: &str, config: &StaticAnalysisConfig) -> Opti
     None
 }
 
-/// Read clippy output from a pre-computed file.
+/// Read clippy output from a pre-computed file with path traversal guard.
 fn read_clippy_file(path: &str) -> Option<String> {
-    let content = std::fs::read_to_string(path).ok()?;
+    let Ok(canonical) = std::fs::canonicalize(path) else {
+        debug!(path = path, "clippy output file does not exist");
+        return None;
+    };
+
+    let project_root = std::env::current_dir().ok()?;
+    let project_root = std::fs::canonicalize(&project_root).ok()?;
+
+    if !canonical.starts_with(&project_root) {
+        debug!(
+            path = path,
+            "clippy output file is outside project root, ignoring (path traversal guard)"
+        );
+        return None;
+    }
+
+    let content = std::fs::read_to_string(&canonical).ok()?;
     let trimmed = content.trim();
 
     if trimmed.is_empty() {
@@ -42,6 +59,8 @@ fn read_clippy_file(path: &str) -> Option<String> {
 }
 
 /// Run `cargo clippy` and filter output to lines mentioning files in the diff.
+/// Uses `block_in_place` to avoid starving the async runtime.
+/// Has a 30-second timeout on clippy execution.
 fn run_clippy_for_diff(diff: &str) -> Option<String> {
     let changed_files = extract_changed_rust_files(diff);
     if changed_files.is_empty() {
@@ -54,36 +73,57 @@ fn run_clippy_for_diff(diff: &str) -> Option<String> {
         "running clippy for changed Rust files"
     );
 
-    // Run cargo clippy with short output format, timeout 30 seconds
-    let child = match std::process::Command::new("cargo")
-        .args([
-            "clippy",
-            "--message-format=short",
-            "--",
-            "-W",
-            "clippy::all",
-        ])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            debug!("clippy spawn failed: {}", e);
-            return None;
-        }
-    };
+    let result = tokio::task::block_in_place(|| {
+        let child = std::process::Command::new("cargo")
+            .args([
+                "clippy",
+                "--message-format=short",
+                "--",
+                "-W",
+                "clippy::all",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn();
 
-    let output = match child.wait_with_output() {
-        Ok(o) => o,
-        Err(e) => {
-            debug!("clippy wait failed: {}", e);
-            return None;
-        }
-    };
+        let mut child = match child {
+            Ok(c) => c,
+            Err(e) => {
+                debug!("clippy spawn failed: {}", e);
+                return None;
+            }
+        };
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+        // Wait with 30-second timeout via thread
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = child.wait();
+            let mut stdout_buf = String::new();
+            let mut stderr_buf = String::new();
+            use std::io::Read;
+            if let Some(mut out) = child.stdout {
+                let _ = Read::read_to_string(&mut out, &mut stdout_buf);
+            }
+            if let Some(mut err) = child.stderr {
+                let _ = Read::read_to_string(&mut err, &mut stderr_buf);
+            }
+            let _ = tx.send((stdout_buf, stderr_buf));
+        });
+
+        match rx.recv_timeout(Duration::from_secs(30)) {
+            Ok((stdout, stderr)) => Some((stdout, stderr)),
+            Err(_) => {
+                debug!("clippy timed out after 30 seconds");
+                None
+            }
+        }
+    });
+
+#[allow(clippy::question_mark)]
+    let (stdout, stderr) = match result {
+        Some(r) => r,
+        None => return None,
+    };
 
     // Combine stdout + stderr, clippy sometimes outputs to stderr
     let combined = format!("{}\n{}", stdout, stderr);
@@ -117,15 +157,19 @@ fn run_clippy_for_diff(diff: &str) -> Option<String> {
 
     let result = relevant_lines.join("\n");
 
-    // Truncate if too long
+    // Truncate at char boundary (safe for UTF-8)
     if result.len() > MAX_CLIPPY_OUTPUT_CHARS {
-        let truncated = &result[..MAX_CLIPPY_OUTPUT_CHARS];
+        let mut end = MAX_CLIPPY_OUTPUT_CHARS;
+        // floor_char_boundary is available on Rust 1.85+
+        while !result.is_char_boundary(end) {
+            end -= 1;
+        }
         debug!(
             original_len = result.len(),
-            truncated_len = truncated.len(),
+            truncated_len = end,
             "clippy output truncated"
         );
-        Some(format!("{}\n... (truncated)", truncated))
+        Some(format!("{}\n... (truncated)", &result[..end]))
     } else {
         Some(result)
     }
@@ -161,15 +205,7 @@ mod tests {
 
     #[test]
     fn extract_rust_files_from_diff() {
-        let diff = "\
---- a/src/main.rs
-+++ b/src/main.rs
-@@ -1,1 +1,2 @@
- use anyhow::Result;
---- a/src/engine/llm.rs
-+++ b/src/engine/llm.rs
-@@ -10,1 +10,2 @@
- pub async fn review_diff()";
+        let diff = "--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,1 +1,2 @@\n use anyhow::Result;\n--- a/src/engine/llm.rs\n+++ b/src/engine/llm.rs\n@@ -10,1 +10,2 @@\n pub async fn review_diff()";
 
         let files = extract_changed_rust_files(diff);
         assert_eq!(
@@ -180,11 +216,7 @@ mod tests {
 
     #[test]
     fn extract_skips_non_rust() {
-        let diff = "\
---- a/src/main.rs
-+++ b/src/main.rs
---- a/package.json
-+++ b/package.json";
+        let diff = "--- a/src/main.rs\n+++ b/src/main.rs\n--- a/package.json\n+++ b/package.json";
 
         let files = extract_changed_rust_files(diff);
         assert_eq!(files, vec!["src/main.rs".to_string()]);
