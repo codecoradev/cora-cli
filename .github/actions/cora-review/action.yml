@@ -1,5 +1,5 @@
 name: 'Cora AI Code Review'
-description: 'Run cora AI code review on a PR diff. Uses org secrets (CORA_API_KEY, CORA_BASE_URL, CORA_MODEL). Posts PR comment with findings.'
+description: 'Run cora AI code review on a PR diff. Posts PR comment with findings.'
 
 inputs:
   base-branch:
@@ -18,6 +18,15 @@ inputs:
     description: 'Upload SARIF to GitHub Code Scanning (default: false)'
     required: false
     default: 'false'
+  cora-api-key:
+    description: 'LLM API key'
+    required: true
+  cora-base-url:
+    description: 'LLM API base URL'
+    required: false
+  cora-model:
+    description: 'LLM model ID'
+    required: false
   github-token:
     description: 'GitHub token for PR comments and SARIF upload'
     required: true
@@ -94,9 +103,9 @@ runs:
       id: review
       shell: bash
       env:
-        CORA_API_KEY: ${{ secrets.CORA_API_KEY }}
-        CORA_BASE_URL: ${{ secrets.CORA_BASE_URL }}
-        CORA_MODEL: ${{ secrets.CORA_MODEL }}
+        CORA_API_KEY: ${{ inputs.cora-api-key }}
+        CORA_BASE_URL: ${{ inputs.cora-base-url }}
+        CORA_MODEL: ${{ inputs.cora-model }}
         INPUT_BASE: ${{ inputs.base-branch }}
         INPUT_SEVERITY: ${{ inputs.severity }}
       run: |
