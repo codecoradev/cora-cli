@@ -23,9 +23,7 @@ static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         match std::fs::read(&ca_path) {
             Ok(ca_data) => match reqwest::Certificate::from_pem(&ca_data) {
                 Ok(cert) => {
-                    builder = builder
-                        .tls_built_in_root_certs(false)
-                        .add_root_certificate(cert);
+                    builder = builder.add_root_certificate(cert);
                     tracing::debug!("loaded custom CA bundle from REQUESTS_CA_BUNDLE");
                 }
                 Err(e) => {
