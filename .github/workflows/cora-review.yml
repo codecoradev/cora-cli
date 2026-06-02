@@ -31,4 +31,3 @@ jobs:
         uses: ./.github/actions/cora-review
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          infisical-identity-id: ${{ secrets.INFISICAL_IDENTITY_ID }}

@@ -94,17 +94,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Fetch CARGO_REGISTRY_TOKEN from Infisical
-        uses: Infisical/secrets-action@v1.0.9
-        with:
-          method: "oidc"
-          identity-id: "${{ secrets.INFISICAL_IDENTITY_ID }}"
-          project-slug: "github-actions"
-          env-slug: "prod"
-          domain: "https://infisical.ajianaz.dev"
-
       - name: Publish to crates.io
-        run: cargo publish --token ${{ env.CARGO_REGISTRY_TOKEN }} --allow-dirty
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --allow-dirty
 
   release:
     name: Create GitHub Release
