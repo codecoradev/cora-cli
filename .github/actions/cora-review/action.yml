@@ -53,7 +53,7 @@ runs:
           done
           if [ -z "$VERSION" ]; then
             echo "::warning::Failed to resolve latest cora-cli version from GitHub API, using fallback"
-            VERSION="v0.1.7"
+            VERSION="v0.2.0"
           fi
         else
           VERSION="$INPUT_VERSION"
@@ -116,10 +116,16 @@ runs:
           --format sarif \
           --severity "$INPUT_SEVERITY" \
           --quiet \
-          > cora-results.sarif 2>cora-stderr.log || true
-        echo "Cora review complete ($(wc -c < cora-results.sarif) bytes)"
+          > cora-results.sarif 2>cora-stderr.log; EXIT_CODE=$?
+        SARIF_BYTES=$(wc -c < cora-results.sarif)
+        echo "Cora review complete ($SARIF_BYTES bytes, exit=$EXIT_CODE)"
         if [ -s cora-stderr.log ]; then
           echo "::warning::Cora stderr: $(cat cora-stderr.log)"
+        fi
+        # Fail if cora exited non-zero AND produced empty result (LLM API failure)
+        if [ "$EXIT_CODE" -ne 0 ] && [ "$SARIF_BYTES" -lt 10 ]; then
+          echo "::error::Cora review failed (exit=$EXIT_CODE, $SARIF_BYTES bytes). LLM API may be unavailable."
+          exit 1
         fi
 
     - name: Upload SARIF to GitHub Code Scanning

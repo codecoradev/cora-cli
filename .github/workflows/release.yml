@@ -7,6 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-release:
@@ -78,7 +79,7 @@ jobs:
           7z a ${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}.${{ matrix.ext }} ${{ matrix.artifact }}.exe
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}
           path: release/${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}.${{ matrix.ext }}
