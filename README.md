@@ -46,10 +46,10 @@ Download the latest release from [GitHub Releases](https://github.com/ajianaz/co
 
 ```bash
 # Determine your platform tag from the releases page, e.g.:
-#   cora-aarch64-unknown-linux-gnu-v0.1.8.tar.gz
-#   cora-x86_64-unknown-linux-gnu-v0.1.8.tar.gz
-#   cora-aarch64-apple-darwin-v0.1.8.tar.gz
-#   cora-x86_64-pc-windows-msvc-v0.1.8.zip
+#   cora-aarch64-unknown-linux-gnu-v0.2.0.tar.gz
+#   cora-x86_64-unknown-linux-gnu-v0.2.0.tar.gz
+#   cora-aarch64-apple-darwin-v0.2.0.tar.gz
+#   cora-x86_64-pc-windows-msvc-v0.2.0.zip
 
 # Example: Linux aarch64
 VERSION=$(curl -s https://api.github.com/repos/ajianaz/cora-cli/releases/latest | grep tag_name | cut -d'"' -f4)
