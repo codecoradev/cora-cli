@@ -30,6 +30,7 @@ const DEFAULT_EXTENSIONS: &[&str] = &[
 /// Uses `include` and `exclude` glob patterns to filter results.
 /// The `ignore` crate handles .gitignore (including nested), .git/info/exclude,
 /// and hidden-file filtering automatically.
+#[allow(clippy::unnecessary_wraps, clippy::format_push_string)]
 pub fn walk_project(
     root: &Path,
     include_patterns: &[String],
@@ -184,6 +185,7 @@ pub fn batch_files(files: &[FileEntry], max_chars: usize, max_files: usize) -> V
 }
 
 /// Format a batch of files for the LLM prompt.
+#[allow(clippy::format_push_string)]
 pub fn format_batch_for_prompt(files: &[FileEntry]) -> String {
     let mut output = String::new();
 

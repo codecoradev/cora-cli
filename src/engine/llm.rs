@@ -82,6 +82,7 @@ struct ChatChoice {
 /// (deserialization) even though only `total_tokens` is currently accessed.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
+#[allow(clippy::struct_field_names)]
 struct Usage {
     prompt_tokens: u32,
     completion_tokens: u32,
@@ -366,6 +367,7 @@ pub async fn review_diff_stream(
 ///
 /// Sends `"stream": true` in the request body, reads SSE chunks, prints
 /// delta content to stdout in real-time, and returns the full accumulated text.
+#[allow(clippy::too_many_lines)]
 async fn chat_completion_stream(
     config: &LLMConfig,
     system_prompt: &str,
@@ -494,6 +496,7 @@ async fn chat_completion_stream(
 }
 
 /// Scan a batch of file contents using the LLM. Returns issues found.
+#[allow(clippy::format_push_string)]
 pub async fn scan_files(
     llm_config: &LLMConfig,
     files_content: &str,
@@ -578,6 +581,7 @@ pub(crate) fn extract_file_paths_from_diff(diff: &str) -> Vec<String> {
 }
 
 /// Build the user prompt for diff review.
+#[allow(clippy::format_push_string)]
 fn build_review_prompt(diff: &str, focus: &[String], rules: &[String]) -> String {
     let mut prompt = String::new();
 
@@ -611,7 +615,7 @@ fn build_review_prompt(diff: &str, focus: &[String], rules: &[String]) -> String
 }
 
 /// Parse the LLM response into review issues.
-/// Handles: raw JSON array, JSON wrapped in ```json fences, array|||summary format.
+/// Handles: raw JSON array, JSON wrapped in markdown fences, array and summary format.
 pub(crate) fn parse_review_response(
     raw: &str,
 ) -> Result<(Vec<ReviewIssue>, String, Option<TokenUsage>)> {

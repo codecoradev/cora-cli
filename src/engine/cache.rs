@@ -14,6 +14,7 @@ fn cache_dir() -> Result<PathBuf> {
 
 /// Compute SHA-256 hex digest of the diff content + config parameters.
 /// Includes model and temperature so config changes invalidate the cache.
+#[allow(clippy::format_collect)]
 fn cache_key(diff: &str, model: &str, temperature: f32) -> String {
     let mut hasher = Sha256::new();
     hasher.update(diff.as_bytes());

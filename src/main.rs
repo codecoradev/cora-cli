@@ -256,6 +256,7 @@ enum ConfigAction {
     },
 }
 
+#[allow(clippy::too_many_lines)]
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -398,7 +399,7 @@ async fn main() -> Result<()> {
             }
         },
         Command::Providers => {
-            providers::execute_providers()?;
+            providers::execute_providers();
             0
         }
         Command::Completion { shell } => {
@@ -411,6 +412,7 @@ async fn main() -> Result<()> {
 }
 
 /// Struct to hold review options from CLI.
+#[allow(clippy::struct_excessive_bools)]
 struct ReviewOpts {
     staged: bool,
     unpushed: bool,
@@ -517,6 +519,7 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
 }
 
 /// Upload a SARIF string to GitHub Code Scanning.
+#[allow(clippy::ref_option)]
 async fn upload_sarif_content(
     sarif_content: &str,
     repo: &Option<String>,

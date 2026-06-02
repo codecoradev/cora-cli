@@ -219,38 +219,39 @@ impl CoraFile {
     }
 
     /// Merge this file config into a `Config`, overwriting only fields that are present.
+    #[allow(clippy::assigning_clones)]
     pub fn merge_into(&self, config: &mut Config) {
         if let Some(p) = &self.provider {
             if let Some(v) = &p.provider {
-                config.provider.provider = v.clone();
+                config.provider.provider.clone_from(v);
             }
             if let Some(v) = &p.model {
-                config.provider.model = v.clone();
+                config.provider.model.clone_from(v);
             }
             if let Some(v) = &p.base_url {
-                config.provider.base_url = v.clone();
+                config.provider.base_url.clone_from(v);
             }
         }
         if let Some(v) = &self.focus {
-            config.focus = v.clone();
+            config.focus.clone_from(v);
         }
         if let Some(v) = &self.rules {
-            config.rules = v.clone();
+            config.rules.clone_from(v);
         }
         if let Some(ig) = &self.ignore {
             if let Some(v) = &ig.files {
-                config.ignore.files = v.clone();
+                config.ignore.files.clone_from(v);
             }
             if let Some(v) = &ig.rules {
-                config.ignore.rules = v.clone();
+                config.ignore.rules.clone_from(v);
             }
         }
         if let Some(h) = &self.hook {
             if let Some(v) = &h.mode {
-                config.hook.mode = v.clone();
+                config.hook.mode.clone_from(v);
             }
             if let Some(v) = &h.min_severity {
-                config.hook.min_severity = v.clone();
+                config.hook.min_severity.clone_from(v);
             }
             if let Some(v) = h.max_diff_size {
                 config.hook.max_diff_size = v;
@@ -258,7 +259,7 @@ impl CoraFile {
         }
         if let Some(o) = &self.output {
             if let Some(v) = &o.format {
-                config.output.format = v.clone();
+                config.output.format.clone_from(v);
             }
             if let Some(v) = o.color {
                 config.output.color = v;
@@ -266,7 +267,7 @@ impl CoraFile {
         }
         if let Some(r) = &self.review {
             if let Some(v) = &r.response_format {
-                config.response_format = v.clone();
+                config.response_format.clone_from(v);
             }
             if let Some(v) = &r.system_prompt {
                 config.review_system_prompt_override = Some(v.clone());
@@ -301,6 +302,7 @@ impl CoraFile {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
