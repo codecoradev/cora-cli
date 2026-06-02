@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{Context, Result};
+use crate::error::CoraError;
 use git2::Repository;
 
 /// Characters that should not appear in git refs passed to our diff commands.
@@ -13,7 +13,7 @@ const DANGEROUS_REF_CHARS: &[char] = &[
 /// Validate a git ref string for safety before passing it to git commands.
 ///
 /// Rejects refs containing shell metacharacters or path traversal sequences (..).
-fn validate_ref(ref_str: &str) -> Result<()> {
+fn validate_ref(ref_str: &str) -> std::result::Result<(), CoraError> {
     if ref_str.contains("..") {
         // ".." is only allowed in the middle of range expressions like "HEAD..HEAD" or "main...HEAD"
         // But we need to be careful about path traversal. Allow it only for git range syntax.
@@ -22,7 +22,9 @@ fn validate_ref(ref_str: &str) -> Result<()> {
         // Since git refs shouldn't contain path components with "..", we reject refs
         // that start with ".." or contain "/.." or ".." at the end.
         if ref_str.starts_with("..") || ref_str.contains("/..") || ref_str.ends_with("..") {
-            anyhow::bail!("invalid ref '{ref_str}': contains path traversal sequence '..'");
+            return Err(CoraError::InvalidRef(format!(
+                "invalid ref '{ref_str}': contains path traversal sequence '..'"
+            )));
         }
     }
 
@@ -31,51 +33,62 @@ fn validate_ref(ref_str: &str) -> Result<()> {
             .chars()
             .filter(|c| DANGEROUS_REF_CHARS.contains(c))
             .collect();
-        anyhow::bail!("invalid ref '{ref_str}': contains unsafe characters: '{found}'");
+        return Err(CoraError::InvalidRef(format!(
+            "invalid ref '{ref_str}': contains unsafe characters: '{found}'"
+        )));
     }
 
     Ok(())
 }
 
 /// Open the git repository at or above the current working directory.
-pub fn open_repo() -> Result<Repository> {
-    Repository::discover(std::env::current_dir()?).context("not inside a git repository")
+pub fn open_repo() -> std::result::Result<Repository, CoraError> {
+    Repository::discover(std::env::current_dir()?).map_err(|_| CoraError::NotInGitRepo)
 }
 
 /// Run a git command and return its stdout as a string.
-fn git_cmd(args: &[&str]) -> Result<String> {
+fn git_cmd(args: &[&str]) -> std::result::Result<String, CoraError> {
     let output = Command::new("git")
         .args(args)
         .output()
-        .context("failed to execute git command")?;
+        .map_err(|e| CoraError::GitCommand {
+            command: args.join(" "),
+            stderr: e.to_string(),
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("git command failed: {stderr}");
+        return Err(CoraError::GitCommand {
+            command: args.join(" "),
+            stderr: stderr.to_string(),
+        });
     }
 
-    String::from_utf8(output.stdout).context("git output is not valid UTF-8")
+    String::from_utf8(output.stdout).map_err(|e| CoraError::GitCommand {
+        command: args.join(" "),
+        stderr: e.to_string(),
+    })
 }
 
 /// Get the diff of currently staged changes (git diff --cached).
-pub fn get_staged_diff() -> Result<String> {
+pub fn get_staged_diff() -> std::result::Result<String, CoraError> {
     git_cmd(&["diff", "--cached"])
 }
 
 /// Get the diff of unstaged changes (working tree vs index).
-pub fn get_unstaged_diff() -> Result<String> {
+pub fn get_unstaged_diff() -> std::result::Result<String, CoraError> {
     git_cmd(&["diff"])
 }
 
 /// Get the diff between the current branch and `base_branch`.
-pub fn get_branch_diff(base_branch: &str) -> Result<String> {
+pub fn get_branch_diff(base_branch: &str) -> std::result::Result<String, CoraError> {
     validate_ref(base_branch)?;
     let arg = format!("{base_branch}...HEAD");
     git_cmd(&["diff", &arg])
 }
 
 /// Get the diff of unpushed commits (HEAD vs @{u}).
-pub fn get_unpushed_diff() -> Result<String> {
+pub fn get_unpushed_diff() -> std::result::Result<String, CoraError> {
     git_cmd(&["log", "-p", "@{u}..HEAD"])
 }
 
@@ -84,7 +97,7 @@ pub fn get_unpushed_diff() -> Result<String> {
 /// - If the ref contains `..` (e.g. `HEAD~3..HEAD`), uses `git diff <ref>`.
 /// - Otherwise (e.g. `HEAD`, `abc123`), uses `git show <ref> --format=""` to
 ///   get just the diff without commit metadata.
-pub fn get_commit_diff(ref_str: &str) -> Result<String> {
+pub fn get_commit_diff(ref_str: &str) -> std::result::Result<String, CoraError> {
     validate_ref(ref_str)?;
     if ref_str.contains("..") {
         git_cmd(&["diff", ref_str])
@@ -94,22 +107,31 @@ pub fn get_commit_diff(ref_str: &str) -> Result<String> {
 }
 
 /// Get the current branch name.
-pub fn get_current_branch() -> Result<String> {
+pub fn get_current_branch() -> std::result::Result<String, CoraError> {
     let output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
-        .context("failed to execute git rev-parse")?;
+        .map_err(|e| CoraError::GitCommand {
+            command: "git rev-parse --abbrev-ref HEAD".into(),
+            stderr: e.to_string(),
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("git rev-parse failed: {stderr}");
+        return Err(CoraError::GitCommand {
+            command: "git rev-parse --abbrev-ref HEAD".into(),
+            stderr: stderr.to_string(),
+        });
     }
 
-    let name = String::from_utf8(output.stdout).context("branch name is not valid UTF-8")?;
+    let name = String::from_utf8(output.stdout).map_err(|e| CoraError::GitCommand {
+        command: "git rev-parse".into(),
+        stderr: e.to_string(),
+    })?;
     let name = name.trim().to_string();
 
     if name.is_empty() || name == "HEAD" {
-        anyhow::bail!("HEAD is detached -- cannot determine branch name");
+        return Err(CoraError::HeadDetached);
     }
 
     Ok(name)
@@ -117,7 +139,7 @@ pub fn get_current_branch() -> Result<String> {
 
 /// Try to get repository info: (owner, `repo_name`, branch).
 /// Owner is derived from the remote URL if possible.
-pub fn get_repo_info() -> Result<(String, String, String)> {
+pub fn get_repo_info() -> std::result::Result<(String, String, String), CoraError> {
     let repo = open_repo()?;
     let branch = get_current_branch()?;
 

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::CoraError;
 use tracing::{debug, instrument};
 
 use crate::config::schema::Config;
@@ -60,7 +60,7 @@ pub async fn review_diff_with_cache(
     stream: bool,
     use_cache: bool,
     quiet: bool,
-) -> Result<ReviewResponse> {
+) -> std::result::Result<ReviewResponse, CoraError> {
     review_diff_inner(config, llm_config, diff, stream, use_cache, quiet).await
 }
 
@@ -71,7 +71,7 @@ async fn review_diff_inner(
     stream: bool,
     use_cache: bool,
     quiet: bool,
-) -> Result<ReviewResponse> {
+) -> std::result::Result<ReviewResponse, CoraError> {
     debug!(
         diff_len = diff.len(),
         stream = stream,

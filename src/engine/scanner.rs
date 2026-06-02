@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use anyhow::Result;
+use crate::error::CoraError;
 use glob::Pattern;
 use ignore::WalkBuilder;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -36,7 +36,7 @@ pub fn walk_project(
     include_patterns: &[String],
     exclude_patterns: &[String],
     extra_extensions: &[String],
-) -> Result<Vec<FileEntry>> {
+) -> std::result::Result<Vec<FileEntry>, CoraError> {
     debug!(
         root = %root.display(),
         "walking project directory"

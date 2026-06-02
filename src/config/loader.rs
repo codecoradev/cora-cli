@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use crate::error::CoraError;
 use tracing::debug;
 
 use crate::config::providers::{PRESETS, detected_presets};
@@ -24,7 +24,7 @@ const MIGRATION_MARKER: &str = ".migrated";
 
 /// Locate the `.cora.yaml` config by walking parent directories from `start`.
 /// Returns the path and parsed content, or `None` if not found.
-pub fn find_cora_file(start: &Path) -> Result<Option<(PathBuf, CoraFile)>> {
+pub fn find_cora_file(start: &Path) -> std::result::Result<Option<(PathBuf, CoraFile)>, CoraError> {
     let mut dir = if start.is_file() {
         start.parent().unwrap_or(start).to_path_buf()
     } else {
@@ -36,14 +36,13 @@ pub fn find_cora_file(start: &Path) -> Result<Option<(PathBuf, CoraFile)>> {
         if candidate.is_file() {
             debug!(path = %candidate.display(), "found .cora.yaml");
             let content = std::fs::read_to_string(&candidate)
-                .with_context(|| format!("failed to read {}", candidate.display()))?;
+                .map_err(|e| CoraError::ConfigRead(format!("{}: {}", candidate.display(), e)))?;
             let cora = CoraFile::from_str(&content).map_err(|e| {
-                let msg = e.to_string();
-                anyhow::anyhow!(
+                CoraError::ConfigParse(format!(
                     "{}\n  → file: {}\n  → hint: check for syntax errors (indentation, colons, trailing spaces)",
-                    msg,
+                    e,
                     candidate.display()
-                )
+                ))
             })?;
             return Ok(Some((candidate, cora)));
         }
@@ -57,14 +56,14 @@ pub fn find_cora_file(start: &Path) -> Result<Option<(PathBuf, CoraFile)>> {
 
 /// Load the global config from `~/.cora/config.yaml`.
 /// Returns `None` if the file doesn't exist or can't be parsed.
-fn load_global_config() -> Result<Option<CoraFile>> {
+fn load_global_config() -> std::result::Result<Option<CoraFile>, CoraError> {
     let dir = cora_dir()?;
     let path = dir.join(GLOBAL_CONFIG_FILENAME);
     if !path.is_file() {
         return Ok(None);
     }
     let content = std::fs::read_to_string(&path)
-        .with_context(|| format!("failed to read {}", path.display()))?;
+        .map_err(|e| CoraError::ConfigRead(format!("{}: {}", path.display(), e)))?;
     let cora = CoraFile::from_str(&content)?;
     debug!(path = %path.display(), "loaded global config");
     Ok(Some(cora))
@@ -232,7 +231,7 @@ pub fn load_config(
     cli_base_url: Option<&str>,
     cli_format: Option<&str>,
     no_color: bool,
-) -> Result<Config> {
+) -> std::result::Result<Config, CoraError> {
     let mut config = Config::default();
 
     // Run migration silently on first access
@@ -247,15 +246,13 @@ pub fn load_config(
     if let Some(path) = cli_config_path {
         let path = Path::new(path);
         let content = std::fs::read_to_string(path)
-            .with_context(|| format!("failed to read config at {}", path.display()))?;
+            .map_err(|e| CoraError::ConfigRead(format!("{}: {}", path.display(), e)))?;
         let cora = CoraFile::from_str(&content).map_err(|e| {
-            let msg = e.to_string();
-            // Enhance error message with path info and hint about malformed YAML
-            anyhow::anyhow!(
+            CoraError::ConfigParse(format!(
                 "{}\n  → file: {}\n  → hint: check for syntax errors (indentation, colons, trailing spaces)",
-                msg,
+                e,
                 path.display()
-            )
+            ))
         })?;
         cora.merge_into(&mut config);
         debug!(path = %path.display(), "loaded explicit config");
@@ -291,7 +288,10 @@ pub fn load_config(
 ///
 /// If none of those are set, auto-detect from known provider env vars (`OPENAI_API_KEY`, etc.)
 /// and configure `provider/model/base_url` from the matching preset.
-pub fn build_llm_config(config: &Config, cli_api_key: Option<&str>) -> Result<LLMConfig> {
+pub fn build_llm_config(
+    config: &Config,
+    cli_api_key: Option<&str>,
+) -> std::result::Result<LLMConfig, CoraError> {
     // Resolve the API key and optional auto-detected preset in one pass.
     let (api_key, auto_preset) = if let Some(key) = cli_api_key {
         (key.to_string(), None)
@@ -303,16 +303,11 @@ pub fn build_llm_config(config: &Config, cli_api_key: Option<&str>) -> Result<LL
         // No CORA_API_KEY or stored key — auto-detect from provider presets
         let detected = detected_presets();
         if detected.is_empty() {
-            let available: Vec<String> = PRESETS
+            let _available: Vec<String> = PRESETS
                 .iter()
                 .map(|p| format!("  {} (set {})", p.name, p.env_key))
                 .collect();
-            anyhow::bail!(
-                "no API key found.\n\
-                 Set one of the following environment variables, pass --api-key, or run `cora auth login`:\n\
-                 \n  CORA_API_KEY          (generic, used with current config)\n{}",
-                available.join("\n")
-            );
+            return Err(CoraError::NoApiKey);
         }
 
         // Use the first detected provider
@@ -366,13 +361,14 @@ pub fn build_llm_config(config: &Config, cli_api_key: Option<&str>) -> Result<LL
 }
 
 /// Get the cora config directory: ~/.cora/
-pub fn cora_dir() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("cannot determine home directory")?;
+pub fn cora_dir() -> std::result::Result<PathBuf, CoraError> {
+    let home = dirs::home_dir()
+        .ok_or_else(|| CoraError::ConfigRead("cannot determine home directory".into()))?;
     Ok(home.join(".cora"))
 }
 
 /// Read the stored API key from ~/.cora/auth.toml.
-pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
+pub fn load_api_key_from_auth_file() -> std::result::Result<Option<String>, CoraError> {
     let dir = cora_dir()?;
     let path = dir.join(AUTH_FILENAME);
     if !path.is_file() {
@@ -396,12 +392,12 @@ pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
     }
 
     let content = std::fs::read_to_string(&path)
-        .with_context(|| format!("failed to read {}", path.display()))?;
+        .map_err(|e| CoraError::ConfigRead(format!("{}: {}", path.display(), e)))?;
 
     // Simple TOML: expect `[auth]\napi_key = "..."`  or just `api_key = "..."`
     let value: toml::Table = content
         .parse::<toml::Table>()
-        .context("auth config file is not valid TOML")?;
+        .map_err(|e| CoraError::AuthError(format!("invalid TOML: {}", e)))?;
 
     let key = value
         .get("auth")
@@ -419,9 +415,9 @@ pub fn load_api_key_from_auth_file() -> Result<Option<String>> {
 }
 
 /// Save an API key to ~/.cora/auth.toml.
-pub fn save_api_key(key: &str) -> Result<()> {
+pub fn save_api_key(key: &str) -> std::result::Result<(), CoraError> {
     let dir = cora_dir()?;
-    std::fs::create_dir_all(&dir).with_context(|| format!("failed to create {}", dir.display()))?;
+    std::fs::create_dir_all(&dir).map_err(|e| CoraError::AuthError(e.to_string()))?;
 
     let path = dir.join(AUTH_FILENAME);
     let mut table = toml::Table::new();
@@ -429,7 +425,7 @@ pub fn save_api_key(key: &str) -> Result<()> {
     let content = table.to_string();
 
     std::fs::write(&path, content)
-        .with_context(|| format!("failed to write {}", path.display()))?;
+        .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
 
     debug!(path = %path.display(), "saved API key");
 
@@ -445,19 +441,19 @@ pub fn save_api_key(key: &str) -> Result<()> {
 }
 
 /// Remove the stored API key from ~/.cora/auth.toml.
-pub fn remove_api_key() -> Result<()> {
+pub fn remove_api_key() -> std::result::Result<(), CoraError> {
     let dir = cora_dir()?;
     let path = dir.join(AUTH_FILENAME);
     if path.is_file() {
         std::fs::remove_file(&path)
-            .with_context(|| format!("failed to remove {}", path.display()))?;
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
         debug!("removed API key file");
     }
     Ok(())
 }
 
 /// Check the auth status: whether an API key is available.
-pub fn auth_status() -> Result<AuthStatus> {
+pub fn auth_status() -> std::result::Result<AuthStatus, CoraError> {
     if std::env::var("CORA_API_KEY").is_ok() {
         Ok(AuthStatus {
             source: "env var CORA_API_KEY".to_string(),
