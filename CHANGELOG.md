@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-02
+
+### Added
+
+- **`--progress` flag** — NDJSON progress events to stderr for structured CI/GUI consumers (Termul prerequisite) (#108)
+- **`--max-diff-size` flag** — override `hook.max_diff_size` for large diffs from CLI (#112)
+- **Output footer watermark** — Cora version stamp in terminal, SARIF, and JSON output when issues found (#106)
+- **Security audit CI** — `cargo audit` via `rustsec/audit-check` for dependency CVE scanning (#85)
+
+### Changed
+
+- **Naive .gitignore parser → `ignore` crate** — ripgrep-grade correctness with nested .gitignore, global gitignore, and `.git/info/exclude` support (#80)
+- **Blanket `#![allow(dead_code)]` removed** — targeted cleanup, 27 warnings → 0 (#79)
+
+### Fixed
+
+- **`REQUESTS_CA_BUNDLE` env var support** — custom CA certificates for corporate proxies, additive to built-in root certs (#74)
+- **`tls_built_in_root_certs(false)` security fix** — custom CA bundle now added alongside system roots instead of replacing them (caught by Cora self-review)
+- **`require_git(false)` on WalkBuilder** — gitignore rules applied even outside git repositories (#112)
+- **CI `actions-rs/audit-check` → `rustsec/audit-check`** — replaced archived GitHub Action (#112)
+- **Cora CI diff limit** — `CORA_CONFIG` env var with temp config for 200K char limit in CI action (#112)
+
 ## [0.1.8] - 2026-06-02
 
 ### Fixed
@@ -182,7 +204,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/ajianaz/cora-cli/compare/v0.1.8...develop
+[Unreleased]: https://github.com/ajianaz/cora-cli/compare/v0.2.0...develop
+[0.2.0]: https://github.com/ajianaz/cora-cli/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/ajianaz/cora-cli/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/ajianaz/cora-cli/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/ajianaz/cora-cli/compare/v0.1.5...v0.1.6
