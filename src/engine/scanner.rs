@@ -74,6 +74,7 @@ pub fn walk_project(
         .git_ignore(true) // respect .gitignore at all levels
         .git_global(true) // respect core.excludesFile
         .git_exclude(true) // respect .git/info/exclude
+        .require_git(false) // apply gitignore rules even outside git repos
         .build();
 
     for result in walker {
