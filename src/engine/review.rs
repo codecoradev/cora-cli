@@ -109,6 +109,10 @@ async fn review_diff_inner(
         config.review_system_prompt_file.as_deref(),
     );
 
+    // Collect static analysis context (clippy output, etc.)
+    let static_context =
+        crate::engine::static_analysis::collect_static_context(diff, &config.static_analysis);
+
     let mut response = if stream {
         llm::review_diff_stream(
             llm_config,
@@ -117,6 +121,7 @@ async fn review_diff_inner(
             &config.rules,
             &config.response_format,
             review_prompt.as_deref(),
+            static_context.as_deref(),
         )
         .await?
     } else {
@@ -128,6 +133,7 @@ async fn review_diff_inner(
             &config.response_format,
             review_prompt.as_deref(),
             quiet,
+            static_context.as_deref(),
         )
         .await?
     };

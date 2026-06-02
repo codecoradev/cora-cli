@@ -36,6 +36,8 @@ pub struct Config {
     pub timeout: u64,
     /// Cache TTL in minutes for review caching.
     pub cache_ttl: u64,
+    /// Static analysis context injection for reviews.
+    pub static_analysis: StaticAnalysisConfig,
 }
 
 /// Provider configuration.
@@ -110,6 +112,7 @@ impl Default for Config {
             max_tokens: 4096,
             timeout: 120,
             cache_ttl: 1440, // 24h in minutes
+            static_analysis: StaticAnalysisConfig::default(),
         }
     }
 }
@@ -189,6 +192,26 @@ pub struct ReviewSection {
     pub system_prompt: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_prompt_file: Option<String>,
+    /// Static analysis context injection (e.g., clippy output).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub static_analysis: Option<StaticAnalysisConfig>,
+}
+
+/// Static analysis configuration — inject linter/compiler output as review context.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StaticAnalysisConfig {
+    /// Automatically run `cargo clippy` and inject output as context.
+    /// Adds ~2-5 seconds to review time.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub auto_clippy: bool,
+    /// Path to a file containing pre-computed static analysis output (e.g., clippy JSON).
+    /// If set, this file's content is injected instead of running auto_clippy.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clippy_output_file: Option<String>,
+}
+
+fn is_default<T: Default + PartialEq>(val: &T) -> bool {
+    *val == T::default()
 }
 
 /// Scan-specific configuration section.
@@ -274,6 +297,9 @@ impl CoraFile {
             }
             if let Some(v) = &r.system_prompt_file {
                 config.review_system_prompt_file = Some(v.clone());
+            }
+            if let Some(sa) = &r.static_analysis {
+                config.static_analysis.clone_from(sa);
             }
         }
         if let Some(s) = &self.scan {
@@ -629,6 +655,7 @@ review:
                 response_format: Some("json_object".to_string()),
                 system_prompt: None,
                 system_prompt_file: None,
+                static_analysis: None,
             }),
             ..Default::default()
         };
@@ -644,6 +671,7 @@ review:
                 response_format: None,
                 system_prompt: Some("Custom prompt here.".to_string()),
                 system_prompt_file: None,
+                static_analysis: None,
             }),
             ..Default::default()
         };
@@ -662,6 +690,7 @@ review:
                 response_format: None,
                 system_prompt: None,
                 system_prompt_file: Some("prompts/review.md".to_string()),
+                static_analysis: None,
             }),
             ..Default::default()
         };
