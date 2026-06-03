@@ -166,6 +166,7 @@ pub fn format_rule_context(findings: &[RuleFinding]) -> String {
 }
 
 /// Convenience: parse diff + run rules in one step.
+#[allow(dead_code)] // public API for future standalone usage
 pub fn parse_and_run_rules(diff: &str, config: &RulesConfig) -> Vec<RuleFinding> {
     let chunks = parse_diff(diff);
     run_rules(&chunks, config)

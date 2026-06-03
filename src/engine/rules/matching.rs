@@ -59,16 +59,14 @@ fn glob_matches(pattern: &str, path: &str) -> bool {
                     if ext_part == ".*" {
                         return true;
                     }
-                    if let Some(file_ext) =
-                        file_name.rsplit_once(name_part).map(|(_, ext)| ext)
-                    {
+                    if let Some(file_ext) = file_name.rsplit_once(name_part).map(|(_, ext)| ext) {
                         if file_ext.starts_with('.')
                             && ext_part
                                 .strip_prefix('.')
                                 .is_some_and(|e| file_ext.ends_with(e))
-                            {
-                                return true;
-                            }
+                        {
+                            return true;
+                        }
                     }
                 }
             }

@@ -83,6 +83,7 @@ impl std::fmt::Display for SymbolKind {
 
 /// A single symbol extracted from a changed line, with source location.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // fields consumed in v0.5 when bundling wired
 pub struct ExtractedSymbol {
     /// What kind of symbol this is.
     pub kind: SymbolKind,
@@ -139,6 +140,7 @@ pub struct ContextStats {
 
 /// The fully assembled context chain, ready for prompt injection.
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)] // stats consumed in v0.5 when bundling wired
 pub struct ContextChain {
     /// Formatted text to inject into the prompt.
     pub text: String,
@@ -190,7 +192,10 @@ mod tests {
     #[test]
     fn estimate_tokens_basic() {
         // 40 chars → ~10 tokens
-        assert_eq!(estimate_tokens("hello world this is a test string xyz123"), 10);
+        assert_eq!(
+            estimate_tokens("hello world this is a test string xyz123"),
+            10
+        );
     }
 
     #[test]

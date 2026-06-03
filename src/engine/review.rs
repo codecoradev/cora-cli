@@ -129,12 +129,19 @@ async fn review_diff_inner(
     };
 
     // Build context chain (cross-file dependency extraction)
-    let context_chain =
-        crate::engine::context::build_context_chain(&diff_chunks, &config.context_chain, std::env::current_dir().unwrap_or_default().as_path(), &config.ignore.rules);
+    let context_chain = crate::engine::context::build_context_chain(
+        &diff_chunks,
+        &config.context_chain,
+        std::env::current_dir().unwrap_or_default().as_path(),
+        &config.ignore.rules,
+    );
 
     let final_context = if !context_chain.text.is_empty() {
         match combined_context {
-            Some(ctx) => Some(format!("{ctx}\n\n## Cross-file Context\n{context_chain_text}", context_chain_text = context_chain.text)),
+            Some(ctx) => Some(format!(
+                "{ctx}\n\n## Cross-file Context\n{context_chain_text}",
+                context_chain_text = context_chain.text
+            )),
             None => Some(format!("## Cross-file Context\n{}", context_chain.text)),
         }
     } else {
@@ -179,18 +186,14 @@ async fn review_diff_inner(
                     "LLM call failed, returning deterministic rule findings only"
                 );
                 let mut fallback = ReviewResponse {
-                    issues: crate::engine::rules::merge_rule_findings(
-                        vec![],
-                        rule_findings,
-                    ),
+                    issues: crate::engine::rules::merge_rule_findings(vec![], rule_findings),
                     summary: format!(
                         "LLM review failed: {e}. Showing {n_rules} deterministic rule findings only."
                     ),
                     tokens_used: None,
                     should_block: false,
                 };
-                fallback.issues =
-                    apply_ignore_rules(fallback.issues, &config.ignore.rules);
+                fallback.issues = apply_ignore_rules(fallback.issues, &config.ignore.rules);
                 let min_sev = config.hook.min_severity_level();
                 fallback.should_block = fallback
                     .issues
@@ -204,7 +207,8 @@ async fn review_diff_inner(
 
     // Merge rule findings with LLM issues (rule findings appended after LLM issues)
     if !rule_findings_clone.is_empty() {
-        response.issues = crate::engine::rules::merge_rule_findings(response.issues, rule_findings_clone);
+        response.issues =
+            crate::engine::rules::merge_rule_findings(response.issues, rule_findings_clone);
     }
 
     // Filter out issues with invalid file paths (hallucination guard)

@@ -163,11 +163,7 @@ fn extract_symbols_from_line(line: &str, language: &str) -> Vec<SymbolKind> {
                     .unwrap()
                     .as_str()
                     .to_string();
-                add_unique(
-                    &mut symbols,
-                    &mut seen,
-                    SymbolKind::Import(path),
-                );
+                add_unique(&mut symbols, &mut seen, SymbolKind::Import(path));
             }
             for cap in RE_JS_FN_CALL.captures_iter(line) {
                 let name = cap.get(1).unwrap().as_str().to_string();
