@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 /// Bundling types — configuration and data structures for file grouping.
 use serde::{Deserialize, Serialize};
 

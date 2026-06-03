@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 /// Grouping strategies for bundling files into LLM-friendly groups.
 use std::collections::HashMap;
 
@@ -95,7 +96,7 @@ fn group_smart(files: &[FileEntry], config: &BundlingConfig) -> Vec<FileGroup> {
 
         if should_split && !current_group.is_empty() {
             groups.push(std::mem::replace(&mut current_group, FileGroup::new()));
-            current_key = None;
+            let _ = current_key.take();
         }
 
         current_group.push(file.clone());
@@ -193,7 +194,7 @@ pub fn group_by_dimension(
         let mut current_group = FileGroup::new();
 
         for file in bucket_files {
-            if !current_group.would_fit(*file, max_chars, max_files) && !current_group.is_empty() {
+            if !current_group.would_fit(file, max_chars, max_files) && !current_group.is_empty() {
                 groups.push(std::mem::replace(&mut current_group, FileGroup::new()));
             }
             current_group.push((*file).clone());

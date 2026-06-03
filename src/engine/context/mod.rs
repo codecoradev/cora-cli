@@ -38,8 +38,6 @@ use std::path::Path;
 use crate::engine::diff_parser::FileChunk;
 use types::{ContextChain, ContextConfig};
 
-pub use types::{ContextStats, ExtractedSymbol, SymbolKind};
-
 /// Build the full context chain from parsed diff chunks.
 ///
 /// Convenience entry point that combines extraction and resolution.

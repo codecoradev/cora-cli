@@ -60,16 +60,15 @@ fn glob_matches(pattern: &str, path: &str) -> bool {
                         return true;
                     }
                     if let Some(file_ext) =
-                        file_name.strip_prefix(&file_name[..file_name.len() - name_part.len()])
+                        file_name.rsplit_once(name_part).map(|(_, ext)| ext)
                     {
-                        if file_ext.starts_with('.') {
-                            if ext_part
+                        if file_ext.starts_with('.')
+                            && ext_part
                                 .strip_prefix('.')
-                                .map_or(false, |e| file_ext.ends_with(e))
+                                .is_some_and(|e| file_ext.ends_with(e))
                             {
                                 return true;
                             }
-                        }
                     }
                 }
             }
@@ -78,7 +77,7 @@ fn glob_matches(pattern: &str, path: &str) -> bool {
 
     // Handle "dir/" prefix patterns (directory-based exclusion)
     if pattern.ends_with('/') {
-        return path.starts_with(pattern) || path.contains(&format!("{pattern}"));
+        return path.starts_with(pattern) || path.contains(&pattern.to_string());
     }
 
     // Handle "**" glob in patterns like "tests/**"

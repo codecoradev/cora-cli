@@ -40,15 +40,17 @@ pub fn build_context_chain(
         return ContextChain::default();
     }
 
-    let mut stats = ContextStats::default();
-    stats.symbols_extracted = symbols.len();
+    let mut stats = ContextStats {
+        symbols_extracted: symbols.len(),
+        ..Default::default()
+    };
 
     // Phase 1: Resolve symbols to file locations
     let mut entries = resolve_symbols(symbols, config, project_root, ignore_patterns, &mut stats);
 
     // Phase 2: Add test file mappings
     if config.include_tests {
-        add_test_mappings(&symbols, project_root, &mut entries, &mut stats);
+        add_test_mappings(symbols, project_root, &mut entries, &mut stats);
     }
 
     // Sort by priority (FunctionDef first, Test last)
@@ -322,7 +324,7 @@ fn resolve_function(
                         continue;
                     }
 
-                    if let Some(rel) = path.strip_prefix(project_root).ok() {
+                    if let Ok(rel) = path.strip_prefix(project_root) {
                         let rel_str = rel.to_string_lossy().to_string();
                         if rel_str == source_file {
                             continue;
@@ -349,7 +351,7 @@ fn resolve_function(
                         continue;
                     }
 
-                    if let Some(rel) = path.strip_prefix(project_root).ok() {
+                    if let Ok(rel) = path.strip_prefix(project_root) {
                         let rel_str = rel.to_string_lossy().to_string();
                         if rel_str == source_file {
                             continue;
@@ -373,7 +375,7 @@ fn resolve_function(
             if let Ok(files) = std::fs::read_dir(project_root.join(search_dir)) {
                 for file in files.flatten() {
                     let path = file.path();
-                    if let Some(rel) = path.strip_prefix(project_root).ok() {
+                    if let Ok(rel) = path.strip_prefix(project_root) {
                         let rel_str = rel.to_string_lossy().to_string();
                         if rel_str == source_file {
                             continue;
@@ -418,7 +420,7 @@ fn resolve_type(
     if let Ok(files) = std::fs::read_dir(project_root.join(search_dir)) {
         for file in files.flatten() {
             let path = file.path();
-            if let Some(rel) = path.strip_prefix(project_root).ok() {
+            if let Ok(rel) = path.strip_prefix(project_root) {
                 let rel_str = rel.to_string_lossy().to_string();
                 if rel_str == source_file {
                     continue;
@@ -575,7 +577,7 @@ fn find_go_package_file(dir: &Path, import_path: &str) -> Option<ContextEntry> {
             let line_end = find_definition_end(&path);
             let rel = path
                 .to_str()
-                .and_then(|p| p.rsplitn(2, '/').nth(1))
+                .and_then(|p| p.rsplit_once('/').map(|x| x.0))
                 .unwrap_or(import_path);
             return Some(ContextEntry {
                 file: rel.to_string(),

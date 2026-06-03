@@ -1,3 +1,4 @@
+#[allow(dead_code, unused)]
 /// File bundling engine — groups files into cohesive units for LLM review.
 ///
 /// Instead of arbitrary batching by character count alone, the bundling engine
@@ -28,8 +29,5 @@
 pub mod grouping;
 pub mod types;
 
-// Re-export commonly used types
-pub use grouping::{
-    GroupingDimension, GroupingStats, group_by_dimension, group_files, merge_small_groups,
-};
-pub use types::{BundlingConfig, FileGroup, GroupingKey, GroupingStrategy, LanguageFamily};
+#[allow(dead_code, unused)]
+pub use types::GroupingStrategy;
