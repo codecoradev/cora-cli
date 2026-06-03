@@ -15,9 +15,9 @@ inputs:
     required: false
     default: 'latest'
   upload-sarif:
-    description: 'Upload SARIF to GitHub Code Scanning (default: false)'
+    description: 'Upload SARIF to GitHub Code Scanning (default: true). Set to "false" to disable.'
     required: false
-    default: 'false'
+    default: 'true'
   cora-api-key:
     description: 'LLM API key'
     required: true

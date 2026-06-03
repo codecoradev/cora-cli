@@ -113,7 +113,43 @@ async fn review_diff_inner(
     let static_context =
         crate::engine::static_analysis::collect_static_context(diff, &config.static_analysis);
 
-    let mut response = if stream {
+    // Parse diff and run rule engine
+    let diff_chunks = crate::engine::diff_parser::parse_diff(diff);
+    let rule_findings = crate::engine::rules::run_rules(&diff_chunks, &config.rules_config);
+    let rule_context = crate::engine::rules::format_rule_context(&rule_findings);
+    // Keep a clone for merging after LLM (rule_findings may be consumed in error fallback)
+    let rule_findings_clone = rule_findings.clone();
+
+    // Combine static analysis + rule engine context for LLM prompt
+    let combined_context = match (static_context.as_deref(), rule_context.as_str()) {
+        (Some(sa), rc) if !rc.is_empty() => Some(format!("{sa}\n\n{rc}")),
+        (Some(sa), _) => Some(sa.to_string()),
+        (_, rc) if !rc.is_empty() => Some(rc.to_string()),
+        _ => None,
+    };
+
+    // Build context chain (cross-file dependency extraction)
+    let context_chain = crate::engine::context::build_context_chain(
+        &diff_chunks,
+        &config.context_chain,
+        std::env::current_dir().unwrap_or_default().as_path(),
+        &config.ignore.rules,
+    );
+
+    let final_context = if !context_chain.text.is_empty() {
+        match combined_context {
+            Some(ctx) => Some(format!(
+                "{ctx}\n\n## Cross-file Context\n{context_chain_text}",
+                context_chain_text = context_chain.text
+            )),
+            None => Some(format!("## Cross-file Context\n{}", context_chain.text)),
+        }
+    } else {
+        combined_context
+    };
+
+    // Call LLM — but preserve deterministic rule findings even on LLM failure
+    let llm_result: Result<ReviewResponse, CoraError> = if stream {
         llm::review_diff_stream(
             llm_config,
             diff,
@@ -121,9 +157,9 @@ async fn review_diff_inner(
             &config.rules,
             &config.response_format,
             review_prompt.as_deref(),
-            static_context.as_deref(),
+            final_context.as_deref(),
         )
-        .await?
+        .await
     } else {
         llm::review_diff(
             llm_config,
@@ -133,10 +169,47 @@ async fn review_diff_inner(
             &config.response_format,
             review_prompt.as_deref(),
             quiet,
-            static_context.as_deref(),
+            final_context.as_deref(),
         )
-        .await?
+        .await
     };
+
+    let mut response = match llm_result {
+        Ok(resp) => resp,
+        Err(e) => {
+            // LLM failed — return deterministic findings only (don't silently swallow them)
+            if !rule_findings.is_empty() {
+                let n_rules = rule_findings.len();
+                debug!(
+                    error = %e,
+                    rule_findings = n_rules,
+                    "LLM call failed, returning deterministic rule findings only"
+                );
+                let mut fallback = ReviewResponse {
+                    issues: crate::engine::rules::merge_rule_findings(vec![], rule_findings),
+                    summary: format!(
+                        "LLM review failed: {e}. Showing {n_rules} deterministic rule findings only."
+                    ),
+                    tokens_used: None,
+                    should_block: false,
+                };
+                fallback.issues = apply_ignore_rules(fallback.issues, &config.ignore.rules);
+                let min_sev = config.hook.min_severity_level();
+                fallback.should_block = fallback
+                    .issues
+                    .iter()
+                    .any(|issue| issue.severity <= min_sev);
+                return Ok(fallback);
+            }
+            return Err(e);
+        }
+    };
+
+    // Merge rule findings with LLM issues (rule findings appended after LLM issues)
+    if !rule_findings_clone.is_empty() {
+        response.issues =
+            crate::engine::rules::merge_rule_findings(response.issues, rule_findings_clone);
+    }
 
     // Filter out issues with invalid file paths (hallucination guard)
     if !valid_files.is_empty() {

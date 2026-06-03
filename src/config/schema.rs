@@ -1,7 +1,8 @@
+use crate::engine::Severity;
+use crate::engine::bundling::types::BundlingConfig;
+use crate::engine::rules::types::RulesConfig;
 use crate::error::CoraError;
 use serde::{Deserialize, Serialize};
-
-use crate::engine::Severity;
 
 /// Runtime configuration — merged from defaults + .cora.yaml + CLI flags.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,6 +39,12 @@ pub struct Config {
     pub cache_ttl: u64,
     /// Static analysis context injection for reviews.
     pub static_analysis: StaticAnalysisConfig,
+    /// Rule engine configuration.
+    pub rules_config: RulesConfig,
+    /// Context chain configuration — cross-file dependency extraction.
+    pub context_chain: crate::engine::context::types::ContextConfig,
+    /// File bundling configuration for scan/review grouping.
+    pub bundling: BundlingConfig,
 }
 
 /// Provider configuration.
@@ -113,6 +120,9 @@ impl Default for Config {
             timeout: 120,
             cache_ttl: 1440, // 24h in minutes
             static_analysis: StaticAnalysisConfig::default(),
+            rules_config: RulesConfig::default(),
+            context_chain: crate::engine::context::types::ContextConfig::default(),
+            bundling: BundlingConfig::default(),
         }
     }
 }
@@ -145,6 +155,10 @@ pub struct CoraFile {
     pub scan: Option<ScanSection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm: Option<LlmSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rules_engine: Option<RulesSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bundling: Option<BundlingSection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -195,6 +209,9 @@ pub struct ReviewSection {
     /// Static analysis context injection (e.g., clippy output).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub static_analysis: Option<StaticAnalysisConfig>,
+    /// Context chain configuration (cross-file dependency extraction).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_chain: Option<crate::engine::context::types::ContextConfig>,
 }
 
 /// Static analysis configuration — inject linter/compiler output as review context.
@@ -234,6 +251,36 @@ pub struct LlmSection {
     pub timeout: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_ttl: Option<u64>,
+}
+
+fn default_max_findings() -> usize {
+    5
+}
+
+/// Rule engine configuration section for `.cora.yaml`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RulesSection {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub enabled: bool,
+    #[serde(default = "default_max_findings")]
+    pub max_findings: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub custom: Vec<crate::engine::rules::types::CustomRule>,
+}
+
+/// File bundling configuration section for `.cora.yaml`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BundlingSection {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_chars_per_group: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_files_per_group: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<crate::engine::bundling::GroupingStrategy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coalesce_by_directory: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coalesce_by_language: Option<bool>,
 }
 
 impl CoraFile {
@@ -322,6 +369,30 @@ impl CoraFile {
             }
             if let Some(v) = llm.cache_ttl {
                 config.cache_ttl = v;
+            }
+        }
+        if let Some(re) = &self.rules_engine {
+            config.rules_config.enabled = re.enabled;
+            config.rules_config.max_findings = re.max_findings;
+            if !re.custom.is_empty() {
+                config.rules_config.custom_rules = re.custom.clone();
+            }
+        }
+        if let Some(b) = &self.bundling {
+            if let Some(v) = b.max_chars_per_group {
+                config.bundling.max_chars_per_group = v;
+            }
+            if let Some(v) = b.max_files_per_group {
+                config.bundling.max_files_per_group = v;
+            }
+            if let Some(v) = b.strategy {
+                config.bundling.strategy = v;
+            }
+            if let Some(v) = b.coalesce_by_directory {
+                config.bundling.coalesce_by_directory = v;
+            }
+            if let Some(v) = b.coalesce_by_language {
+                config.bundling.coalesce_by_language = v;
             }
         }
     }
@@ -656,6 +727,7 @@ review:
                 system_prompt: None,
                 system_prompt_file: None,
                 static_analysis: None,
+                context_chain: None,
             }),
             ..Default::default()
         };
@@ -672,6 +744,7 @@ review:
                 system_prompt: Some("Custom prompt here.".to_string()),
                 system_prompt_file: None,
                 static_analysis: None,
+                context_chain: None,
             }),
             ..Default::default()
         };
@@ -691,6 +764,7 @@ review:
                 system_prompt: None,
                 system_prompt_file: Some("prompts/review.md".to_string()),
                 static_analysis: None,
+                context_chain: None,
             }),
             ..Default::default()
         };
@@ -926,5 +1000,139 @@ provider:
         let back: CoraFile = serde_yaml_ng::from_str(&yaml).unwrap();
         assert_eq!(back.llm.as_ref().unwrap().temperature, Some(0.5));
         assert_eq!(back.llm.as_ref().unwrap().max_tokens, Some(8192));
+    }
+
+    // ─── BundlingSection parsing and merge ───
+
+    #[test]
+    fn config_default_bundling() {
+        let cfg = Config::default();
+        assert_eq!(cfg.bundling.max_chars_per_group, 60_000);
+        assert_eq!(cfg.bundling.max_files_per_group, 20);
+        assert_eq!(
+            cfg.bundling.strategy,
+            crate::engine::bundling::GroupingStrategy::Smart
+        );
+        assert!(cfg.bundling.coalesce_by_directory);
+        assert!(cfg.bundling.coalesce_by_language);
+    }
+
+    #[test]
+    fn parse_bundling_section_full() {
+        let yaml = r"
+bundling:
+  max_chars_per_group: 30000
+  max_files_per_group: 10
+  strategy: flat
+  coalesce_by_directory: false
+  coalesce_by_language: false
+";
+        let cora = CoraFile::from_str(yaml).unwrap();
+        let b = cora.bundling.unwrap();
+        assert_eq!(b.max_chars_per_group, Some(30_000));
+        assert_eq!(b.max_files_per_group, Some(10));
+        assert_eq!(
+            b.strategy,
+            Some(crate::engine::bundling::GroupingStrategy::Flat)
+        );
+        assert_eq!(b.coalesce_by_directory, Some(false));
+        assert_eq!(b.coalesce_by_language, Some(false));
+    }
+
+    #[test]
+    fn parse_bundling_section_partial() {
+        let yaml = r"
+bundling:
+  max_chars_per_group: 40000
+  strategy: flat
+";
+        let cora = CoraFile::from_str(yaml).unwrap();
+        let b = cora.bundling.unwrap();
+        assert_eq!(b.max_chars_per_group, Some(40_000));
+        assert_eq!(b.max_files_per_group, None);
+        assert_eq!(
+            b.strategy,
+            Some(crate::engine::bundling::GroupingStrategy::Flat)
+        );
+        assert_eq!(b.coalesce_by_directory, None);
+        assert_eq!(b.coalesce_by_language, None);
+    }
+
+    #[test]
+    fn merge_bundling_all_fields() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            bundling: Some(BundlingSection {
+                max_chars_per_group: Some(30_000),
+                max_files_per_group: Some(10),
+                strategy: Some(crate::engine::bundling::GroupingStrategy::Flat),
+                coalesce_by_directory: Some(false),
+                coalesce_by_language: Some(false),
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(cfg.bundling.max_chars_per_group, 30_000);
+        assert_eq!(cfg.bundling.max_files_per_group, 10);
+        assert_eq!(
+            cfg.bundling.strategy,
+            crate::engine::bundling::GroupingStrategy::Flat
+        );
+        assert!(!cfg.bundling.coalesce_by_directory);
+        assert!(!cfg.bundling.coalesce_by_language);
+    }
+
+    #[test]
+    fn merge_bundling_partial() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            bundling: Some(BundlingSection {
+                max_chars_per_group: Some(40_000),
+                max_files_per_group: None,
+                strategy: None,
+                coalesce_by_directory: None,
+                coalesce_by_language: Some(false),
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(cfg.bundling.max_chars_per_group, 40_000);
+        assert_eq!(cfg.bundling.max_files_per_group, 20); // default unchanged
+        assert_eq!(
+            cfg.bundling.strategy,
+            crate::engine::bundling::GroupingStrategy::Smart
+        ); // default unchanged
+        assert!(cfg.bundling.coalesce_by_directory); // default unchanged
+        assert!(!cfg.bundling.coalesce_by_language);
+    }
+
+    #[test]
+    fn merge_bundling_absent_leaves_defaults() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg);
+        assert_eq!(cfg.bundling.max_chars_per_group, 60_000);
+        assert_eq!(cfg.bundling.max_files_per_group, 20);
+    }
+
+    #[test]
+    fn bundling_section_yaml_roundtrip() {
+        let section = BundlingSection {
+            max_chars_per_group: Some(50_000),
+            max_files_per_group: Some(15),
+            strategy: Some(crate::engine::bundling::GroupingStrategy::Smart),
+            coalesce_by_directory: Some(true),
+            coalesce_by_language: Some(false),
+        };
+        let yaml = serde_yaml_ng::to_string(&section).unwrap();
+        let back: BundlingSection = serde_yaml_ng::from_str(&yaml).unwrap();
+        assert_eq!(back.max_chars_per_group, Some(50_000));
+        assert_eq!(back.max_files_per_group, Some(15));
+        assert_eq!(
+            back.strategy,
+            Some(crate::engine::bundling::GroupingStrategy::Smart)
+        );
     }
 }

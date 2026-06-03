@@ -111,7 +111,7 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
         json!([{
             "executionSuccessful": true,
             "properties": {
-                "cora.watermark": format!("Reviewed by Cora v{}", env!("CARGO_PKG_VERSION"))
+                "cora.watermark": format!("Reviewed by CodeCora v{}", env!("CARGO_PKG_VERSION"))
             }
         }])
     };
@@ -122,7 +122,8 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
         "runs": [{
             "tool": {
                 "driver": {
-                    "name": "Cora",
+                    "name": "CodeCora",
+                    "fullName": "codecoradev/cora-cli",
                     "version": env!("CARGO_PKG_VERSION"),
                     "informationUri": env!("CARGO_PKG_REPOSITORY"),
                     "rules": rules
@@ -212,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn sarif_tool_driver_name_is_cora() {
+    fn sarif_tool_driver_name_is_codecora() {
         let fmt = SarifFormatter;
         let output = fmt.format_review(&sample_response()).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -220,7 +221,20 @@ mod tests {
             parsed["runs"][0]["tool"]["driver"]["name"]
                 .as_str()
                 .unwrap(),
-            "Cora"
+            "CodeCora"
+        );
+    }
+
+    #[test]
+    fn sarif_tool_driver_has_fullname_codecoradev() {
+        let fmt = SarifFormatter;
+        let output = fmt.format_review(&sample_response()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(
+            parsed["runs"][0]["tool"]["driver"]["fullName"]
+                .as_str()
+                .unwrap(),
+            "codecoradev/cora-cli"
         );
     }
 
