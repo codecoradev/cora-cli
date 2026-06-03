@@ -34,34 +34,40 @@
 
 ## 📦 Installation
 
-### Cargo (Recommended)
+### Quick Install (Linux/macOS)
 
 ```bash
-cargo install cora-cli
+curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
 ```
 
-### Binary Download
-
-Download the latest release from [GitHub Releases](https://github.com/codecoradev/cora-cli/releases):
+Installs to `~/.local/bin`. Add to PATH if needed:
 
 ```bash
-# Determine your platform tag from the releases page, e.g.:
-#   cora-aarch64-unknown-linux-gnu-v0.2.0.tar.gz
-#   cora-x86_64-unknown-linux-gnu-v0.2.0.tar.gz
-#   cora-aarch64-apple-darwin-v0.2.0.tar.gz
-#   cora-x86_64-pc-windows-msvc-v0.2.0.zip
-
-# Example: Linux aarch64
-VERSION=$(curl -s https://api.github.com/repos/codecoradev/cora-cli/releases/latest | grep tag_name | cut -d'"' -f4)
-curl -L "https://github.com/codecoradev/cora-cli/releases/download/${VERSION}/cora-aarch64-unknown-linux-gnu-${VERSION}.tar.gz" | tar xz
-sudo mv cora /usr/local/bin/
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
 ```
 
-> **Tip:** Visit the [Releases page](https://github.com/codecoradev/cora-cli/releases) to find the correct asset name for your platform.
+### Pre-built Binaries
+
+Download from [GitHub Releases](https://github.com/codecoradev/cora-cli/releases):
+
+| Platform | Asset |
+|----------|-------|
+| Linux x86_64 | `cora-x86_64-unknown-linux-gnu-v*.tar.gz` |
+| Linux ARM64 | `cora-aarch64-unknown-linux-gnu-v*.tar.gz` |
+| macOS Apple Silicon | `cora-aarch64-apple-darwin-v*.tar.gz` |
+| Windows x86_64 | `cora-x86_64-pc-windows-msvc-v*.zip` |
+
+> **Windows users:** Extract the zip and place `cora.exe` somewhere in your PATH (e.g. `C:\Users\<you>\.local\bin`). Run from Command Prompt, PowerShell, or Windows Terminal — do not double-click the `.exe` (it will flash and close).
+
+### Cargo
+
+```bash
+cargo install --git https://github.com/codecoradev/cora-cli
+```
 
 ### Homebrew
 
-> 🚧 Homebrew tap is planned — check back soon!
+> 🚧 Homebrew tap is planned — see [#151](https://github.com/codecoradev/cora-cli/issues/151).
 
 ### Build from Source
 
@@ -128,6 +134,9 @@ cora review --base origin/main
 
 # Review a pull request diff from a file
 cora review --diff-file pr.diff
+
+# CI mode: skip diff size limit, hard gate on any findings
+cora review --ci --base ${{ github.base_ref }}
 
 # Use a specific model
 cora review --model gpt-4o
@@ -283,6 +292,7 @@ hook:
   mode: warn               # warn | block
   min_severity: major       # info | minor | major | critical
   max_diff_size: 51200      # Max diff size in bytes (50 KB)
+  on_violation: warn        # warn | disallow — block commit on oversized diff
 
 # Output settings
 output:

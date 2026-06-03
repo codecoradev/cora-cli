@@ -125,6 +125,10 @@ enum Command {
         #[clap(long)]
         no_cache: bool,
 
+        /// CI mode: skip diff size limit, exit 2 if any findings
+        #[clap(long)]
+        ci: bool,
+
         /// Upload SARIF output to GitHub Code Scanning after review
         /// (implies --format sarif)
         #[clap(long)]
@@ -302,6 +306,7 @@ async fn main() -> Result<()> {
             quiet,
             severity,
             no_cache,
+            ci,
             upload,
             repo,
             ref_name,
@@ -326,6 +331,7 @@ async fn main() -> Result<()> {
                     ref_name,
                     token,
                     no_cache,
+                    ci,
                 },
             )
             .await?
@@ -434,6 +440,7 @@ struct ReviewOpts {
     ref_name: Option<String>,
     token: Option<String>,
     no_cache: bool,
+    ci: bool,
 }
 
 /// Struct to hold scan options from CLI.
@@ -486,6 +493,7 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         quiet: opts.quiet || opts.progress,
         severity: opts.severity.clone(),
         no_cache: opts.no_cache,
+        ci: opts.ci,
     };
 
     // When streaming and not quiet/progress, show a simpler message
