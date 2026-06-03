@@ -1,4 +1,6 @@
+pub mod bundling;
 pub mod cache;
+pub mod context;
 pub mod diff_parser;
 pub mod llm;
 pub mod review;
