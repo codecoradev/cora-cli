@@ -128,8 +128,29 @@ runs:
           exit 1
         fi
 
-    - name: Upload SARIF to GitHub Code Scanning
+    - name: Check SARIF for findings
+      id: sarif-check
       if: inputs.upload-sarif == 'true'
+      shell: bash
+      run: |
+        RESULTS=$(python3 -c "
+        import json, sys
+        try:
+            data = json.load(open('cora-results.sarif'))
+            results = data.get('runs', [{}])[0].get('results', [])
+            print(len(results))
+        except:
+            print(0)
+        " 2>/dev/null || echo "0")
+        echo "results=$RESULTS" >> "$GITHUB_OUTPUT"
+        if [ "$RESULTS" -gt 0 ]; then
+          echo "SARIF contains $RESULTS finding(s) — will upload."
+        else
+          echo "SARIF has no findings — skipping upload."
+        fi
+
+    - name: Upload SARIF to GitHub Code Scanning
+      if: inputs.upload-sarif == 'true' && steps.sarif-check.outputs.results > 0
       continue-on-error: true
       uses: github/codeql-action/upload-sarif@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
       with:
