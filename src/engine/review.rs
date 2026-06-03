@@ -126,6 +126,19 @@ async fn review_diff_inner(
         _ => None,
     };
 
+    // Build context chain (cross-file dependency extraction)
+    let context_chain =
+        crate::engine::context::build_context_chain(&diff_chunks, &config.context_chain, std::env::current_dir().unwrap_or_default().as_path(), &config.ignore.rules);
+
+    let final_context = if !context_chain.text.is_empty() {
+        match combined_context {
+            Some(ctx) => Some(format!("{ctx}\n\n## Cross-file Context\n{context_chain_text}", context_chain_text = context_chain.text)),
+            None => Some(format!("## Cross-file Context\n{}", context_chain.text)),
+        }
+    } else {
+        combined_context
+    };
+
     let mut response = if stream {
         llm::review_diff_stream(
             llm_config,
@@ -134,7 +147,7 @@ async fn review_diff_inner(
             &config.rules,
             &config.response_format,
             review_prompt.as_deref(),
-            combined_context.as_deref(),
+            final_context.as_deref(),
         )
         .await?
     } else {
@@ -146,7 +159,7 @@ async fn review_diff_inner(
             &config.response_format,
             review_prompt.as_deref(),
             quiet,
-            combined_context.as_deref(),
+            final_context.as_deref(),
         )
         .await?
     };
