@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Deterministic rule engine** — pre-LLM regex-based rules that always report findings (no LLM dismissal). Includes security (hardcoded URLs, secrets, TLS disabled, debug prints), SQL injection, and TODO markers (#116)
+- **Custom rules via `.cora.yaml`** — define project-specific regex rules with severity, category, exclude patterns, and glob file matching
+- **Unified diff parser** — parse git diff into structured `FileChunk`/`DiffHunk`/`DiffLine` with language detection for 70+ extensions
+- **File bundling engine** — smart grouping by directory and language family with configurable character/file limits. Defers full parallel review to v0.5 (#115)
+- **Cross-file context chain** — deterministic symbol extraction (imports, function calls, type references) for 5 languages (Rust, Python, JS, Go, Java) with token-budgeted context injection into LLM prompt (#114)
+- **`BundlingConfig`** — `strategy`, `max_chars_per_group`, `max_files_per_group`, `coalesce_by_directory`, `coalesce_by_language` in `.cora.yaml`
+- **`ContextConfig`** — `enabled`, `max_context_tokens`, `follow_depth`, `max_symbols` in `.cora.yaml` review section
+
+### Changed
+
+- **Review pipeline** — rules engine runs before LLM call, context chain enriches LLM prompt with cross-file dependencies
+
 ## [0.3.0] - 2026-06-03
 
 ### Added
