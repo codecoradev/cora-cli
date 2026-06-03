@@ -113,6 +113,19 @@ async fn review_diff_inner(
     let static_context =
         crate::engine::static_analysis::collect_static_context(diff, &config.static_analysis);
 
+    // Parse diff and run rule engine
+    let diff_chunks = crate::engine::diff_parser::parse_diff(diff);
+    let rule_findings = crate::engine::rules::run_rules(&diff_chunks, &config.rules_config);
+    let rule_context = crate::engine::rules::format_rule_context(&rule_findings);
+
+    // Combine static analysis + rule engine context for LLM prompt
+    let combined_context = match (static_context.as_deref(), rule_context.as_str()) {
+        (Some(sa), rc) if !rc.is_empty() => Some(format!("{sa}\n\n{rc}")),
+        (Some(sa), _) => Some(sa.to_string()),
+        (_, rc) if !rc.is_empty() => Some(rc.to_string()),
+        _ => None,
+    };
+
     let mut response = if stream {
         llm::review_diff_stream(
             llm_config,
@@ -121,7 +134,7 @@ async fn review_diff_inner(
             &config.rules,
             &config.response_format,
             review_prompt.as_deref(),
-            static_context.as_deref(),
+            combined_context.as_deref(),
         )
         .await?
     } else {
@@ -133,10 +146,15 @@ async fn review_diff_inner(
             &config.response_format,
             review_prompt.as_deref(),
             quiet,
-            static_context.as_deref(),
+            combined_context.as_deref(),
         )
         .await?
     };
+
+    // Merge rule findings with LLM issues (rule findings appended after LLM issues)
+    if !rule_findings.is_empty() {
+        response.issues = crate::engine::rules::merge_rule_findings(response.issues, rule_findings);
+    }
 
     // Filter out issues with invalid file paths (hallucination guard)
     if !valid_files.is_empty() {

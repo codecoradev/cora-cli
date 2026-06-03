@@ -1,7 +1,7 @@
+use crate::engine::Severity;
+use crate::engine::rules::types::RulesConfig;
 use crate::error::CoraError;
 use serde::{Deserialize, Serialize};
-
-use crate::engine::Severity;
 
 /// Runtime configuration — merged from defaults + .cora.yaml + CLI flags.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,6 +38,8 @@ pub struct Config {
     pub cache_ttl: u64,
     /// Static analysis context injection for reviews.
     pub static_analysis: StaticAnalysisConfig,
+    /// Rule engine configuration.
+    pub rules_config: RulesConfig,
 }
 
 /// Provider configuration.
@@ -113,6 +115,7 @@ impl Default for Config {
             timeout: 120,
             cache_ttl: 1440, // 24h in minutes
             static_analysis: StaticAnalysisConfig::default(),
+            rules_config: RulesConfig::default(),
         }
     }
 }
@@ -145,6 +148,8 @@ pub struct CoraFile {
     pub scan: Option<ScanSection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm: Option<LlmSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rules_engine: Option<RulesSection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -236,6 +241,21 @@ pub struct LlmSection {
     pub cache_ttl: Option<u64>,
 }
 
+fn default_max_findings() -> usize {
+    5
+}
+
+/// Rule engine configuration section for `.cora.yaml`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RulesSection {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub enabled: bool,
+    #[serde(default = "default_max_findings")]
+    pub max_findings: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub custom: Vec<crate::engine::rules::types::CustomRule>,
+}
+
 impl CoraFile {
     pub fn from_str(content: &str) -> std::result::Result<Self, CoraError> {
         serde_yaml_ng::from_str(content).map_err(|e| CoraError::ConfigParse(e.to_string()))
@@ -322,6 +342,13 @@ impl CoraFile {
             }
             if let Some(v) = llm.cache_ttl {
                 config.cache_ttl = v;
+            }
+        }
+        if let Some(re) = &self.rules_engine {
+            config.rules_config.enabled = re.enabled;
+            config.rules_config.max_findings = re.max_findings;
+            if !re.custom.is_empty() {
+                config.rules_config.custom_rules = re.custom.clone();
             }
         }
     }
