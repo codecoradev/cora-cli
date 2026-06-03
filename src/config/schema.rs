@@ -68,6 +68,7 @@ pub struct HookConfig {
     pub mode: String,
     pub min_severity: String,
     pub max_diff_size: usize,
+    pub on_violation: String, // "warn" | "disallow"
 }
 
 /// Output configuration.
@@ -105,6 +106,7 @@ impl Default for Config {
                 mode: "warn".to_string(),
                 min_severity: "major".to_string(),
                 max_diff_size: 50 * 1024,
+                on_violation: "warn".to_string(),
             },
             output: OutputConfig {
                 format: "pretty".to_string(),
@@ -187,6 +189,8 @@ pub struct HookSection {
     pub min_severity: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_diff_size: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_violation: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -326,6 +330,9 @@ impl CoraFile {
             if let Some(v) = h.max_diff_size {
                 config.hook.max_diff_size = v;
             }
+            if let Some(v) = &h.on_violation {
+                config.hook.on_violation.clone_from(v);
+            }
         }
         if let Some(o) = &self.output {
             if let Some(v) = &o.format {
@@ -443,6 +450,7 @@ mod tests {
         assert_eq!(cfg.hook.mode, "warn");
         assert_eq!(cfg.hook.min_severity, "major");
         assert_eq!(cfg.hook.max_diff_size, 50 * 1024);
+        assert_eq!(cfg.hook.on_violation, "warn");
     }
 
     #[test]
@@ -543,6 +551,7 @@ mod tests {
                 mode: Some("block".to_string()),
                 min_severity: Some("critical".to_string()),
                 max_diff_size: Some(1024),
+                on_violation: Some("disallow".to_string()),
             }),
             ..Default::default()
         };
@@ -550,6 +559,7 @@ mod tests {
         assert_eq!(cfg.hook.mode, "block");
         assert_eq!(cfg.hook.min_severity, "critical");
         assert_eq!(cfg.hook.max_diff_size, 1024);
+        assert_eq!(cfg.hook.on_violation, "disallow");
     }
 
     #[test]
@@ -620,6 +630,7 @@ output:
             mode: "warn".to_string(),
             min_severity: "critical".to_string(),
             max_diff_size: 1024,
+            on_violation: "warn".to_string(),
         };
         assert_eq!(cfg.min_severity_level(), Severity::Critical);
     }
@@ -630,6 +641,7 @@ output:
             mode: "warn".to_string(),
             min_severity: "whatever".to_string(),
             max_diff_size: 1024,
+            on_violation: "warn".to_string(),
         };
         assert_eq!(cfg.min_severity_level(), Severity::Info);
     }

@@ -37,6 +37,8 @@ pub struct ReviewOptions {
     pub severity: Option<String>,
     /// Disable review caching.
     pub no_cache: bool,
+    /// CI mode: skip diff size limit, hard gate on any findings.
+    pub ci: bool,
 }
 
 /// Result of a review command execution.
@@ -82,9 +84,26 @@ pub async fn execute_review(
         progress.parsing_diff(files_changed, lines_changed);
     }
 
-    // 3. Validate size
+    // 3. Validate size (skip in CI mode)
     let max_size = opts.max_diff_size.unwrap_or(config.hook.max_diff_size);
-    if diff.len() > max_size {
+    if !opts.ci && diff.len() > max_size {
+        if config.hook.on_violation == "disallow" {
+            // Return blocked result instead of error
+            return Ok(ReviewResult {
+                exit_code: EXIT_BLOCKED,
+                output: format!(
+                    "{}\n",
+                    format!(
+                        "❌ Diff too large ({} chars, max {}). Commit blocked. \
+                         Use --base to review a specific branch, increase hook.max_diff_size, \
+                         or run: git commit --no-verify",
+                        diff.len(), max_size
+                    )
+                    .red()
+                    .bold(),
+                ),
+            });
+        }
         anyhow::bail!(
             "Diff too large ({} chars, max {}). Use --base to review a specific branch, or increase hook.max_diff_size.",
             diff.len(),
@@ -156,7 +175,14 @@ pub async fn execute_review(
     let output = formatter.format_review(&filtered_response)?;
 
     // 8. Return exit code
-    let exit_code = if response.should_block && config.hook.mode == "block" {
+    let exit_code = if opts.ci {
+        // CI mode: hard gate — any finding blocks
+        if !filtered_response.issues.is_empty() {
+            EXIT_BLOCKED
+        } else {
+            EXIT_OK
+        }
+    } else if response.should_block && config.hook.mode == "block" {
         EXIT_BLOCKED
     } else {
         EXIT_OK
