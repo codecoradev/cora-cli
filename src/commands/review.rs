@@ -95,9 +95,10 @@ pub async fn execute_review(
                     "{}\n",
                     format!(
                         "❌ Diff too large ({} chars, max {}). Commit blocked. \
-                         Use --base to review a specific branch, increase hook.max_diff_size, \
-                         or run: git commit --no-verify",
-                        diff.len(), max_size
+                         Use --base to review a specific branch, increase \
+                         hook.max_diff_size, or run: git commit --no-verify",
+                        diff.len(),
+                        max_size
                     )
                     .red()
                     .bold(),
