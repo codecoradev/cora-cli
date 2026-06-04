@@ -10,7 +10,27 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  sync-main:
+    name: Sync main branch
+    runs-on: ubuntu-latest
+    # Only runs on v* tag pushes (release trigger). Uses force-push because main
+    # is a release-only mirror of develop — any commits on main not in develop
+    # are stale snapshots that should be overwritten by the current release.
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Push to main
+        run: |
+          git push origin HEAD:main --force
+          echo "✅ main synced to develop at ${{ github.sha }}"
+
   build-release:
+    needs: sync-main
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -152,18 +172,16 @@ jobs:
             printf '| Windows (x86_64) | `cora-x86_64-pc-windows-msvc-%s.zip` |\n\n' "${{ steps.version.outputs.TAG }}"
             printf '### 🚀 Quick Start\n\n'
             printf '```bash\n'
-            printf '# Install via cargo\n'
+            printf '# Quick install (Linux / macOS)\n'
+            printf 'curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh\n\n'
+            printf '# Or via cargo\n'
             printf 'cargo install cora\n\n'
-            printf '# Or download binary (extracts as '\''cora'\'')\n'
-            printf 'curl -fsSL https://github.com/codecoradev/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu-%s.tar.gz | tar xz\n' "${{ steps.version.outputs.TAG }}"
-            printf 'chmod +x cora\n'
-            printf 'sudo mv cora /usr/local/bin/\n\n'
             printf '# Init project\n'
             printf 'cora init\n\n'
             printf '# Review staged changes\n'
             printf 'CORA_API_KEY=your-key cora review --staged\n'
             printf '```\n\n'
-            printf '**Full changelog:** https://github.com/codecoradev/cora-cli/blob/develop/CHANGELOG.md\n'
+            printf '**Full changelog:** https://github.com/codecoradev/cora-cli/blob/main/CHANGELOG.md\n'
           } > release-notes.md
 
       - name: Create GitHub Release

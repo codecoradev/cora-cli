@@ -46,6 +46,12 @@ Installs to `~/.local/bin`. Add to PATH if needed:
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
 ```
 
+Pin a specific version with `CORA_VERSION`:
+
+```bash
+CORA_VERSION=v0.4.0 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+```
+
 ### Pre-built Binaries
 
 Download from [GitHub Releases](https://github.com/codecoradev/cora-cli/releases):
@@ -358,11 +364,9 @@ jobs:
 Or install manually:
 
 ```yaml
-# Manual install in CI
+# Manual install in CI (using install script)
 - name: Install cora-cli
-  run: |
-    curl -fsSL https://github.com/codecoradev/cora-cli/releases/latest/download/cora-x86_64-unknown-linux-gnu.tar.gz | tar xz
-    sudo mv cora /usr/local/bin/
+  run: curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
 ```
 
 ### GitLab CI
