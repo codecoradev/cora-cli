@@ -13,6 +13,10 @@ jobs:
   sync-main:
     name: Sync main branch
     runs-on: ubuntu-latest
+    # Only runs on v* tag pushes (release trigger). Uses force-push because main
+    # is a release-only mirror of develop — any commits on main not in develop
+    # are stale snapshots that should be overwritten by the current release.
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
@@ -26,6 +30,7 @@ jobs:
           echo "✅ main synced to develop at ${{ github.sha }}"
 
   build-release:
+    needs: sync-main
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
