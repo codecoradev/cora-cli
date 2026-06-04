@@ -7,19 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-03
+
 ### Added
 
-- **Deterministic rule engine** — pre-LLM regex-based rules that always report findings (no LLM dismissal). Includes security (hardcoded URLs, secrets, TLS disabled, debug prints), SQL injection, and TODO markers (#116)
+- **Deterministic rule engine** — pre-LLM regex-based rules that always report findings (no LLM dismissal). 12 built-in rules covering security (hardcoded URLs, secrets, TLS disabled, debug prints), SQL injection, TODO/FIXME, `panic!`/`unwrap` in new code, and large functions (#116)
 - **Custom rules via `.cora.yaml`** — define project-specific regex rules with severity, category, exclude patterns, and glob file matching
 - **Unified diff parser** — parse git diff into structured `FileChunk`/`DiffHunk`/`DiffLine` with language detection for 70+ extensions
-- **File bundling engine** — smart grouping by directory and language family with configurable character/file limits. Defers full parallel review to v0.5 (#115)
+- **File bundling engine** — smart grouping by directory and language family with configurable character/file limits. Bundle types: related, config, test, large, standalone. Token budget estimation (~4 chars/token). Defers full parallel review to v0.5 (#115)
 - **Cross-file context chain** — deterministic symbol extraction (imports, function calls, type references) for 5 languages (Rust, Python, JS, Go, Java) with token-budgeted context injection into LLM prompt (#114)
 - **`BundlingConfig`** — `strategy`, `max_chars_per_group`, `max_files_per_group`, `coalesce_by_directory`, `coalesce_by_language` in `.cora.yaml`
 - **`ContextConfig`** — `enabled`, `max_context_tokens`, `follow_depth`, `max_symbols` in `.cora.yaml` review section
+- **Default SARIF upload to GitHub Code Scanning ON** — opt-out with `upload-sarif: false` (#148)
+- **SARIF tool branding** — `CodeCora` driver name (`codecoradev/cora-cli`) in SARIF output (#148)
 
 ### Changed
 
 - **Review pipeline** — rules engine runs before LLM call, context chain enriches LLM prompt with cross-file dependencies
+- **LLM failure handling** — deterministic rule findings always visible even when LLM call fails
 
 ## [0.3.0] - 2026-06-03
 
@@ -240,7 +245,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.3.0...develop
+[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.4.0...develop
+[0.4.0]: https://github.com/codecoradev/cora-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/codecoradev/cora-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/codecoradev/cora-cli/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/codecoradev/cora-cli/compare/v0.1.7...v0.1.8
