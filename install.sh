@@ -100,14 +100,35 @@ install() {
     TEMP_DIR=$(mktemp -d)
     ARCHIVE="${TEMP_DIR}/${ARCHIVE_NAME}"
 
+    CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${VERSION}/checksums-sha256.txt"
+    CHECKSUM_FILE="${TEMP_DIR}/checksums-sha256.txt"
+
     info "Downloading from: $DOWNLOAD_URL"
     if ! curl -fsSL "$DOWNLOAD_URL" -o "$ARCHIVE"; then
         error "Failed to download ${ARCHIVE_NAME}"
     fi
 
+    # Verify SHA256 checksum (prevents MITM / corrupted download).
+    info "Downloading checksums..."
+    if curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUM_FILE"; then
+        info "Verifying SHA256 checksum..."
+        EXPECTED=$(grep -F "$ARCHIVE_NAME" "$CHECKSUM_FILE" | awk '{print $1}')
+        if [ -n "$EXPECTED" ]; then
+            ACTUAL=$(sha256sum "$ARCHIVE" | awk '{print $1}')
+            if [ "$ACTUAL" != "$EXPECTED" ]; then
+                error "Checksum mismatch! Expected: ${EXPECTED}, got: ${ACTUAL}"
+            fi
+            info "Checksum verified: $EXPECTED"
+        else
+            warn "Checksum for ${ARCHIVE_NAME} not found in checksums file — skipping verification"
+        fi
+    else
+        warn "Failed to download checksums — skipping verification"
+    fi
+
     # Verify archive contents before extraction (CWE-22 path traversal).
     # Reject any entry with an absolute path or a ".." component.
-    info "Verifying archive..."
+    info "Verifying archive integrity..."
     if tar -tzf "$ARCHIVE" | grep -qE '^/|(^|/)\.\.(/|$)'; then
         error "Archive contains unsafe paths (absolute or directory traversal) — refusing to extract"
     fi
