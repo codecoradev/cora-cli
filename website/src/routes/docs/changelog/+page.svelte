@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import changelogRaw from '../../../CHANGELOG.md?raw';
+	import changelogRaw from '../../../../CHANGELOG.md?raw';
 
 	interface ChangelogSection {
 		version: string;

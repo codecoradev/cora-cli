@@ -17,7 +17,7 @@
 
 			<nav class="hidden sm:flex items-center gap-6">
 				<a href="/docs" class="site-header-link" class:active={isDocs}>Docs</a>
-				<a href="https://github.com/ajianaz/cora-cli" target="_blank" rel="noopener" class="site-header-link">
+				<a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="site-header-link">
 					GitHub
 				</a>
 			</nav>
