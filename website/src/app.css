@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 
 /* ============================================
@@ -16,11 +15,14 @@
   --muted: oklch(0.22 0.01 270);
   --muted-foreground: oklch(0.65 0.01 270);
   --accent: oklch(0.65 0.22 270);
+  --accent-bright: oklch(0.72 0.2 270);
   --accent-foreground: oklch(0.98 0 0);
+  --accent-dim: oklch(0.45 0.12 270);
   --success: oklch(0.72 0.19 145);
   --warning: oklch(0.78 0.15 85);
   --destructive: oklch(0.55 0.22 25);
   --border: oklch(0.27 0.01 270);
+  --border-subtle: oklch(0.22 0.01 270);
   --ring: oklch(0.65 0.22 270);
   --shadow-card: 0 1px 3px oklch(0 0 0 / 0.3);
   --shadow-card-hover: 0 4px 12px oklch(0 0 0 / 0.4);
@@ -115,12 +117,14 @@ body {
   background: oklch(0.75 0.01 270);
 }
 
-/* ---- Animations (motion OK) ---- */
+/* ============================================
+   ANIMATIONS (motion OK)
+   ============================================ */
 @media (prefers-reduced-motion: no-preference) {
   @keyframes fade-in-up {
     from {
       opacity: 0;
-      transform: translateY(12px);
+      transform: translateY(20px);
     }
     to {
       opacity: 1;
@@ -140,7 +144,7 @@ body {
 
   @keyframes subtle-float {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
+    50% { transform: translateY(-6px); }
   }
 
   @keyframes glow {
@@ -154,12 +158,37 @@ body {
     }
   }
 
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
   .animate-fade-in-up {
-    animation: fade-in-up 0.5s ease-out forwards;
+    animation: fade-in-up 0.6s ease-out forwards;
   }
 
   .animate-fade-in {
-    animation: fade-in 0.3s ease-out forwards;
+    animation: fade-in-up 0.6s ease-out forwards;
+  }
+
+  .animate-fade-in-delay-1 {
+    animation: fade-in-up 0.6s ease-out 0.1s forwards;
+    opacity: 0;
+  }
+
+  .animate-fade-in-delay-2 {
+    animation: fade-in-up 0.6s ease-out 0.2s forwards;
+    opacity: 0;
+  }
+
+  .animate-fade-in-delay-3 {
+    animation: fade-in-up 0.6s ease-out 0.3s forwards;
+    opacity: 0;
+  }
+
+  .animate-fade-in-delay-4 {
+    animation: fade-in-up 0.6s ease-out 0.4s forwards;
+    opacity: 0;
   }
 
   .delay-100 { animation-delay: 100ms; opacity: 0; }
@@ -187,7 +216,11 @@ body {
     transform: none !important;
   }
   .animate-fade-in-up,
-  .animate-fade-in {
+  .animate-fade-in,
+  .animate-fade-in-delay-1,
+  .animate-fade-in-delay-2,
+  .animate-fade-in-delay-3,
+  .animate-fade-in-delay-4 {
     opacity: 1 !important;
     transform: none !important;
   }
@@ -208,22 +241,245 @@ body {
   transform: translateY(0);
 }
 
-/* ---- Glass Card ---- */
+/* ============================================
+   HERO EFFECTS (from uteke pattern)
+   ============================================ */
+
+/* Hero gradient text */
+.hero-gradient {
+  background: linear-gradient(135deg, oklch(0.72 0.2 270), oklch(0.65 0.22 270), oklch(0.6 0.18 240));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Subtle glow effect */
+.glow-purple {
+  box-shadow: 0 0 60px -12px oklch(0.65 0.22 270 / 0.2);
+}
+
+.glow-text {
+  text-shadow: 0 0 40px oklch(0.65 0.22 270 / 0.25);
+}
+
+/* Grid background pattern */
+.grid-bg {
+  background-image:
+    linear-gradient(oklch(0.65 0.22 270 / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.65 0.22 270 / 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ============================================
+   TERMINAL BLOCK (from uteke pattern)
+   ============================================ */
+
+/* Terminal code block with top accent line */
+.terminal-block {
+  background: linear-gradient(135deg, var(--card), var(--muted));
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.terminal-block::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.4;
+}
+
+/* ============================================
+   FEATURE CARD (from uteke pattern)
+   ============================================ */
+
+.feature-card {
+  transition: all 200ms ease-out;
+}
+
+.feature-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-dim);
+  background-color: var(--muted);
+}
+
+/* ============================================
+   CTA BUTTONS (from uteke pattern)
+   ============================================ */
+
+.cta-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border-radius: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  font-weight: 600;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  min-height: 44px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 200ms ease-out;
+}
+
+.cta-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px oklch(0.65 0.22 270 / 0.35);
+}
+
+.cta-primary:active {
+  transform: translateY(0);
+}
+
+.cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: transparent;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  font-weight: 500;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  min-height: 44px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 200ms ease-out;
+}
+
+.cta-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ============================================
+   CURSOR & FLOAT ANIMATION (from uteke)
+   ============================================ */
+
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+.float-animation {
+  animation: subtle-float 3s ease-in-out infinite;
+}
+
+/* ============================================
+   COMMAND SYNTAX HIGHLIGHTING (from uteke)
+   ============================================ */
+
+.cmd-highlight {
+  color: var(--accent-bright);
+}
+
+.cmd-flag {
+  color: oklch(0.75 0.15 240);
+}
+
+.cmd-string {
+  color: oklch(0.78 0.16 155);
+}
+
+.cmd-comment {
+  color: var(--muted-foreground);
+}
+
+/* ============================================
+   SEPARATOR GRADIENT (from uteke)
+   ============================================ */
+
+.separator-gradient {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  max-width: 1152px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ============================================
+   COMPARISON TABLE (from uteke pattern)
+   ============================================ */
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid oklch(0.27 0.01 270 / 0.5);
+  text-align: left;
+  font-size: 14px;
+  color: var(--foreground);
+}
+
+.compare-table thead th {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: var(--space-3);
+}
+
+.compare-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.compare-table .cora-col {
+  background: oklch(0.65 0.22 270 / 0.05);
+  font-weight: 500;
+}
+
+.compare-table thead .cora-col {
+  background: oklch(0.65 0.22 270 / 0.1);
+  color: var(--accent);
+}
+
+/* Highlight column (uteke pattern) */
+.compare-table th.highlight-col {
+  background-color: var(--muted);
+  border-bottom: 2px solid var(--accent);
+}
+
+.compare-table td.highlight-col {
+  background-color: var(--card);
+}
+
+/* ============================================
+   GLASS CARD (cora original)
+   ============================================ */
+
 .glass-card {
   background: var(--card);
   border-radius: var(--space-4);
   padding: var(--space-6);
   box-shadow: var(--shadow-card);
   border: 1px solid oklch(0.27 0.01 270 / 0.5);
-  transition: box-shadow 0.3s ease-out, transform 0.3s ease-out;
+  transition: box-shadow 0.3s ease-out, transform 0.3s ease-out, border-color 0.3s ease-out;
 }
 
 .glass-card:hover {
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-2px);
+  border-color: var(--accent-dim);
 }
 
-/* ---- Terminal ---- */
+/* ============================================
+   TERMINAL (cora original)
+   ============================================ */
+
 .terminal {
   background: oklch(0.10 0 0);
   border-radius: var(--space-3);
@@ -267,7 +523,10 @@ body {
   color: var(--foreground);
 }
 
-/* ---- Buttons ---- */
+/* ============================================
+   BUTTONS (cora original — kept for compatibility)
+   ============================================ */
+
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -323,74 +582,77 @@ body {
   background: oklch(0.25 0.01 270);
 }
 
-/* ---- Section Container (8px grid based) ---- */
+/* ============================================
+   SECTION CONTAINER (8px grid based)
+   ============================================ */
+
 .section {
-  max-width: 1152px; /* 72 × 16px */
+  max-width: 1152px;
   margin-left: auto;
   margin-right: auto;
-  padding-left: var(--space-6);   /* 24px mobile */
-  padding-right: var(--space-6);  /* 24px mobile */
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
 }
 
 @media (min-width: 768px) {
   .section {
-    padding-left: var(--space-8);  /* 32px tablet */
+    padding-left: var(--space-8);
     padding-right: var(--space-8);
   }
 }
 
 @media (min-width: 1280px) {
   .section {
-    padding-left: var(--space-10); /* 40px desktop */
+    padding-left: var(--space-10);
     padding-right: var(--space-10);
   }
 }
 
-/* Section vertical rhythm — based on Linear (96/128) + Supabase (64/72/96) */
 .section-hero {
-  padding-top: var(--space-20);   /* 80px mobile */
-  padding-bottom: var(--space-16); /* 64px mobile */
+  padding-top: var(--space-20);
+  padding-bottom: var(--space-16);
 }
 
 .section-tall {
-  padding-top: var(--space-16);   /* 64px mobile */
-  padding-bottom: var(--space-16); /* 64px mobile */
+  padding-top: var(--space-16);
+  padding-bottom: var(--space-16);
 }
 
 .section-compact {
-  padding-top: var(--space-12);  /* 48px mobile */
-  padding-bottom: var(--space-12); /* 48px mobile */
+  padding-top: var(--space-12);
+  padding-bottom: var(--space-12);
 }
 
 @media (min-width: 768px) {
   .section-hero {
-    padding-top: var(--space-24);   /* 96px tablet+ */
-    padding-bottom: var(--space-20); /* 80px tablet+ */
+    padding-top: var(--space-24);
+    padding-bottom: var(--space-20);
   }
   .section-tall {
-    padding-top: var(--space-24);   /* 96px tablet+ */
-    padding-bottom: var(--space-24); /* 96px tablet+ */
+    padding-top: var(--space-24);
+    padding-bottom: var(--space-24);
   }
   .section-compact {
-    padding-top: var(--space-16);  /* 64px tablet+ */
-    padding-bottom: var(--space-16); /* 64px tablet+ */
+    padding-top: var(--space-16);
+    padding-bottom: var(--space-16);
   }
 }
 
 @media (min-width: 1280px) {
   .section-hero {
-    padding-top: var(--space-32);   /* 128px desktop */
-    padding-bottom: var(--space-24); /* 96px desktop */
+    padding-top: var(--space-32);
+    padding-bottom: var(--space-24);
   }
   .section-tall {
-    padding-top: var(--space-32);   /* 128px desktop */
-    padding-bottom: var(--space-32); /* 128px desktop */
+    padding-top: var(--space-32);
+    padding-bottom: var(--space-32);
   }
 }
 
-/* section-tall and section-compact mobile handled by min-width queries above */
+/* ============================================
+   BADGE
+   ============================================ */
 
-/* ---- Badge ---- */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -426,7 +688,10 @@ body {
   letter-spacing: 0.01em;
 }
 
-/* ---- Typing Cursor ---- */
+/* ============================================
+   TYPING CURSOR
+   ============================================ */
+
 .typing-cursor {
   display: inline-block;
   width: 8px;
@@ -437,7 +702,10 @@ body {
   animation: typing-cursor 1s step-end infinite;
 }
 
-/* ---- Copy Button ---- */
+/* ============================================
+   COPY BUTTON
+   ============================================ */
+
 .copy-btn {
   position: absolute;
   top: var(--space-3);
@@ -469,47 +737,10 @@ body {
   border-color: oklch(0.72 0.19 145 / 0.3);
 }
 
-/* ---- Compare Table ---- */
-.compare-table {
-  width: 100%;
-  border-collapse: collapse;
-}
+/* ============================================
+   SYNTAX HIGHLIGHTING (cora original)
+   ============================================ */
 
-.compare-table th,
-.compare-table td {
-  padding: var(--space-3) var(--space-5);
-  border-bottom: 1px solid oklch(0.27 0.01 270 / 0.5);
-  text-align: left;
-  font-size: 14px;
-  color: var(--foreground);
-}
-
-.compare-table thead th {
-  color: var(--muted-foreground);
-  font-weight: 500;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding-bottom: var(--space-3);
-}
-
-.compare-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.compare-table .cora-col {
-  background: oklch(0.65 0.22 270 / 0.05);
-  font-weight: 500;
-}
-
-.compare-table thead .cora-col {
-  background: oklch(0.65 0.22 270 / 0.1);
-  color: var(--accent);
-}
-
-/* Compare table mobile handled by min-width queries in section container */
-
-/* ---- Syntax Highlighting ---- */
 .syntax-cmd { color: var(--muted-foreground); }
 .syntax-flag { color: oklch(0.75 0.15 240); }
 .syntax-string { color: var(--success); }
@@ -519,7 +750,10 @@ body {
 .syntax-warning { color: var(--warning); }
 .syntax-error { color: var(--destructive); }
 
-/* ---- Check/X Symbols ---- */
+/* ============================================
+   CHECK/X SYMBOLS
+   ============================================ */
+
 .symbol-check {
   color: var(--success);
   font-weight: 600;
@@ -530,7 +764,10 @@ body {
   font-weight: 600;
 }
 
-/* ---- Connect Line (How It Works) ---- */
+/* ============================================
+   CONNECT LINE (How It Works)
+   ============================================ */
+
 .connect-line {
   position: relative;
   flex: 1;
@@ -554,7 +791,10 @@ body {
   );
 }
 
-/* ---- Feature Icon ---- */
+/* ============================================
+   FEATURE ICON
+   ============================================ */
+
 .feature-icon {
   width: var(--space-12);
   height: var(--space-12);
@@ -571,7 +811,10 @@ body {
   color: var(--accent);
 }
 
-/* ---- Timeline Step ---- */
+/* ============================================
+   TIMELINE STEP
+   ============================================ */
+
 .timeline-step {
   display: flex;
   gap: var(--space-5);
@@ -592,7 +835,10 @@ body {
   flex-shrink: 0;
 }
 
-/* ---- Docs Layout ---- */
+/* ============================================
+   DOCS LAYOUT (preserved for docs pages)
+   ============================================ */
+
 .docs-sidebar {
   position: sticky;
   top: 3.5rem;

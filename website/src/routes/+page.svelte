@@ -1,41 +1,81 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	// ---- Terminal typing animation state ----
-	let terminalLines = $state<string[]>([]);
-	let terminalComplete = $state(false);
-	let demoStarted = $state(false);
+	// ---- Cycling command demo state ----
+	interface Command {
+		cmd: string;
+		desc: string;
+		output: string;
+	}
 
-	const installCmd = 'curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh';
+	const commands: Command[] = [
+		{
+			cmd: 'cora review --staged',
+			desc: 'Review staged changes before commit',
+			output: `🛡️  Rules engine: 3 files scanned (zero-cost regex)
+    ✖ src/api/auth.ts:42  — hardcoded API key detected
+    ✖ src/db/query.ts:18  — potential SQL injection
 
-	const terminalOutput = [
-		{ text: '$ cora review --staged', color: 'var(--muted-foreground)' },
-		{ text: '', color: '' },
-		{ text: '🛡️  Rules engine: 3 files scanned (zero-cost regex)', color: 'var(--muted-foreground)' },
-		{ text: '    ✖ src/api/auth.ts:42  — hardcoded API key detected', color: 'var(--destructive)' },
-		{ text: '    ✖ src/db/query.ts:18  — potential SQL injection', color: 'var(--destructive)' },
-		{ text: '', color: '' },
-		{ text: '🔗  Context chain: resolving cross-file references...', color: 'var(--muted-foreground)' },
-		{ text: '    → src/api/auth.ts imports validateToken from src/lib/token.ts', color: 'var(--muted-foreground)' },
-		{ text: '    → src/db/query.ts uses pool from src/lib/db.ts', color: 'var(--muted-foreground)' },
-		{ text: '', color: '' },
-		{ text: '🤖  LLM review: OpenAI GPT-4o-mini', color: 'var(--muted-foreground)' },
-		{ text: '    ⚠ src/api/auth.ts:67  — missing error boundary for token refresh', color: 'var(--warning)' },
-		{ text: '    ⚠ src/lib/token.ts:23  — token expiry not validated', color: 'var(--warning)' },
-		{ text: '', color: '' },
-		{ text: '📊  SARIF: review-results.sarif written (4 findings)', color: 'var(--muted-foreground)' },
-		{ text: '', color: '' },
-		{ text: '✓ Review complete — 4 issues found (2 critical, 2 major)', color: 'var(--accent)' },
+🔗  Context chain: resolving cross-file references...
+    → src/api/auth.ts imports validateToken from src/lib/token.ts
+
+🤖  LLM review: OpenAI GPT-4o-mini
+    ⚠ src/api/auth.ts:67  — missing error boundary
+
+✓ Review complete — 4 issues found`
+		},
+		{
+			cmd: 'cora review --pr 42',
+			desc: 'Review an existing pull request',
+			output: `📦  Fetching PR #42: feat: add payment processing
+📝  12 files changed, +340 −89
+
+🛡️  Rules engine: 12 files scanned
+    ✖ src/payments/stripe.ts:15  — hardcoded secret key
+
+🤖  LLM review: Anthropic Claude 3.5 Sonnet
+    ⚠ src/payments/webhook.ts:45  — missing idempotency check
+
+📊  SARIF: review-results.sarif written (3 findings)
+✓ Review complete — 3 issues found`
+		},
+		{
+			cmd: 'cora config set llm.model gpt-4o',
+			desc: 'Configure your LLM provider',
+			output: `✓ Config updated: llm.model = "gpt-4o"
+  Config file: .cora.yaml
+  
+  Run 'cora review' to start using the new model.`
+		},
+		{
+			cmd: 'cora review --full',
+			desc: 'Full codebase review with all checks',
+			output: `🛡️  Rules engine: 47 files scanned (zero-cost regex)
+    ✖ 3 hardcoded secrets detected
+    ✖ 2 potential SQL injection patterns
+
+🔗  Context chain: 23 cross-file references resolved
+
+🤖  LLM review: OpenAI GPT-4o
+    ⚠ 8 issues found across 6 files
+    💡 3 suggestions for improvement
+
+📊  SARIF: review-results.sarif written (13 findings)
+✓ Review complete — 13 issues found`
+		},
 	];
 
+	let visibleCmd: number = $state(0);
+
 	// ---- FAQ state ----
-	let openFAQIndex = $state<number | null>(null);
+	let openFAQIndex: number | null = $state(null);
 
 	function toggleFAQ(index: number) {
 		openFAQIndex = openFAQIndex === index ? null : index;
 	}
 
 	// ---- Copy install command ----
+	const installCmd = 'curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh';
 	let copyClicked = $state(false);
 	function copyInstall() {
 		navigator.clipboard.writeText(installCmd);
@@ -193,30 +233,12 @@
 
 		document.querySelectorAll('.scroll-reveal').forEach((el) => observer.observe(el));
 
-		// Typing animation observer - start when terminal section visible
-		const demoObserver = new IntersectionObserver(
-			(entries) => {
-				entries.forEach((entry) => {
-					if (entry.isIntersecting && !demoStarted) {
-						demoStarted = true;
-						let lineIndex = 0;
-						const typeInterval = setInterval(() => {
-							if (lineIndex < terminalOutput.length) {
-								terminalLines = [...terminalLines, terminalOutput[lineIndex].text];
-								lineIndex++;
-							} else {
-								terminalComplete = true;
-								clearInterval(typeInterval);
-							}
-						}, 150);
-					}
-				});
-			},
-			{ threshold: 0.3 }
-		);
+		// Cycle through commands
+		const interval = setInterval(() => {
+			visibleCmd = (visibleCmd + 1) % commands.length;
+		}, 4000);
 
-		const demoEl = document.getElementById('demo-terminal');
-		if (demoEl) demoObserver.observe(demoEl);
+		return () => clearInterval(interval);
 	});
 </script>
 
@@ -232,489 +254,388 @@
 	<meta property="og:description" content="CLI-first AI code review. BYOK any LLM. Pre-commit hooks. Deterministic rules engine. Zero telemetry. Open source MIT license." />
 </svelte:head>
 
-<div class="bg-[var(--background)]">
-	<!-- ====== FLOATING BLOBS (Background) ====== -->
-	<div class="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
-		<div class="blob blob-1"></div>
-		<div class="blob blob-2"></div>
-		<div class="blob blob-3"></div>
-	</div>
+<!-- ====== HERO ====== -->
+<section class="grid-bg relative overflow-hidden">
+	<!-- Subtle top gradient -->
+	<div class="absolute inset-0 bg-gradient-to-b from-purple-950/10 to-transparent pointer-events-none"></div>
 
-	<!-- ====== S1 — HERO ====== -->
-	<section class="section section-hero relative flex items-center justify-center min-h-[calc(100vh-3.5rem)]">
-		<!-- Subtle radial gradient glow -->
-		<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 50% 40% at 50% 40%, oklch(0.65 0.22 270 / 0.06), transparent);"></div>
+	<div class="relative max-w-6xl mx-auto px-6 pt-24 md:pt-36 pb-20 text-center">
+		<!-- Badge -->
+		<div class="animate-fade-in inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--card)] text-xs text-[var(--muted-foreground)] mb-8">
+			<span class="w-2 h-2 rounded-full bg-[var(--success)]"></span>
+			<span>v0.4 released</span>
+			<span class="text-[var(--muted-foreground)]">—</span>
+			<a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="text-[var(--accent)] hover:underline">release notes →</a>
+		</div>
 
-		<div class="relative z-10 max-w-3xl mx-auto text-center">
-			<!-- Badge -->
-			<div class="animate-fade-in-up">
-				<span class="accent-badge">
-					<span class="badge-dot"></span>
-					v0.4 · Open Source · MIT
-				</span>
+		<!-- Headline -->
+		<h1 class="animate-fade-in-delay-1 text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
+			Ship with Confidence.<br />
+			<span class="hero-gradient glow-text">AI Code Review, Before You Commit.</span>
+		</h1>
+
+		<!-- Subheadline -->
+		<p class="animate-fade-in-delay-2 text-base md:text-xl text-[var(--muted-foreground)] max-w-2xl mx-auto mb-10 leading-relaxed">
+			CLI-first AI code review. <strong class="text-[var(--foreground)]">BYOK any LLM, zero telemetry, open source.</strong>
+		</p>
+
+		<!-- Install command -->
+		<div class="animate-fade-in-delay-3 inline-flex flex-col items-center gap-4">
+			<div class="terminal-block inline-flex items-center gap-3 px-5 py-3.5 rounded-xl font-mono text-sm glow-purple">
+				<span class="text-[var(--success)]">$</span>
+				<span class="hidden sm:inline text-[var(--foreground)]">curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh</span>
+				<span class="sm:hidden text-[var(--foreground)]">curl -fsSL .../install.sh | sh</span>
+				<button
+					class="text-[var(--muted-foreground)] hover:text-[var(--accent)] transition-colors ml-2"
+					onclick={() => navigator.clipboard.writeText(installCmd)}
+					title="Copy"
+				>
+					<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+						<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+					</svg>
+				</button>
 			</div>
 
-			<!-- Headline -->
-			<h1 class="mt-8 mb-0 animate-fade-in-up delay-100 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-[var(--foreground)] leading-none -tracking-tighter">
-				Ship with Confidence.
-				<span class="bg-gradient-to-br from-[oklch(0.65_0.22_270)] to-[oklch(0.7_0.15_240)] bg-clip-text text-transparent"> AI Code Review, Before You Commit.</span>
-			</h1>
-
-			<!-- Subtitle -->
-			<p class="max-w-xl mx-auto mt-6 animate-fade-in-up delay-200 text-base sm:text-lg text-[var(--muted-foreground)] leading-normal sm:leading-relaxed -tracking-tight">
-				CLI-first AI code review. BYOK any LLM. Pre-commit hooks. Zero telemetry. Open source.
-			</p>
-
-			<!-- Install Terminal -->
-			<div class="max-w-2xl w-full mx-auto mt-10 animate-fade-in-up delay-300">
-				<div class="terminal relative">
-					<div class="terminal-header">
-						<span class="terminal-dot terminal-dot-red"></span>
-						<span class="terminal-dot terminal-dot-yellow"></span>
-						<span class="terminal-dot terminal-dot-green"></span>
-						<span class="terminal-title">Install cora</span>
-					</div>
-					<div class="terminal-body relative overflow-x-auto">
-						<span class="syntax-cmd">$</span>
-						<span class="syntax-highlight"> curl -fsSL</span>
-						<span class="syntax-string"> https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh</span>
-						<span class="syntax-highlight"> | sh</span>
-						<span class="typing-cursor"></span>
-						<button class="copy-btn" onclick={copyClicked ? undefined : copyInstall} class:copied={copyClicked} aria-label="Copy install command">
-							{#if copyClicked}
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-							{:else}
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-							{/if}
-						</button>
-					</div>
-				</div>
-			</div>
-
-			<!-- CTAs -->
-			<div class="flex flex-wrap justify-center gap-4 items-center mt-8 animate-fade-in-up delay-400">
-				<a href="https://github.com/codecoradev/cora-cli" target="__blank" rel="noopener" class="btn-primary">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-					Star on GitHub
+			<div class="flex items-center gap-3 text-sm">
+				<a
+					href="https://github.com/codecoradev/cora-cli"
+					target="_blank"
+					rel="noopener"
+					class="cta-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--accent)] text-[var(--accent-foreground)] font-semibold text-sm"
+				>
+					<svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+					GitHub
 				</a>
-				<a href="/docs/getting-started" class="btn-ghost">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+				<a
+					href="/docs/getting-started"
+					class="cta-secondary inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] font-medium text-sm"
+				>
 					Install & Get Started
 				</a>
 			</div>
-
-			<!-- Trust Line -->
-			<p class="mt-6 animate-fade-in-up delay-500 text-xs text-[var(--muted-foreground)] tracking-wide">
-				<span class="flex items-center justify-center flex-wrap gap-x-4 gap-y-1">
-					<span>MIT License</span>
-					<span>·</span>
-					<span>No account</span>
-					<span>·</span>
-					<span>No telemetry</span>
-					<span>·</span>
-					<span>Rust &amp; WebAssembly</span>
-				</span>
-			</p>
 		</div>
-	</section>
 
-	<!-- ====== S2 — PROBLEM / SOLUTION CARDS ====== -->
-	<section class="section section-tall relative z-10">
-		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
-			Code review shouldn't be slow or expensive
-		</h2>
-		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)] max-w-[32rem] mx-auto">
-			Stop waiting hours for feedback. cora catches issues in seconds — before you commit.
+		<!-- Trust line -->
+		<p class="mt-8 animate-fade-in-delay-4 text-xs text-[var(--muted-foreground)] tracking-wide">
+			<span class="flex items-center justify-center flex-wrap gap-x-4 gap-y-1">
+				<span>MIT License</span>
+				<span>·</span>
+				<span>No account</span>
+				<span>·</span>
+				<span>No telemetry</span>
+				<span>·</span>
+				<span>Rust & WebAssembly</span>
+			</span>
 		</p>
+	</div>
+</section>
 
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-10 max-w-4xl mx-auto">
-			{#each comparisons as comp, i}
-				<div class="grid gap-4 scroll-reveal" style="transition-delay: {i * 100}ms;">
-					<!-- Problem card -->
-					<div class="rounded-xl p-6 border" style="background: oklch(0.55 0.22 25 / 0.08); border-color: oklch(0.55 0.22 25 / 0.2);">
-						<div class="flex items-center gap-3" style="color: var(--destructive);">
-							<span>✕</span>
-							<span class="font-semibold">{comp.problem}</span>
-						</div>
-					</div>
-					<!-- Solution card -->
-					<div class="rounded-xl p-6 border" style="background: oklch(0.72 0.19 145 / 0.08); border-color: oklch(0.72 0.19 145 / 0.2);">
-						<div class="flex items-center gap-3" style="color: var(--success);">
-							<span>✓</span>
-							<span class="font-semibold">{comp.solution}</span>
-						</div>
-					</div>
-				</div>
-			{/each}
+<!-- ====== TERMINAL DEMO (Cycling Commands) ====== -->
+<section class="max-w-6xl mx-auto px-6 -mt-4 pb-16 md:pb-24">
+	<div class="terminal-block rounded-2xl overflow-hidden glow-purple">
+		<!-- Title bar -->
+		<div class="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--card)]">
+			<div class="flex gap-1.5">
+				<div class="w-3 h-3 rounded-full bg-red-500/60"></div>
+				<div class="w-3 h-3 rounded-full bg-yellow-500/60"></div>
+				<div class="w-3 h-3 rounded-full bg-green-500/60"></div>
+			</div>
+			<span class="text-xs text-[var(--muted-foreground)] ml-2 font-mono">cora v0.4 — AI code review engine</span>
 		</div>
-	</section>
 
-	<!-- ====== S3 — LIVE TERMINAL DEMO ====== -->
-	<section class="section section-tall relative z-10" id="demo-terminal">
-		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
-			See it in action
-		</h2>
-		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)] max-w-[32rem] mx-auto">
-			Run cora against staged changes. Rules engine + LLM + SARIF output — in one pass.
-		</p>
-
-		<div class="max-w-3xl mx-auto mt-10 scroll-reveal">
-			<div class="terminal">
-				<div class="terminal-header">
-					<span class="terminal-dot terminal-dot-red"></span>
-					<span class="terminal-dot terminal-dot-yellow"></span>
-					<span class="terminal-dot terminal-dot-green"></span>
-					<span class="terminal-title">cora v0.4 — review --staged</span>
-				</div>
-				<div class="terminal-body">
-					{#each terminalLines as line, i}
-						<div class="min-h-[1.45em]" style="color: {terminalOutput[i]?.color || 'var(--foreground)'}; white-space: pre-wrap;">{line}</div>
-					{/each}
-					{#if terminalComplete}
-						<span class="typing-cursor"></span>
+		<!-- Terminal content -->
+		<div class="p-5 md:p-6 font-mono text-sm space-y-3 min-h-[260px]">
+			{#each commands as c, i}
+				<div class="transition-all duration-300 {i === visibleCmd ? 'opacity-100' : 'opacity-30'}">
+					{#if i === visibleCmd}
+						<div class="flex items-start gap-2">
+							<span class="text-[var(--success)] select-none">❯</span>
+							<div>
+								<span class="cmd-highlight">{c.cmd.split(' ')[0]}</span>
+								<span class="cmd-flag"> {c.cmd.split(' ').slice(1).join(' ')}</span>
+							</div>
+						</div>
+						<p class="text-[var(--muted-foreground)] ml-5 mt-0.5 text-xs cmd-comment"># {c.desc}</p>
+						<div class="ml-5 mt-2 text-[var(--muted-foreground)] text-xs whitespace-pre-wrap leading-relaxed">{c.output}</div>
+					{:else}
+						<div class="flex items-start gap-2">
+							<span class="text-[var(--muted-foreground)] select-none">❯</span>
+							<span class="text-[var(--muted-foreground)]">{c.cmd}</span>
+						</div>
 					{/if}
 				</div>
-			</div>
-		</div>
-	</section>
-
-	<!-- ====== S4 — FEATURES GRID ====== -->
-	<section class="section section-tall relative z-10">
-		<div class="text-center scroll-reveal">
-			<h2 class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
-				Everything you need. Nothing you don't.
-			</h2>
-			<p class="mt-4 text-sm text-[var(--muted-foreground)]">
-				Built for developers who value speed, privacy, and control.
-			</p>
-		</div>
-
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-			{#each features as feature, i}
-				<div class="glass-card scroll-reveal" style="transition-delay: {i * 80}ms;">
-					<div class="text-2xl mb-4">{feature.icon}</div>
-					<div class="text-xs font-medium text-[var(--accent)] mb-2 tracking-wide uppercase">{feature.tag}</div>
-					<h3 class="text-lg font-semibold text-[var(--foreground)]">{feature.title}</h3>
-					<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">{@html feature.description}</p>
-				</div>
 			{/each}
 		</div>
-	</section>
+	</div>
+</section>
 
-	<!-- ====== S5 — HOW IT WORKS ====== -->
-	<section class="section section-tall relative z-10">
-		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
-			Three steps to confident commits
+<!-- ====== SOCIAL PROOF ====== -->
+<section class="max-w-6xl mx-auto px-6 py-10 text-center">
+	<div class="flex flex-wrap items-center justify-center gap-8 text-[var(--muted-foreground)]">
+		<div class="flex items-center gap-2">
+			<span class="text-xl">🦀</span>
+			<span class="text-sm">Built with Rust</span>
+		</div>
+		<div class="flex items-center gap-2">
+			<span class="text-xl">🔒</span>
+			<span class="text-sm">Zero Telemetry</span>
+		</div>
+		<div class="flex items-center gap-2">
+			<span class="text-xl">⚡</span>
+			<span class="text-sm">Pre-commit Hooks</span>
+		</div>
+		<div class="flex items-center gap-2">
+			<span class="text-xl">🛡️</span>
+			<span class="text-sm">Rules Engine</span>
+		</div>
+		<div class="flex items-center gap-2">
+			<span class="text-xl">🔑</span>
+			<span class="text-sm">BYOK Any LLM</span>
+		</div>
+		<div class="flex items-center gap-2">
+			<span class="text-xl">📦</span>
+			<span class="text-sm">Single Binary</span>
+		</div>
+	</div>
+</section>
+
+<div class="separator-gradient"></div>
+
+<!-- ====== PROBLEM / SOLUTION CARDS ====== -->
+<section class="max-w-6xl mx-auto px-6 py-16 md:py-24">
+	<div class="max-w-3xl mx-auto text-center">
+		<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase">The Problem</p>
+		<h2 class="text-2xl md:text-4xl font-bold mb-6">
+			Code review shouldn't be<br />slow or expensive
 		</h2>
-		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)] max-w-[32rem] mx-auto">
-			Install, configure, review. That's it.
+		<p class="text-base md:text-lg text-[var(--muted-foreground)] leading-relaxed mb-12">
+			Stop waiting hours for feedback. cora catches issues in seconds — <span class="text-[var(--foreground)]">before you commit.</span>
 		</p>
+	</div>
 
-		<div class="flex flex-col md:flex-row items-stretch mt-10 gap-6 max-w-5xl mx-auto">
-			<!-- Step 1 -->
-			<div class="glass-card flex-1 text-center scroll-reveal">
-				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">01</div>
-				<div class="flex justify-center mt-4">
-					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+	<div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+		{#each comparisons as comp, i}
+			<div class="grid gap-4 scroll-reveal" style="transition-delay: {i * 100}ms;">
+				<!-- Problem card -->
+				<div class="feature-card rounded-xl p-6 border border-[var(--border)] bg-[var(--card)]">
+					<div class="flex items-center gap-3 text-[var(--destructive)]">
+						<span>✕</span>
+						<span class="font-semibold">{comp.problem}</span>
+					</div>
 				</div>
-				<h3 class="mt-4 text-xl font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Install</h3>
-				<p class="mt-2 text-sm text-[var(--muted-foreground)]">One command. Single binary. No dependencies.</p>
-				<div class="mt-4 mx-auto max-w-fit">
-					<div class="terminal">
-						<div class="terminal-header py-2 px-3">
-							<span class="terminal-dot terminal-dot-red" style="width:10px;height:10px;"></span>
-							<span class="terminal-dot terminal-dot-yellow" style="width:10px;height:10px;"></span>
-							<span class="terminal-dot terminal-dot-green" style="width:10px;height:10px;"></span>
-						</div>
-						<div class="terminal-body py-3 px-4 text-[12px] leading-relaxed overflow-x-auto">
-							<span class="syntax-cmd">$</span> <span class="syntax-highlight">curl -fsSL</span> <span class="syntax-string">…install.sh</span> <span class="syntax-highlight">| sh</span>
-						</div>
+				<!-- Solution card -->
+				<div class="feature-card rounded-xl p-6 border" style="background: oklch(0.72 0.19 145 / 0.05); border-color: oklch(0.72 0.19 145 / 0.2);">
+					<div class="flex items-center gap-3 text-[var(--success)]">
+						<span>✓</span>
+						<span class="font-semibold">{comp.solution}</span>
 					</div>
 				</div>
 			</div>
+		{/each}
+	</div>
+</section>
 
-			<!-- Connector -->
-			<div class="connect-line hidden md:flex scroll-reveal">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+<div class="separator-gradient"></div>
+
+<!-- ====== FEATURES GRID ====== -->
+<section class="max-w-6xl mx-auto px-6 py-16 md:py-24">
+	<div class="text-center mb-14">
+		<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase scroll-reveal">Features</p>
+		<h2 class="text-2xl md:text-4xl font-bold scroll-reveal">Everything you need.<br />Nothing you don't.</h2>
+	</div>
+
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+		{#each features as feat, i}
+			<div class="feature-card p-6 rounded-xl border border-[var(--border)] bg-[var(--card)] scroll-reveal" style="transition-delay: {i * 60}ms;">
+				<span class="text-2xl">{feat.icon}</span>
+				<h3 class="text-lg font-semibold mt-3 mb-1">{feat.title}</h3>
+				<p class="text-sm text-[var(--accent)] mb-2">{feat.tag}</p>
+				<p class="text-sm text-[var(--muted-foreground)] leading-relaxed">{@html feat.description}</p>
 			</div>
+		{/each}
+	</div>
+</section>
 
-			<!-- Step 2 -->
-			<div class="glass-card flex-1 text-center scroll-reveal [transition-delay:100ms]">
-				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">02</div>
-				<div class="flex justify-center mt-4">
-					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-				</div>
-				<h3 class="mt-4 text-xl font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Configure</h3>
-				<p class="mt-2 text-sm text-[var(--muted-foreground)]">Creates <code class="text-[var(--accent)] font-mono text-[13px]">.cora.yaml</code> with your LLM settings.</p>
-				<div class="mt-4 mx-auto max-w-fit">
-					<div class="terminal">
-						<div class="terminal-header py-2 px-3">
-							<span class="terminal-dot terminal-dot-red" style="width:10px;height:10px;"></span>
-							<span class="terminal-dot terminal-dot-yellow" style="width:10px;height:10px;"></span>
-							<span class="terminal-dot terminal-dot-green" style="width:10px;height:10px;"></span>
-						</div>
-						<div class="terminal-body py-3 px-4 text-[12px]">
-							<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora init</span>
-						</div>
-					</div>
+<div class="separator-gradient"></div>
+
+<!-- ====== QUICK START / HOW IT WORKS ====== -->
+<section class="grid-bg relative">
+	<div class="max-w-6xl mx-auto px-6 py-16 md:py-24 relative z-10">
+		<div class="text-center mb-14">
+			<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase scroll-reveal">Get Started</p>
+			<h2 class="text-2xl md:text-4xl font-bold scroll-reveal">Three steps to<br />confident commits</h2>
+		</div>
+
+		<div class="max-w-2xl mx-auto space-y-6">
+			<div class="flex gap-4 scroll-reveal">
+				<div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--accent-dim)] flex items-center justify-center text-sm font-bold text-[var(--accent)]">1</div>
+				<div class="min-w-0 flex-1">
+					<p class="font-medium mb-2">Install</p>
+					<code class="block px-4 py-3 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm font-mono text-[var(--muted-foreground)] overflow-x-auto">
+						<span class="cmd-highlight">curl</span> -fsSL .../install.sh <span class="cmd-flag">|</span> sh
+					</code>
 				</div>
 			</div>
-
-			<!-- Connector -->
-			<div class="connect-line hidden md:flex scroll-reveal [transition-delay:100ms]">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-			</div>
-
-			<!-- Step 3 -->
-			<div class="glass-card flex-1 text-center scroll-reveal [transition-delay:200ms]">
-				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">03</div>
-				<div class="flex justify-center mt-4">
-					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+			<div class="flex gap-4 scroll-reveal">
+				<div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--accent-dim)] flex items-center justify-center text-sm font-bold text-[var(--accent)]">2</div>
+				<div class="min-w-0 flex-1">
+					<p class="font-medium mb-2">Configure</p>
+					<code class="block px-4 py-3 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm font-mono text-[var(--muted-foreground)] overflow-x-auto">
+						<span class="cmd-highlight">cora</span> init
+					</code>
 				</div>
-				<h3 class="mt-4 text-xl font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Review</h3>
-				<p class="mt-2 text-sm text-[var(--muted-foreground)]">Review staged changes before every commit.</p>
-				<div class="mt-4 mx-auto max-w-fit">
-					<div class="terminal">
-						<div class="terminal-header py-2 px-3">
-							<span class="terminal-dot terminal-dot-red" style="width:10px;height:10px;"></span>
-							<span class="terminal-dot terminal-dot-yellow" style="width:10px;height:10px;"></span>
-							<span class="terminal-dot terminal-dot-green" style="width:10px;height:10px;"></span>
-						</div>
-						<div class="terminal-body py-3 px-4 text-[12px]">
-							<span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span>
-						</div>
-					</div>
+			</div>
+			<div class="flex gap-4 scroll-reveal">
+				<div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--accent-dim)] flex items-center justify-center text-sm font-bold text-[var(--accent)]">3</div>
+				<div class="min-w-0 flex-1">
+					<p class="font-medium mb-2">Review</p>
+					<code class="block px-4 py-3 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm font-mono text-[var(--muted-foreground)] overflow-x-auto">
+						<span class="cmd-highlight">cora review</span> <span class="cmd-flag">--staged</span>
+					</code>
+				</div>
+			</div>
+			<div class="flex gap-4 scroll-reveal">
+				<div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--success)]/20 flex items-center justify-center text-sm font-bold text-[var(--success)]">✓</div>
+				<div class="min-w-0 flex-1">
+					<p class="font-medium text-[var(--success)]">That's it. No account. No server. No lock-in.</p>
+					<p class="text-sm text-[var(--muted-foreground)] mt-1">Works out of the box with sensible defaults. Customize with <code class="text-[var(--accent)] font-mono text-[12px]">.cora.yaml</code> when you need more control.</p>
 				</div>
 			</div>
 		</div>
-	</section>
+	</div>
+</section>
 
-	<!-- ====== S6 — REPOS USING CORA ====== -->
-	<section class="section section-compact relative z-10">
-		<p class="text-center scroll-reveal text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-widest">
-			Trusted across 13 repositories
-		</p>
-		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 mt-8 max-w-4xl mx-auto">
-			{#each repos as repo, i}
-				<div class="glass-card text-center scroll-reveal py-6" style="transition-delay: {i * 60}ms;">
-					<div class="text-base font-semibold text-[var(--foreground)] -tracking-tight">{repo.name}</div>
-					<div class="text-xs text-[var(--muted-foreground)] mt-1">{repo.desc}</div>
-				</div>
-			{/each}
-		</div>
-	</section>
+<div class="separator-gradient"></div>
 
-	<!-- ====== S7 — COMPARISON TABLE ====== -->
-	<section class="section section-tall relative z-10">
-		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
-			Why developers choose cora
-		</h2>
-		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)]">
-			Feature-by-feature with popular code review tools.
-		</p>
-
-		<div class="glass-card scroll-reveal mt-10 p-0 max-w-[56rem] mx-auto overflow-hidden">
-			<div class="overflow-x-auto">
-				<table class="compare-table">
-					<thead>
-						<tr>
-							<th>Feature</th>
-							<th class="cora-col">cora</th>
-							<th>CodeRabbit</th>
-							<th>Copilot</th>
-							<th>SonarQube</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each competitors as comp}
-							<tr>
-								<td>{comp.feature}</td>
-								<td class="cora-col">{@html comp.cora}</td>
-								<td>{@html comp.coderabbit}</td>
-								<td>{@html comp.copilot}</td>
-								<td>{@html comp.sonarqube}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+<!-- ====== REPOS USING CORA ====== -->
+<section class="max-w-6xl mx-auto px-6 py-16 md:py-24">
+	<p class="text-center scroll-reveal text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-widest">
+		Trusted across 13 repositories
+	</p>
+	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 mt-8 max-w-4xl mx-auto">
+		{#each repos as repo, i}
+			<div class="feature-card text-center scroll-reveal py-6 rounded-xl border border-[var(--border)] bg-[var(--card)]" style="transition-delay: {i * 60}ms;">
+				<div class="text-base font-semibold text-[var(--foreground)] -tracking-tight">{repo.name}</div>
+				<div class="text-xs text-[var(--muted-foreground)] mt-1">{repo.desc}</div>
 			</div>
-		</div>
-	</section>
+		{/each}
+	</div>
+</section>
 
-	<!-- ====== S8 — FAQ ACCORDION ====== -->
-	<section class="section section-tall relative z-10" id="faq">
-		<div class="max-w-3xl mx-auto">
-			<div class="text-center scroll-reveal">
-				<h2 class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
-					Frequently asked questions
-				</h2>
-				<p class="mt-4 text-sm text-[var(--muted-foreground)]">
-					Everything you need to know about cora.
-				</p>
-			</div>
+<div class="separator-gradient"></div>
 
-			<div class="mt-10 flex flex-col gap-3">
-				{#each faqs as faq, index}
-					<div class="scroll-reveal" style="transition-delay: {index * 50}ms;">
-						<div class="rounded-xl border overflow-hidden" style="background: var(--card); border-color: oklch(0.27 0.01 270 / 0.5);">
-							<button
-								onclick={() => toggleFAQ(index)}
-								class="w-full px-6 py-5 text-left flex items-center justify-between gap-4 cursor-pointer hover:opacity-80 transition-opacity"
-								aria-expanded={openFAQIndex === index}
-							>
-								<span class="font-semibold text-sm sm:text-base text-[var(--foreground)]">{faq.q}</span>
-								<span class="text-xl text-[var(--muted-foreground)] flex-shrink-0 transition-transform duration-300" style="transform: {openFAQIndex === index ? 'rotate(180deg)' : 'rotate(0deg)'}">
-									{openFAQIndex === index ? '−' : '+'}
-								</span>
-							</button>
-							{#if openFAQIndex === index}
-								<div class="px-6 pb-5 text-sm text-[var(--muted-foreground)] leading-relaxed border-t" style="border-color: oklch(0.27 0.01 270 / 0.5);">
-									<div class="pt-4">{@html faq.a}</div>
-								</div>
-							{/if}
-						</div>
-					</div>
+<!-- ====== COMPARISON TABLE ====== -->
+<section class="max-w-6xl mx-auto px-6 py-16 md:py-24">
+	<div class="text-center mb-14">
+		<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase scroll-reveal">Compare</p>
+		<h2 class="text-2xl md:text-4xl font-bold scroll-reveal">Why developers choose cora</h2>
+	</div>
+
+	<div class="overflow-x-auto rounded-xl border border-[var(--border)] scroll-reveal">
+		<table class="compare-table w-full text-sm">
+			<thead>
+				<tr class="border-b border-[var(--border)]">
+					<th class="text-left px-4 py-3 font-medium text-[var(--muted-foreground)]">Feature</th>
+					<th class="highlight-col text-center px-4 py-3 font-semibold text-[var(--accent)]">cora</th>
+					<th class="text-center px-4 py-3 font-medium text-[var(--muted-foreground)] hidden sm:table-cell">CodeRabbit</th>
+					<th class="text-center px-4 py-3 font-medium text-[var(--muted-foreground)] hidden md:table-cell">Copilot</th>
+					<th class="text-center px-4 py-3 font-medium text-[var(--muted-foreground)] hidden lg:table-cell">SonarQube</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each competitors as row}
+					<tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--card)] transition-colors">
+						<td class="px-4 py-3 text-[var(--muted-foreground)]">{row.feature}</td>
+						<td class="highlight-col px-4 py-3 text-center font-medium">{@html row.cora}</td>
+						<td class="px-4 py-3 text-center text-[var(--muted-foreground)] hidden sm:table-cell">{@html row.coderabbit}</td>
+						<td class="px-4 py-3 text-center text-[var(--muted-foreground)] hidden md:table-cell">{@html row.copilot}</td>
+						<td class="px-4 py-3 text-center text-[var(--muted-foreground)] hidden lg:table-cell">{@html row.sonarqube}</td>
+					</tr>
 				{/each}
-			</div>
+			</tbody>
+		</table>
+	</div>
+</section>
+
+<div class="separator-gradient"></div>
+
+<!-- ====== FAQ ACCORDION ====== -->
+<section class="max-w-6xl mx-auto px-6 py-16 md:py-24" id="faq">
+	<div class="max-w-3xl mx-auto">
+		<div class="text-center">
+			<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase scroll-reveal">FAQ</p>
+			<h2 class="text-2xl md:text-4xl font-bold scroll-reveal">Frequently asked questions</h2>
 		</div>
-	</section>
 
-	<!-- ====== S9 — FINAL CTA ====== -->
-	<section class="section section-hero relative z-10">
-		<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 40% 30% at 50% 50%, oklch(0.65 0.22 270 / 0.05), transparent);"></div>
-
-		<div class="relative z-10 max-w-3xl mx-auto text-center">
-			<h2 class="scroll-reveal text-3xl md:text-4xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
-				Start Shipping Better Code
-			</h2>
-			<p class="mt-4 scroll-reveal text-base text-[var(--muted-foreground)]">
-				Free forever. No account required. Open source MIT.
-			</p>
-
-			<div class="max-w-2xl w-full mx-auto mt-10 scroll-reveal">
-				<div class="terminal relative">
-					<div class="terminal-header">
-						<span class="terminal-dot terminal-dot-red"></span>
-						<span class="terminal-dot terminal-dot-yellow"></span>
-						<span class="terminal-dot terminal-dot-green"></span>
-						<span class="terminal-title">Install cora</span>
-					</div>
-					<div class="terminal-body relative overflow-x-auto">
-						<span class="syntax-cmd">$</span>
-						<span class="syntax-highlight"> curl -fsSL</span>
-						<span class="syntax-string"> https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh</span>
-						<span class="syntax-highlight"> | sh</span>
-						<button class="copy-btn" onclick={copyClicked ? undefined : copyInstall} class:copied={copyClicked} aria-label="Copy install command">
-							{#if copyClicked}
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-							{:else}
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-							{/if}
+		<div class="mt-10 flex flex-col gap-3">
+			{#each faqs as faq, index}
+				<div class="scroll-reveal" style="transition-delay: {index * 50}ms;">
+					<div class="feature-card rounded-xl border overflow-hidden" style="background: var(--card); border-color: var(--border);">
+						<button
+							onclick={() => toggleFAQ(index)}
+							class="w-full px-6 py-5 text-left flex items-center justify-between gap-4 cursor-pointer hover:opacity-80 transition-opacity"
+							aria-expanded={openFAQIndex === index}
+						>
+							<span class="font-semibold text-sm sm:text-base text-[var(--foreground)]">{faq.q}</span>
+							<span class="text-xl text-[var(--muted-foreground)] flex-shrink-0 transition-transform duration-300" style="transform: {openFAQIndex === index ? 'rotate(45deg)' : 'rotate(0deg)'}">
+								+
+							</span>
 						</button>
+						{#if openFAQIndex === index}
+							<div class="px-6 pb-5 text-sm text-[var(--muted-foreground)] leading-relaxed border-t" style="border-color: var(--border);">
+								<div class="pt-4">{@html faq.a}</div>
+							</div>
+						{/if}
 					</div>
 				</div>
-			</div>
-
-			<div class="flex flex-wrap justify-center gap-4 items-center mt-8 scroll-reveal">
-				<a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="btn-primary">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-					Star on GitHub
-				</a>
-				<a href="/docs/getting-started" class="btn-ghost">
-					Read the Docs
-				</a>
-			</div>
-
-			<p class="mt-6 text-xs text-[var(--muted-foreground)] tracking-wide scroll-reveal">
-				<span class="flex items-center justify-center flex-wrap gap-x-4 gap-y-1">
-					<span>🦀 Built in Rust</span>
-					<span>·</span>
-					<span>🔒 Zero telemetry</span>
-					<span>·</span>
-					<span>⚡ Pre-commit hooks</span>
-					<span>·</span>
-					<span>MIT License</span>
-				</span>
-			</p>
+			{/each}
 		</div>
-	</section>
+	</div>
+</section>
 
-	<!-- ====== FOOTER ====== -->
-	<footer class="border-t border-[var(--border)] relative z-10" style="background: var(--background);">
-		<div class="section py-8">
-			<div class="flex flex-col md:flex-row items-center justify-between gap-4">
-				<div class="flex items-center gap-3">
-					<span class="text-sm font-semibold text-[var(--foreground)]">cora</span>
-					<span class="text-xs text-[var(--muted-foreground)]">v0.4 · MIT License</span>
-				</div>
-				<div class="flex items-center gap-6">
-					<a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">GitHub</a>
-					<a href="/docs" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">Docs</a>
-					<a href="#faq" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">FAQ</a>
-				</div>
+<div class="separator-gradient"></div>
+
+<!-- ====== FINAL CTA ====== -->
+<section class="max-w-6xl mx-auto px-6 py-20 md:py-28 text-center">
+	<h2 class="text-2xl md:text-4xl font-bold mb-4 scroll-reveal">
+		Start Shipping<br />
+		<span class="hero-gradient">Better Code</span>
+	</h2>
+	<p class="text-[var(--muted-foreground)] mb-8 text-base scroll-reveal">Free forever · No account required · Open source MIT</p>
+	<div class="flex items-center justify-center gap-4 scroll-reveal">
+		<a
+			href="https://github.com/codecoradev/cora-cli"
+			target="_blank"
+			rel="noopener"
+			class="cta-primary inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[var(--accent)] text-[var(--accent-foreground)] font-semibold"
+		>
+			<svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+			Star on GitHub
+		</a>
+		<a
+			href="/docs/getting-started"
+			class="cta-secondary inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] font-medium"
+		>
+			Read the Docs
+		</a>
+	</div>
+</section>
+
+<!-- ====== FOOTER ====== -->
+<div class="separator-gradient"></div>
+<footer style="background: var(--background);">
+	<div class="max-w-6xl mx-auto px-6 py-8">
+		<div class="flex flex-col md:flex-row items-center justify-between gap-4">
+			<div class="flex items-center gap-3">
+				<span class="text-sm font-semibold text-[var(--foreground)]">cora</span>
+				<span class="text-xs text-[var(--muted-foreground)]">v0.4 · MIT License</span>
+			</div>
+			<div class="flex items-center gap-6">
+				<a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">GitHub</a>
+				<a href="/docs" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">Docs</a>
+				<a href="#faq" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">FAQ</a>
 			</div>
 		</div>
-	</footer>
-</div>
-
-<style>
-	/* ---- Floating Blobs ---- */
-	.blob {
-		position: absolute;
-		border-radius: 50%;
-		filter: blur(80px);
-		opacity: 0.4;
-	}
-
-	.blob-1 {
-		width: 400px;
-		height: 400px;
-		background: oklch(0.65 0.22 270 / 0.15);
-		top: -100px;
-		left: -100px;
-		animation: blob-drift-1 20s ease-in-out infinite;
-	}
-
-	.blob-2 {
-		width: 350px;
-		height: 350px;
-		background: oklch(0.7 0.15 240 / 0.1);
-		top: 40%;
-		right: -80px;
-		animation: blob-drift-2 25s ease-in-out infinite;
-	}
-
-	.blob-3 {
-		width: 300px;
-		height: 300px;
-		background: oklch(0.72 0.19 145 / 0.08);
-		bottom: 10%;
-		left: 20%;
-		animation: blob-drift-3 22s ease-in-out infinite;
-	}
-
-	@keyframes blob-drift-1 {
-		0%, 100% { transform: translate(0, 0) scale(1); }
-		33% { transform: translate(60px, 40px) scale(1.1); }
-		66% { transform: translate(-30px, 60px) scale(0.95); }
-	}
-
-	@keyframes blob-drift-2 {
-		0%, 100% { transform: translate(0, 0) scale(1); }
-		33% { transform: translate(-50px, -30px) scale(1.05); }
-		66% { transform: translate(40px, -50px) scale(0.9); }
-	}
-
-	@keyframes blob-drift-3 {
-		0%, 100% { transform: translate(0, 0) scale(1); }
-		33% { transform: translate(30px, -40px) scale(1.08); }
-		66% { transform: translate(-40px, 20px) scale(0.95); }
-	}
-
-	/* Reduce motion for blobs */
-	@media (prefers-reduced-motion: reduce) {
-		.blob {
-			animation: none !important;
-		}
-	}
-</style>
+	</div>
+</footer>
