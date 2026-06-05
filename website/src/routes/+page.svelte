@@ -427,18 +427,21 @@
 
 	<div class="max-w-2xl mx-auto space-y-3">
 		{#each faqs as faq, i}
-			<button
-				class="feature-card w-full text-left px-5 py-4 rounded-xl border border-[var(--border)] bg-[var(--card)]"
+			<div
+				class="feature-card w-full text-left px-5 py-4 rounded-xl border border-[var(--border)] bg-[var(--card)] cursor-pointer"
+				role="button"
+				tabindex="0"
 				onclick={() => openFaq = openFaq === i ? null : i}
+				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFaq = openFaq === i ? null : i; } }}
 			>
 				<div class="flex items-center justify-between gap-4">
 					<span class="font-medium text-sm">{faq.q}</span>
 					<span class="text-[var(--muted-foreground)] transition-transform duration-200 {openFaq === i ? 'rotate-45' : ''}">+</span>
 				</div>
 				{#if openFaq === i}
-					<p class="text-sm text-[var(--muted-foreground)] mt-3 leading-relaxed">{faq.a}</p>
+					<span class="text-sm text-[var(--muted-foreground)] mt-3 leading-relaxed block">{faq.a}</span>
 				{/if}
-			</button>
+			</div>
 		{/each}
 	</div>
 </section>
