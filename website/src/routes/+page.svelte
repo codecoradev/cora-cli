@@ -21,10 +21,12 @@
 	];
 
 	let copyClicked = $state(false);
-	function copyInstall() {
-		navigator.clipboard.writeText('curl -fsSL https://cora.dev/install | sh');
-		copyClicked = true;
-		setTimeout(() => { copyClicked = false; }, 2000);
+	async function copyInstall() {
+		try {
+			await navigator.clipboard.writeText('curl -fsSL https://cora.dev/install | sh');
+			copyClicked = true;
+			setTimeout(() => { copyClicked = false; }, 2000);
+		} catch { /* clipboard not available */ }
 	}
 
 	onMount(() => {
