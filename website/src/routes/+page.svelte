@@ -29,6 +29,8 @@
 		} catch { /* clipboard not available */ }
 	}
 
+	let typeInterval: ReturnType<typeof setInterval> | null = null;
+
 	onMount(() => {
 		// Scroll reveal observer
 		const observer = new IntersectionObserver(
@@ -52,13 +54,13 @@
 					if (entry.isIntersecting && !demoStarted) {
 						demoStarted = true;
 						let lineIndex = 0;
-						const typeInterval = setInterval(() => {
+						typeInterval = setInterval(() => {
 							if (lineIndex < terminalOutput.length) {
 								terminalLines = [...terminalLines, terminalOutput[lineIndex].text];
 								lineIndex++;
 							} else {
 								terminalComplete = true;
-								clearInterval(typeInterval);
+								if (typeInterval) clearInterval(typeInterval);
 							}
 						}, 200);
 					}
@@ -69,6 +71,13 @@
 
 		const demoEl = document.getElementById('demo-terminal');
 		if (demoEl) demoObserver.observe(demoEl);
+
+		// Cleanup on unmount
+		return () => {
+			observer.disconnect();
+			demoObserver.disconnect();
+			if (typeInterval) clearInterval(typeInterval);
+		};
 	});
 </script>
 
