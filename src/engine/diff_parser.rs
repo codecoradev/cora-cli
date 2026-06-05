@@ -125,9 +125,15 @@ pub fn parse_diff(diff: &str) -> Vec<FileChunk> {
                 }
 
                 let old_start: u32 = caps[1].parse().unwrap_or(1);
-                let old_count: u32 = caps[2].parse().unwrap_or(1);
+                let old_count: u32 = caps
+                    .get(2)
+                    .and_then(|m| m.as_str().parse().ok())
+                    .unwrap_or(1);
                 let new_start: u32 = caps[3].parse().unwrap_or(1);
-                let new_count: u32 = caps[4].parse().unwrap_or(1);
+                let new_count: u32 = caps
+                    .get(4)
+                    .and_then(|m| m.as_str().parse().ok())
+                    .unwrap_or(1);
                 let header = caps[5].to_string();
 
                 // Initialize line counters from hunk header
@@ -565,5 +571,24 @@ diff --git a/src/foo.rs b/src/foo.rs
         assert_eq!(hunk.new_start, 10);
         assert_eq!(hunk.new_count, 8);
         assert!(hunk.header.contains("pub fn process"));
+    }
+
+    #[test]
+    fn hunk_header_without_line_count() {
+        // Regression test: bare @@ -1 +1 @@ without ,count must not panic
+        let diff = r#"diff --git a/main.rs b/main.rs
+--- a/main.rs
++++ b/main.rs
+@@ -1 +1 @@
+-use foo::bar;
++use baz::qux;
+"#;
+        let files = parse_diff(diff);
+        assert_eq!(files.len(), 1);
+        let hunk = &files[0].chunks[0];
+        assert_eq!(hunk.old_start, 1);
+        assert_eq!(hunk.old_count, 1);
+        assert_eq!(hunk.new_start, 1);
+        assert_eq!(hunk.new_count, 1);
     }
 }
