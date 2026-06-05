@@ -10,6 +10,7 @@
 		{ href: '/docs/configuration', label: 'Configuration' },
 		{ href: '/docs/providers', label: 'Providers' },
 		{ href: '/docs/examples', label: 'Examples' },
+		{ href: '/docs/roadmap', label: 'Roadmap' },
 		{ href: '/docs/cli-reference', label: 'CLI Reference' },
 		{ href: '/docs/changelog', label: 'Changelog' },
 	];
