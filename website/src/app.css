@@ -113,6 +113,29 @@ code, .font-mono {
 	.animate-fade-in-delay-4 { animation: fade-in-up 0.6s ease-out 0.4s forwards; opacity: 0; }
 
 	.cursor-blink { animation: blink 1s step-end infinite; }
+
+	/* Hero entrance cascade */
+	.animate-fade-in-up {
+		opacity: 0;
+		transform: translateY(20px);
+		animation: fade-in-up 0.6s ease-out forwards;
+	}
+	.delay-100 { animation-delay: 100ms; }
+	.delay-200 { animation-delay: 200ms; }
+	.delay-300 { animation-delay: 300ms; }
+	.delay-400 { animation-delay: 400ms; }
+	.delay-500 { animation-delay: 500ms; }
+
+	/* Scroll Reveal — hidden until IntersectionObserver adds .revealed */
+	.scroll-reveal {
+		opacity: 0;
+		transform: translateY(20px);
+		transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+	}
+	.scroll-reveal.revealed {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -121,8 +144,9 @@ code, .font-mono {
 		transition-duration: 0.01ms !important;
 	}
 	html { scroll-behavior: auto; }
-	.animate-fade-in, .animate-fade-in-delay-1, .animate-fade-in-delay-2,
-	.animate-fade-in-delay-3, .animate-fade-in-delay-4 { opacity: 1 !important; }
+	.animate-fade-in, .animate-fade-in-up, .animate-fade-in-delay-1, .animate-fade-in-delay-2,
+	.animate-fade-in-delay-3, .animate-fade-in-delay-4,
+	.scroll-reveal { opacity: 1 !important; transform: none !important; }
 }
 
 /* ============================================
@@ -151,6 +175,161 @@ code, .font-mono {
 }
 
 /* ============================================
+   SECTION LAYOUTS
+   ============================================ */
+.section {
+	width: 100%;
+	max-width: 1152px;
+	margin-left: auto;
+	margin-right: auto;
+	padding-left: var(--space-6);
+	padding-right: var(--space-6);
+}
+@media (min-width: 768px) {
+	.section { padding-left: var(--space-8); padding-right: var(--space-8); }
+}
+@media (min-width: 1280px) {
+	.section { padding-left: var(--space-10); padding-right: var(--space-10); }
+}
+
+.section-hero {
+	padding-top: var(--space-24);
+	padding-bottom: var(--space-16);
+}
+
+.section-compact {
+	padding-top: var(--space-16);
+	padding-bottom: var(--space-16);
+}
+
+.section-tall {
+	padding-top: var(--space-24);
+	padding-bottom: var(--space-24);
+}
+
+/* ============================================
+   GLASS CARD
+   ============================================ */
+.glass-card {
+	background: oklch(0.17 0.01 270 / 0.6);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid oklch(0.27 0.01 270 / 0.5);
+	border-radius: var(--space-4);
+	transition: border-color 200ms ease-out, box-shadow 200ms ease-out;
+}
+.glass-card:hover {
+	border-color: oklch(0.65 0.22 270 / 0.3);
+	box-shadow: 0 0 24px oklch(0.65 0.22 270 / 0.08);
+}
+
+/* ============================================
+   FEATURE ICON
+   ============================================ */
+.feature-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--space-10);
+	height: var(--space-10);
+	border-radius: var(--space-3);
+	background: oklch(0.65 0.22 270 / 0.1);
+	color: var(--accent);
+	flex-shrink: 0;
+}
+
+/* ============================================
+   CONNECT LINE (architecture flow)
+   ============================================ */
+.connect-line {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: var(--space-1) 0;
+}
+.connect-line::before {
+	content: '';
+	display: block;
+	width: 1px;
+	height: var(--space-4);
+	background: oklch(0.65 0.22 270 / 0.3);
+}
+
+/* ============================================
+   BUTTONS (landing page)
+   ============================================ */
+.btn-primary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	background: var(--accent);
+	color: var(--accent-foreground);
+	border-radius: var(--space-2);
+	padding: var(--space-2) var(--space-5);
+	font-weight: 600;
+	font-size: 14px;
+	font-family: var(--font-sans);
+	min-height: 44px;
+	border: none;
+	cursor: pointer;
+	text-decoration: none;
+	transition: transform 150ms var(--ease-out, ease-out), box-shadow 200ms ease-out;
+}
+.btn-primary:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 0 24px oklch(0.65 0.22 270 / 0.35);
+}
+.btn-primary:active {
+	transform: translateY(0);
+}
+
+.btn-ghost {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	background: transparent;
+	color: var(--muted-foreground);
+	border: 1px solid var(--border);
+	border-radius: var(--space-2);
+	padding: var(--space-2) var(--space-5);
+	font-weight: 500;
+	font-size: 14px;
+	font-family: var(--font-sans);
+	min-height: 44px;
+	cursor: pointer;
+	text-decoration: none;
+	transition: border-color 150ms ease-out, color 150ms ease-out;
+}
+.btn-ghost:hover {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+
+/* ============================================
+   BADGES
+   ============================================ */
+.accent-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: var(--space-1) var(--space-3);
+	border-radius: 9999px;
+	background: oklch(0.65 0.22 270 / 0.1);
+	color: var(--accent);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+.badge-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 9999px;
+	background: var(--accent);
+}
+
+/* ============================================
    TERMINAL BLOCK (uteke pattern)
    ============================================ */
 .terminal-block {
@@ -168,6 +347,132 @@ code, .font-mono {
 	height: 1px;
 	background: linear-gradient(90deg, transparent, var(--accent), transparent);
 	opacity: 0.4;
+}
+
+/* Terminal internal components */
+.terminal {
+	background: oklch(0.10 0 0);
+	border: 1px solid var(--border);
+	border-radius: var(--space-3);
+	overflow: hidden;
+	font-family: var(--font-mono);
+}
+
+.terminal-header {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-3) var(--space-4);
+	border-bottom: 1px solid oklch(0.27 0.01 270 / 0.5);
+	background: oklch(0.10 0 0);
+}
+
+.terminal-body {
+	padding: var(--space-4) var(--space-5);
+	font-size: 0.8125rem;
+	line-height: 1.625;
+	color: var(--foreground);
+	overflow-x: auto;
+}
+
+.terminal-title {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--muted-foreground);
+	margin-left: var(--space-2);
+	font-family: var(--font-sans);
+}
+
+.terminal-dot {
+	width: var(--space-2);
+	height: var(--space-2);
+	border-radius: 9999px;
+}
+.terminal-dot-red { background: var(--destructive); }
+.terminal-dot-yellow { background: var(--warning); }
+.terminal-dot-green { background: var(--success); }
+
+/* ============================================
+   SYNTAX HIGHLIGHTING (terminal)
+   ============================================ */
+.syntax-cmd { color: var(--accent-bright); font-weight: 600; }
+.syntax-flag { color: oklch(0.75 0.15 240); }
+.syntax-highlight { color: var(--accent); }
+.syntax-string { color: oklch(0.78 0.16 155); }
+
+/* Cursor blink for terminal demos */
+.typing-cursor {
+	display: inline-block;
+	width: 8px;
+	height: 1.2em;
+	background: var(--accent);
+	vertical-align: text-bottom;
+	animation: blink 1s step-end infinite;
+}
+
+/* Copy button for terminal blocks */
+.copy-btn {
+	position: absolute;
+	top: var(--space-3);
+	right: var(--space-3);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: var(--space-1);
+	border: 1px solid var(--border);
+	background: var(--card);
+	color: var(--muted-foreground);
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 150ms ease, color 150ms ease;
+}
+.terminal:hover .copy-btn,
+.terminal-block:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { color: var(--foreground); }
+
+/* ============================================
+   TIMELINE / FLOW STEPS
+   ============================================ */
+.timeline-step {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--space-3);
+}
+.timeline-number {
+	width: var(--space-10);
+	height: var(--space-10);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9999px;
+	background: oklch(0.65 0.22 270 / 0.1);
+	color: var(--accent);
+	font-weight: 700;
+	font-size: 18px;
+}
+
+/* ============================================
+   COMPARISON / TABLE SYMBOLS
+   ============================================ */
+.cora-col {
+	background: oklch(0.65 0.22 270 / 0.06);
+}
+.cora-col th,
+.cora-col td {
+	color: var(--accent);
+}
+
+.symbol-check {
+	color: var(--success);
+	font-weight: 700;
+}
+.symbol-cross {
+	color: var(--destructive);
+	font-weight: 700;
 }
 
 /* ============================================
