@@ -1,5 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 
-	goto('/docs/cli-reference', { replaceState: true });
+	goto('/docs/getting-started', { replaceState: true });
 </script>

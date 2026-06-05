@@ -1,475 +1,558 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	interface Feature {
-		icon: string;
-		title: string;
-		desc: string;
-		detail: string;
+	// Terminal typing animation state
+	let terminalLines = $state<string[]>([]);
+	let terminalComplete = $state(false);
+	let demoStarted = $state(false);
+
+	const terminalOutput = [
+		{ text: '$ cora review --staged', color: 'var(--muted-foreground)' },
+		{ text: '', color: '' },
+		{ text: 'Analyzing 3 files...', color: 'var(--muted-foreground)' },
+		{ text: '\u2713 src/auth/login.ts \u2014 2 issues found', color: 'var(--success)' },
+		{ text: '  \u26A0 Line 42: Potential SQL injection', color: 'var(--warning)' },
+		{ text: '  \u26A0 Line 87: Hardcoded secret', color: 'var(--warning)' },
+		{ text: '\u2713 src/utils/parser.ts \u2014 clean', color: 'var(--muted-foreground)' },
+		{ text: '\u2713 src/api/routes.ts \u2014 1 issue found', color: 'var(--success)' },
+		{ text: '  \u2717 Line 23: Missing error handling', color: 'var(--destructive)' },
+		{ text: '', color: '' },
+		{ text: '3 issues found in 3 files', color: 'var(--foreground)' },
+	];
+
+	let copyClicked = $state(false);
+	async function copyInstall() {
+		try {
+			await navigator.clipboard.writeText('curl -fsSL https://cora.dev/install | sh');
+			copyClicked = true;
+			setTimeout(() => { copyClicked = false; }, 2000);
+		} catch { /* clipboard not available */ }
 	}
 
-	interface Comparison {
-		feature: string;
-		cora: string;
-		coderabbit: string;
-		copilot: string;
-		sonarqube: string;
-	}
-
-	interface Command {
-		cmd: string;
-		desc: string;
-		output: string;
-	}
-
-	const features: Feature[] = [
-		{
-			icon: '🔑',
-			title: 'BYOK Any LLM',
-			desc: 'Zero lock-in',
-			detail: 'OpenAI, Anthropic, Groq, local models — any OpenAI-compatible endpoint. You control the model, you control the cost.'
-		},
-		{
-			icon: '🛡️',
-			title: 'Deterministic Rules Engine',
-			desc: 'Zero token cost',
-			detail: 'Zero-cost regex rules catch secrets, SQL injection, TLS issues BEFORE the LLM call. No tokens wasted on obvious bugs.'
-		},
-		{
-			icon: '🔗',
-			title: 'Cross-file Context Chain',
-			desc: 'Full codebase awareness',
-			detail: 'AST-based symbol extraction understands your codebase, not just the diff. Follows imports, resolves types.'
-		},
-		{
-			icon: '📦',
-			title: 'File Bundling',
-			desc: 'Smart grouping',
-			detail: 'Smart grouping of related files for consistent review across large PRs. Reduces context window waste.'
-		},
-		{
-			icon: '⚡',
-			title: 'Pre-commit Hooks',
-			desc: 'Before you push',
-			detail: 'Automatic review on every git commit. Blocks bad code before it\'s pushed. Zero friction, maximum impact.'
-		},
-		{
-			icon: '📊',
-			title: 'SARIF + CI Integration',
-			desc: 'GitHub native',
-			detail: 'GitHub Actions composite action, SARIF upload, PR comments, blocking on error. Works in any CI/CD pipeline.'
-		}
-	];
-
-	const comparisons: Comparison[] = [
-		{ feature: 'Pricing', cora: '✅ Free (MIT)', coderabbit: '❌ $12/mo+', copilot: '❌ $10/mo+', sonarqube: '❌ $150+/mo' },
-		{ feature: 'BYOK', cora: '✅ Any LLM', coderabbit: '❌ No', copilot: '❌ No', sonarqube: '❌ No' },
-		{ feature: 'Pre-commit hook', cora: '✅ Native', coderabbit: '❌ PR-only', copilot: '❌ PR-only', sonarqube: '❌ CI-only' },
-		{ feature: 'CLI-first', cora: '✅ Local', coderabbit: '❌ Cloud', copilot: '❌ Cloud', sonarqube: '❌ CI' },
-		{ feature: 'Zero telemetry', cora: '✅', coderabbit: '❌ Cloud', copilot: '❌ Cloud', sonarqube: '❌ Cloud' },
-		{ feature: 'Rules engine', cora: '✅ Deterministic', coderabbit: '❌ LLM-only', copilot: '❌ LLM-only', sonarqube: '❌ Static only' },
-		{ feature: 'Context chain', cora: '✅ Cross-file', coderabbit: '⚠️ Diff-only', copilot: '⚠️ Diff-only', sonarqube: '❌ No' },
-		{ feature: 'Privacy', cora: '✅ Local-first', coderabbit: '❌ Cloud', copilot: '❌ Cloud', sonarqube: '❌ Cloud' }
-	];
-
-	const commands: Command[] = [
-		{
-			cmd: 'cora review --staged',
-			desc: 'Review staged changes before commit',
-			output: '🛡️  Rules engine: 3 files scanned\n    ✖ src/api/auth.ts:42  — hardcoded API key detected\n    ✖ src/db/query.ts:18  — potential SQL injection\n\n🤖  LLM review: GPT-4o-mini\n    ⚠ src/api/auth.ts:67  — missing error boundary\n\n✓ Review complete — 3 issues found'
-		},
-		{
-			cmd: 'cora review --pr 42',
-			desc: 'Review an open pull request',
-			output: 'Fetching PR #42 diff... (12 files)\n🔗  Context chain: resolving 8 imports\n\n✓ Found 2 issues + 1 suggestion\n✓ SARIF uploaded to GitHub'
-		},
-		{
-			cmd: 'cora config set llm.model gpt-4o',
-			desc: 'Switch to a different model',
-			output: '✓ LLM model set to gpt-4o\n✓ Config saved to .cora.yaml'
-		},
-		{
-			cmd: 'cora review --full',
-			desc: 'Full codebase review',
-			output: 'Scanning 247 files...\n🛡️  Rules: 5 violations (secrets, SQL)\n🤖  LLM: 12 issues across 8 files\n\n✓ Report written to .cora/review.json'
-		}
-	];
-
-	let visibleCmd = $state(0);
-	let openFaq = $state<number | null>(null);
-
-	const faqs = [
-		{ q: 'What is cora?', a: 'cora is a CLI-first AI code review tool. It reviews your code before you commit using deterministic rules + LLM analysis, runs entirely locally, and uploads SARIF results to GitHub.' },
-		{ q: 'What providers are supported?', a: 'Any OpenAI-compatible endpoint — OpenAI, Anthropic, Groq, local models via Ollama, LiteLLM proxy, and more. You bring your own key.' },
-		{ q: 'Does cora work offline?', a: 'The rules engine works fully offline with zero API calls. LLM review requires network access to your chosen provider.' },
-		{ q: 'How is this different from CodeRabbit?', a: 'cora runs locally as a CLI, supports BYOK (use any LLM), has deterministic rules that catch issues before LLM review, and is free/open source (MIT). CodeRabbit is cloud-only with fixed pricing.' },
-		{ q: 'What is the rules engine?', a: 'A zero-cost regex-based scanner that catches secrets, SQL injection, TLS issues, and common anti-patterns BEFORE the LLM call. No tokens wasted on obvious bugs.' },
-		{ q: 'Can I use cora in CI?', a: 'Yes. GitHub Actions composite action, SARIF upload, PR comments, and blocking on error. Works in any CI/CD pipeline.' },
-		{ q: 'Is it really free?', a: 'Yes. MIT licensed, fully open source. No usage limits, no account required. You only pay for your own LLM API usage.' }
-	];
+	let typeInterval: ReturnType<typeof setInterval> | null = null;
 
 	onMount(() => {
-		const interval = setInterval(() => {
-			visibleCmd = (visibleCmd + 1) % commands.length;
-		}, 4000);
+		// Scroll reveal observer
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						entry.target.classList.add('revealed');
+						observer.unobserve(entry.target);
+					}
+				});
+			},
+			{ threshold: 0.1 }
+		);
 
-		return () => clearInterval(interval);
+		document.querySelectorAll('.scroll-reveal').forEach((el) => observer.observe(el));
+
+		// Typing animation observer - start when terminal section visible
+		const demoObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting && !demoStarted) {
+						demoStarted = true;
+						let lineIndex = 0;
+						typeInterval = setInterval(() => {
+							if (lineIndex < terminalOutput.length) {
+								terminalLines = [...terminalLines, terminalOutput[lineIndex].text];
+								lineIndex++;
+							} else {
+								terminalComplete = true;
+								if (typeInterval) clearInterval(typeInterval);
+							}
+						}, 200);
+					}
+				});
+			},
+			{ threshold: 0.3 }
+		);
+
+		const demoEl = document.getElementById('demo-terminal');
+		if (demoEl) demoObserver.observe(demoEl);
+
+		// Cleanup on unmount
+		return () => {
+			observer.disconnect();
+			demoObserver.disconnect();
+			if (typeInterval) clearInterval(typeInterval);
+		};
 	});
 </script>
 
 <svelte:head>
-	<title>cora — AI Code Review CLI · Open Source · MIT</title>
-	<meta name="description" content="CLI-first AI code review. Runs locally, BYOK any LLM, deterministic rules engine, pre-commit hooks. Free, open source, MIT license." />
-	<meta property="og:title" content="cora — AI Code Review CLI" />
-	<meta property="og:description" content="Ship with confidence. AI code review before you commit. CLI-first, BYOK, deterministic rules." />
-	<meta property="og:type" content="website" />
-	<meta property="og:image" content="/og.png" />
-	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="cora — AI Code Review CLI" />
-	<meta name="twitter:description" content="Ship with confidence. AI code review before you commit." />
-	<meta name="twitter:image" content="/og.png" />
+	<title>cora — AI Code Review CLI</title>
+	<meta name="description" content="cora is a CLI-first AI code reviewer. BYOK, zero config, runs in your terminal. Your code never leaves your machine." />
 </svelte:head>
 
-<!-- Hero -->
-<section class="grid-bg relative overflow-hidden">
-	<div class="absolute inset-0 bg-gradient-to-b from-[oklch(0.45_0.12_270_/_0.08)] to-transparent pointer-events-none"></div>
+<div class="bg-[var(--background)]">
 
-	<div class="relative max-w-4xl mx-auto px-6 pt-24 md:pt-36 pb-20 text-center">
-		<!-- Badge -->
-		<div class="animate-fade-in inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--card)] text-xs text-[var(--muted-foreground)] mb-8">
-			<span class="w-2 h-2 rounded-full bg-[var(--success)]"></span>
-			<span>v0.4 released</span>
-			<span class="text-[var(--border)]">—</span>
-			<a href="https://github.com/codecoradev/cora-cli/releases" target="_blank" rel="noopener" class="text-[var(--accent)] hover:underline">release notes →</a>
+	<!-- ====== S1 — HERO ====== -->
+	<section class="section section-hero relative flex items-center justify-center min-h-[calc(100vh-3.5rem)]">
+		<!-- Subtle radial gradient glow -->
+		<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 50% 40% at 50% 40%, oklch(0.65 0.22 270 / 0.04), transparent);"></div>
+
+		<div class="relative z-10 max-w-3xl mx-auto text-center">
+			<!-- Badge -->
+			<div class="animate-fade-in-up">
+				<span class="accent-badge">
+					<span class="badge-dot"></span>
+					AI Code Review for Developers
+				</span>
+			</div>
+
+			<!-- Headline — mt-8 (32px) badge-to-heading, mb-0 -->
+			<h1 class="mt-8 mb-0 animate-fade-in-up delay-100 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-[var(--foreground)] leading-none -tracking-tighter">
+				Review code.<br />
+				<span class="bg-gradient-to-br from-[oklch(0.65_0.22_270)] to-[oklch(0.7_0.15_240)] bg-clip-text text-transparent">Ship faster.</span>
+			</h1>
+
+			<!-- Subtitle — mt-6 (24px) heading-to-subtitle -->
+			<p class="max-w-xl mx-auto mt-6 animate-fade-in-up delay-200 text-base sm:text-lg text-[var(--muted-foreground)] leading-normal sm:leading-relaxed -tracking-tight">
+				cora catches bugs, security issues, and style violations before they merge. CLI-first. BYOK. Runs in your terminal.
+			</p>
+
+			<!-- Install Terminal — mt-10 (40px) subtitle-to-terminal -->
+			<div class="max-w-lg w-full mx-auto mt-10 animate-fade-in-up delay-300">
+				<div class="terminal relative">
+					<div class="terminal-header">
+						<span class="terminal-dot terminal-dot-red"></span>
+						<span class="terminal-dot terminal-dot-yellow"></span>
+						<span class="terminal-dot terminal-dot-green"></span>
+						<span class="terminal-title">Terminal</span>
+					</div>
+					<div class="terminal-body relative">
+						<span class="syntax-cmd">$</span>
+						<span class="syntax-highlight"> curl -fsSL</span> <span class="syntax-string">https://cora.dev/install</span> <span class="syntax-highlight">|</span> <span class="syntax-string">sh</span>
+						<span class="typing-cursor"></span>
+						<button class="copy-btn" onclick={copyClicked ? undefined : copyInstall} class:copied={copyClicked} aria-label="Copy command">
+							{#if copyClicked}
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+							{:else}
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+							{/if}
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- CTAs — mt-8 (32px) terminal-to-cta -->
+			<div class="flex flex-wrap justify-center gap-4 items-center mt-8 animate-fade-in-up delay-400">
+				<a href="#quick-start" class="btn-primary">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+					Get Started
+				</a>
+				<a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="btn-ghost">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+					View on GitHub
+				</a>
+			</div>
+
+			<!-- Bottom text — mt-6 (24px) cta-to-text -->
+			<p class="mt-6 animate-fade-in-up delay-500 text-xs text-[var(--muted-foreground)] tracking-wide">
+				MIT License &middot; No account &middot; OpenAI &middot; Anthropic &middot; Groq &middot; Ollama
+			</p>
 		</div>
+	</section>
 
-		<!-- Headline -->
-		<h1 class="animate-fade-in-delay-1 text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
-			Ship with<br />
-			<span class="hero-gradient glow-text">Confidence.</span>
-		</h1>
+	<!-- ====== S2 — KPI STATS ====== -->
+	<section class="section section-compact">
+		<p class="text-center mb-10 scroll-reveal text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-widest">
+			Trusted by developers who ship fast
+		</p>
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+			<div class="glass-card text-center scroll-reveal py-8">
+				<div class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">5</div>
+				<div class="text-sm text-[var(--muted-foreground)] mt-2">AI Providers</div>
+			</div>
+			<div class="glass-card text-center scroll-reveal py-8 [transition-delay:100ms]">
+				<div class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">&lt; 3s</div>
+				<div class="text-sm text-[var(--muted-foreground)] mt-2">Review Time</div>
+			</div>
+			<div class="glass-card text-center scroll-reveal py-8 [transition-delay:200ms]">
+				<div class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">Zero</div>
+				<div class="text-sm text-[var(--muted-foreground)] mt-2">Config Required</div>
+			</div>
+		</div>
+	</section>
 
-		<!-- Subheadline -->
-		<p class="animate-fade-in-delay-2 text-base md:text-xl text-[var(--muted-foreground)] max-w-2xl mx-auto mb-10 leading-relaxed">
-			AI code review, <strong class="text-[var(--foreground)]">before you commit.</strong><br class="hidden md:block" />
-			CLI-first, BYOK any LLM, deterministic rules, fully open source.
+	<!-- ====== S3 — LIVE TERMINAL DEMO ====== -->
+	<section class="section section-tall" id="demo-terminal">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
+			See it in action
+		</h2>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)] max-w-[32rem] mx-auto">
+			Run cora against staged changes. Results in seconds, not minutes.
 		</p>
 
-		<!-- Install command -->
-		<div class="animate-fade-in-delay-3 inline-flex flex-col items-center gap-4">
-			<div class="terminal-block inline-flex items-center gap-3 px-5 py-3.5 rounded-xl font-mono text-sm glow-purple">
-				<span class="text-[var(--success)]">$</span>
-				<span class="text-[var(--foreground)]">curl -fsSL https://cora.dev/install.sh | sh</span>
-				<button
-					class="text-[var(--muted-foreground)] hover:text-[var(--accent)] transition-colors ml-2"
-					onclick={() => navigator.clipboard.writeText('curl -fsSL https://cora.dev/install.sh | sh')}
-					title="Copy"
-				>
-					<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-						<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-					</svg>
-				</button>
-			</div>
-
-			<div class="flex items-center gap-4 text-sm">
-				<span class="text-[var(--muted-foreground)]">MIT License</span>
-				<span class="text-[var(--border)]">·</span>
-				<span class="text-[var(--muted-foreground)]">No account</span>
-				<span class="text-[var(--border)]">·</span>
-				<span class="text-[var(--muted-foreground)]">No telemetry</span>
-			</div>
-
-			<div class="flex items-center gap-3 mt-2">
-				<a
-					href="https://github.com/codecoradev/cora-cli"
-					target="_blank"
-					rel="noopener"
-					class="cta-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--accent)] text-[var(--accent-foreground)] font-semibold text-sm"
-				>
-					<svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></svg>
-					GitHub
-				</a>
-				<a
-					href="/docs"
-					class="cta-secondary inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] font-medium text-sm"
-				>
-					Install & Get Started
-				</a>
-			</div>
-		</div>
-	</div>
-</section>
-
-<!-- Terminal Demo -->
-<section class="max-w-4xl mx-auto px-6 -mt-4 pb-16 md:pb-24">
-	<div class="terminal-block rounded-2xl overflow-hidden glow-purple">
-		<!-- Title bar -->
-		<div class="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--card)]">
-			<div class="flex gap-1.5">
-				<div class="w-3 h-3 rounded-full bg-red-500/60"></div>
-				<div class="w-3 h-3 rounded-full bg-yellow-500/60"></div>
-				<div class="w-3 h-3 rounded-full bg-green-500/60"></div>
-			</div>
-			<span class="text-xs text-[var(--muted-foreground)] ml-2 font-mono">cora — AI code review engine</span>
-		</div>
-
-		<!-- Terminal content -->
-		<div class="p-5 md:p-6 font-mono text-sm space-y-3 min-h-[200px]">
-			{#each commands as c, i}
-				<div class="transition-all duration-300 {i === visibleCmd ? 'opacity-100' : 'opacity-25'}">
-					{#if i === visibleCmd}
-						<div class="flex items-start gap-2">
-							<span class="text-[var(--success)] select-none">❯</span>
-							<div>
-								<span class="cmd-highlight">{c.cmd.split(' ')[0]}</span>
-								<span class="text-[var(--foreground)]"> {c.cmd.split(' ').slice(1).join(' ')}</span>
-							</div>
-						</div>
-						<p class="text-[var(--muted-foreground)] ml-5 mt-0.5 text-xs"># {c.desc}</p>
-						<div class="ml-5 mt-2 text-[var(--muted-foreground)] text-xs whitespace-pre-line">{c.output}</div>
-					{:else}
-						<div class="flex items-start gap-2">
-							<span class="text-[var(--muted-foreground)] select-none">❯</span>
-							<span class="text-[var(--muted-foreground)]">{c.cmd}</span>
-						</div>
+		<div class="max-w-2xl mx-auto mt-10 scroll-reveal">
+			<div class="terminal">
+				<div class="terminal-header">
+					<span class="terminal-dot terminal-dot-red"></span>
+					<span class="terminal-dot terminal-dot-yellow"></span>
+					<span class="terminal-dot terminal-dot-green"></span>
+					<span class="terminal-title">cora \u2014 review</span>
+				</div>
+				<div class="terminal-body">
+					{#each terminalLines as line, i}
+						<div class="min-h-[1.45em]" style="color: {terminalOutput[i]?.color || 'var(--foreground)'};">{line}</div>
+					{/each}
+					{#if terminalComplete}
+						<span class="typing-cursor"></span>
 					{/if}
 				</div>
-			{/each}
+			</div>
 		</div>
-	</div>
-</section>
+	</section>
 
-<!-- Social Proof -->
-<section class="max-w-4xl mx-auto px-6 py-10 text-center">
-	<div class="flex flex-wrap items-center justify-center gap-6 text-[var(--muted-foreground)]">
-		<div class="flex items-center gap-2">
-			<span class="text-xl">🦀</span>
-			<span class="text-sm">Built with Rust</span>
-		</div>
-		<div class="flex items-center gap-2">
-			<span class="text-xl">🔒</span>
-			<span class="text-sm">Zero Telemetry</span>
-		</div>
-		<div class="flex items-center gap-2">
-			<span class="text-xl">⚡</span>
-			<span class="text-sm">Pre-commit Hooks</span>
-		</div>
-		<div class="flex items-center gap-2">
-			<span class="text-xl">🛡️</span>
-			<span class="text-sm">Rules Engine</span>
-		</div>
-		<div class="flex items-center gap-2">
-			<span class="text-xl">🔑</span>
-			<span class="text-sm">BYOK Any LLM</span>
-		</div>
-		<div class="flex items-center gap-2">
-			<span class="text-xl">📦</span>
-			<span class="text-sm">Single Binary</span>
-		</div>
-	</div>
-</section>
-
-<div class="separator-gradient"></div>
-
-<!-- Problem → Solution -->
-<section class="max-w-4xl mx-auto px-6 py-16 md:py-24">
-	<div class="max-w-3xl mx-auto text-center">
-		<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase">The Problem</p>
-		<h2 class="text-2xl md:text-4xl font-bold mb-6">
-			Code review shouldn't be<br />
-			<span class="hero-gradient">slow or expensive</span>
+	<!-- ====== S4 — HOW IT WORKS ====== -->
+	<section class="section section-compact">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
+			How it works
 		</h2>
-		<p class="text-base md:text-lg text-[var(--muted-foreground)] leading-relaxed mb-12">
-			Stop waiting hours for feedback. cora catches issues in seconds — <strong class="text-[var(--foreground)]">before you commit.</strong>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)] max-w-[32rem] mx-auto">
+			Three steps from code to confidence.
 		</p>
-	</div>
 
-	<div class="max-w-3xl mx-auto">
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-			<!-- Before -->
-			<div class="terminal-block rounded-xl p-5">
-				<p class="text-xs font-medium text-red-400 mb-3">❌ Without cora</p>
-				<div class="font-mono text-xs space-y-2 text-[var(--muted-foreground)]">
-					<p>> Waiting for PR review...</p>
-					<p class="text-red-400/70">Still waiting (4 hours)</p>
-					<p>> Reviewer missed the SQL injection</p>
-					<p class="text-red-400/70">Merged to production with bug</p>
-					<p>> Now paying $12/mo per reviewer seat</p>
+		<div class="flex flex-col md:flex-row items-stretch mt-10 gap-6">
+			<!-- Step 1 -->
+			<div class="glass-card flex-1 text-center scroll-reveal">
+				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">01</div>
+				<div class="flex justify-center mt-4">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+				</div>
+				<h3 class="mt-4 text-xl font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Write code</h3>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)]">Push your changes as normal. cora only sees your diff.</p>
+			</div>
+
+			<!-- Connector -->
+			<div class="connect-line hidden md:flex scroll-reveal">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+			</div>
+
+			<!-- Step 2 -->
+			<div class="glass-card flex-1 text-center scroll-reveal [transition-delay:100ms]">
+				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">02</div>
+				<div class="flex justify-center mt-4">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+				</div>
+				<h3 class="mt-4 text-xl font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Review with AI</h3>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)]">cora analyzes your diff with the LLM of your choice.</p>
+			</div>
+
+			<!-- Connector -->
+			<div class="connect-line hidden md:flex scroll-reveal [transition-delay:100ms]">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+			</div>
+
+			<!-- Step 3 -->
+			<div class="glass-card flex-1 text-center scroll-reveal [transition-delay:200ms]">
+				<div class="text-2xl font-bold text-[var(--accent)] -tracking-tight font-mono opacity-50">03</div>
+				<div class="flex justify-center mt-4">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+				</div>
+				<h3 class="mt-4 text-xl font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Ship with confidence</h3>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)]">Merge clean, production-ready code. Every time.</p>
+			</div>
+		</div>
+	</section>
+
+	<!-- ====== S5 — FEATURES ====== -->
+	<section class="section section-tall">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
+			Built for developers who value control
+		</h2>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)]">
+			Everything you need, nothing you don't.
+		</p>
+
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
+			<!-- Feature 1: AI Code Review -->
+			<div class="glass-card scroll-reveal">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">AI Code Review</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Diff, branch, or full scan</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Three review modes: staged diff, branch comparison, or full project scan. LLM-powered analysis catches bugs, security issues, and style violations.</p>
+			</div>
+
+			<!-- Feature 2: BYOK -->
+			<div class="glass-card scroll-reveal [transition-delay:100ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Bring Your Own Key</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">No subscriptions, no lock-in</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Uses YOUR OpenAI, Anthropic, Groq, Ollama, or Z.AI API key. No data stored on our servers. You control the model, you control the cost.</p>
+			</div>
+
+			<!-- Feature 3: Pre-commit Hooks -->
+			<div class="glass-card scroll-reveal [transition-delay:200ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V8"/><path d="M5 12H2a10 10 0 0020 0h-3"/><circle cx="12" cy="5" r="3"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Pre-commit Hooks</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Review before you push</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Install once. Every commit gets reviewed automatically. Block bad code from entering your branch before it ships.</p>
+			</div>
+
+			<!-- Feature 4: Incremental Scan -->
+			<div class="glass-card scroll-reveal [transition-delay:300ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Incremental Scan</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Only scan what changed</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">SHA256 content hash cache. First scan indexes your codebase. Subsequent scans only review new or modified files.</p>
+			</div>
+
+			<!-- Feature 5: SARIF Output -->
+			<div class="glass-card scroll-reveal [transition-delay:400ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">SARIF Output</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">GitHub Code Scanning</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Upload review findings directly to GitHub's Security tab. Track issues across PRs. Works with any CI/CD pipeline.</p>
+			</div>
+
+			<!-- Feature 6: Fully Private -->
+			<div class="glass-card scroll-reveal [transition-delay:500ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Fully Private</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Your code stays yours</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Runs entirely on your machine. No cloud, no telemetry, no data leaving your network. Perfect for Gitea and air-gapped environments.</p>
+			</div>
+
+			<!-- Feature 7: Deterministic Reviews -->
+			<div class="glass-card scroll-reveal [transition-delay:600ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Deterministic Reviews</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Same diff, same issues</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Temperature defaults to 0. Identical diffs always produce identical findings — perfect for CI reproducibility.</p>
+			</div>
+
+			<!-- Feature 8: Diff-Hash Caching -->
+			<div class="glass-card scroll-reveal [transition-delay:700ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Smart Caching</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Never review the same diff twice</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Reviews are cached by diff hash in <code class="text-[var(--accent)]">~/.cache/cora/reviews/</code>. Re-reviewing an unchanged diff returns cached results instantly. Use <code class="text-[var(--accent)]">--no-cache</code> to bypass.</p>
+			</div>
+
+			<!-- Feature 9: Custom Prompts + Anti-Hallucination -->
+			<div class="glass-card scroll-reveal [transition-delay:800ms]">
+				<div class="feature-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+				</div>
+				<h3 class="mt-4 text-lg font-semibold text-[var(--foreground)]">Custom Prompts &amp; Anti-Hallucination</h3>
+				<p class="mt-2 text-sm text-[var(--accent)]">Control the review, trust the output</p>
+				<p class="mt-2 text-sm text-[var(--muted-foreground)] leading-relaxed">Override system prompts for review and scan. File path injection and post-parse filtering ensure the LLM only reports issues that exist in your actual diff.</p>
+			</div>
+		</div>
+	</section>
+
+	<!-- ====== S6 — COMPARISON TABLE ====== -->
+	<section class="section section-compact">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
+			Why developers choose cora
+		</h2>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)]">
+			Side-by-side with popular code review tools.
+		</p>
+
+		<div class="glass-card scroll-reveal mt-10 p-0 max-w-[56rem] mx-auto overflow-hidden">
+			<div class="overflow-x-auto">
+				<table class="compare-table">
+					<thead>
+						<tr>
+							<th>Feature</th>
+							<th class="cora-col">cora</th>
+							<th>CodeRabbit</th>
+							<th>Copilot</th>
+							<th>SonarQube</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>BYOK</td>
+							<td class="cora-col"><span class="symbol-check">&#10003;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td class="text-[var(--muted-foreground)]">&mdash;</td>
+						</tr>
+						<tr>
+							<td>Self-hosted</td>
+							<td class="cora-col"><span class="symbol-check">&#10003;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td><span class="symbol-check">&#10003;</span></td>
+						</tr>
+						<tr>
+							<td>Gitea</td>
+							<td class="cora-col"><span class="symbol-check">&#10003;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td><span class="symbol-check">&#10003;</span></td>
+						</tr>
+						<tr>
+							<td>CLI</td>
+							<td class="cora-col"><span class="symbol-check">&#10003;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+						</tr>
+						<tr>
+							<td>Pre-commit</td>
+							<td class="cora-col"><span class="symbol-check">&#10003;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+							<td><span class="symbol-cross">&#10007;</span></td>
+						</tr>
+						<tr>
+							<td>SARIF</td>
+							<td class="cora-col"><span class="symbol-check">&#10003;</span></td>
+							<td><span class="symbol-check">&#10003;</span></td>
+							<td><span class="symbol-check">&#10003;</span></td>
+							<td><span class="symbol-check">&#10003;</span></td>
+						</tr>
+						<tr>
+							<td class="font-semibold">Cost</td>
+							<td class="cora-col font-semibold">Free + API</td>
+							<td>$12-39/mo</td>
+							<td>$10-39/mo</td>
+							<td>Free / $150+</td>
+						</tr>
+						<tr>
+							<td>License</td>
+							<td class="cora-col">MIT</td>
+							<td>Apache 2.0</td>
+							<td>Proprietary</td>
+							<td>LGPL</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</section>
+
+	<!-- ====== S7 — QUICK START + CTA + FOOTER ====== -->
+	<section class="section section-tall" id="quick-start">
+		<h2 class="text-center scroll-reveal text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
+			Start in 30 seconds
+		</h2>
+		<p class="text-center mt-4 scroll-reveal text-sm text-[var(--muted-foreground)]">
+			No account required. No subscription. No cloud.
+		</p>
+
+		<div class="flex flex-col mt-10 max-w-[40rem] mx-auto gap-6">
+			<!-- Step 1 -->
+			<div class="timeline-step scroll-reveal">
+				<div class="timeline-number">1</div>
+				<div>
+					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Install</h3>
+					<p class="mt-1 mb-4 text-sm text-[var(--muted-foreground)]">Single binary, no dependencies.</p>
+					<div class="terminal">
+						<div class="terminal-header">
+							<span class="terminal-dot terminal-dot-red"></span>
+							<span class="terminal-dot terminal-dot-yellow"></span>
+							<span class="terminal-dot terminal-dot-green"></span>
+						</div>
+						<div class="terminal-body py-3 px-4">
+							<span class="syntax-cmd">$</span> <span class="syntax-highlight">curl -fsSL</span> <span class="syntax-string">https://cora.dev/install</span> <span class="syntax-highlight">|</span> <span class="syntax-string">sh</span>
+						</div>
+					</div>
 				</div>
 			</div>
 
-			<!-- After -->
-			<div class="terminal-block rounded-xl p-5" style="border-color: var(--accent-dim);">
-				<p class="text-xs font-medium text-[var(--success)] mb-3">✅ With cora</p>
-				<div class="font-mono text-xs space-y-2">
-					<p class="text-[var(--muted-foreground)]">> git commit -m "feat: auth"</p>
-					<p class="text-[var(--success)]">cora review: 2 issues found (0.8s)</p>
-					<p class="text-[var(--muted-foreground)]">> Fixed both issues, committed</p>
-					<p class="text-[var(--success)]">Zero cost. Zero waiting. Zero bugs shipped.</p>
+			<!-- Step 2 -->
+			<div class="timeline-step scroll-reveal [transition-delay:100ms]">
+				<div class="timeline-number">2</div>
+				<div>
+					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Set API key</h3>
+					<p class="mt-1 mb-4 text-sm text-[var(--muted-foreground)]">Use your existing OpenAI or Anthropic key.</p>
+					<div class="terminal">
+						<div class="terminal-header">
+							<span class="terminal-dot terminal-dot-red"></span>
+							<span class="terminal-dot terminal-dot-yellow"></span>
+							<span class="terminal-dot terminal-dot-green"></span>
+						</div>
+						<div class="terminal-body py-3 px-4">
+							<span class="syntax-cmd">$</span> <span class="syntax-highlight">export</span> <span class="syntax-flag">OPENAI_API_KEY</span>=<span class="syntax-string">"sk-..."</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Step 3 -->
+			<div class="timeline-step scroll-reveal [transition-delay:200ms]">
+				<div class="timeline-number">3</div>
+				<div>
+					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Review</h3>
+					<p class="mt-1 mb-4 text-sm text-[var(--muted-foreground)]">Review your staged changes.</p>
+					<div class="terminal">
+						<div class="terminal-header">
+							<span class="terminal-dot terminal-dot-red"></span>
+							<span class="terminal-dot terminal-dot-yellow"></span>
+							<span class="terminal-dot terminal-dot-green"></span>
+						</div>
+						<div class="terminal-body py-3 px-4">
+							<span class="syntax-cmd">$</span> <span class="syntax-flag">CORA_API_KEY</span>=<span class="syntax-string">key</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Step 4 -->
+			<div class="timeline-step scroll-reveal [transition-delay:300ms]">
+				<div class="timeline-number">4</div>
+				<div>
+					<h3 class="text-lg font-semibold text-[var(--foreground)] -tracking-tight leading-snug">Done</h3>
+					<p class="mt-1 text-sm text-[var(--success)]">That's it. No account. No subscription.</p>
 				</div>
 			</div>
 		</div>
-	</div>
-</section>
 
-<div class="separator-gradient"></div>
-
-<!-- Features -->
-<section class="max-w-4xl mx-auto px-6 py-16 md:py-24">
-	<div class="text-center mb-14">
-		<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase">Features</p>
-		<h2 class="text-2xl md:text-4xl font-bold">Everything you need.<br />Nothing you don't.</h2>
-	</div>
-
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-		{#each features as feat}
-			<div class="feature-card p-6 rounded-xl border border-[var(--border)] bg-[var(--card)]">
-				<span class="text-2xl">{feat.icon}</span>
-				<h3 class="text-lg font-semibold mt-3 mb-1">{feat.title}</h3>
-				<p class="text-sm text-[var(--accent)] mb-2">{feat.desc}</p>
-				<p class="text-sm text-[var(--muted-foreground)] leading-relaxed">{feat.detail}</p>
-			</div>
-		{/each}
-	</div>
-</section>
-
-<div class="separator-gradient"></div>
-
-<!-- Quick Start -->
-<section class="max-w-4xl mx-auto px-6 py-16 md:py-24">
-	<div class="text-center mb-14">
-		<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase">Get Started</p>
-		<h2 class="text-2xl md:text-4xl font-bold">Three steps to<br />confident commits</h2>
-	</div>
-
-	<div class="max-w-2xl mx-auto space-y-6">
-		<div class="flex gap-4">
-			<div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--accent-dim)] flex items-center justify-center text-sm font-bold text-[var(--accent-bright)]">1</div>
-			<div class="min-w-0 flex-1">
-				<p class="font-medium mb-2">Install</p>
-				<code class="block px-4 py-3 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm font-mono text-[var(--muted-foreground)] overflow-x-auto">
-					<span class="cmd-highlight">curl</span> -fsSL https://cora.dev/install.sh <span class="cmd-flag">|</span> sh
-				</code>
+		<!-- CTA — mt-20 (80px) separation from steps -->
+		<div class="text-center mt-20 scroll-reveal">
+			<h2 class="text-2xl md:text-3xl font-bold text-[var(--foreground)] -tracking-tight leading-tight">
+				Ready to ship better code?
+			</h2>
+			<p class="mt-3 text-sm text-[var(--muted-foreground)]">
+				No account. No subscription. No cloud.
+			</p>
+			<div class="flex flex-wrap justify-center gap-4 items-center mt-8">
+				<a href="/docs" class="btn-primary">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+					Get Started
+				</a>
+				<a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="btn-ghost">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+					Star on GitHub
+				</a>
 			</div>
 		</div>
-		<div class="flex gap-4">
-			<div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--accent-dim)] flex items-center justify-center text-sm font-bold text-[var(--accent-bright)]">2</div>
-			<div class="min-w-0 flex-1">
-				<p class="font-medium mb-2">Configure your LLM</p>
-				<code class="block px-4 py-3 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm font-mono text-[var(--muted-foreground)] overflow-x-auto">
-					<span class="cmd-highlight">cora</span> init
-				</code>
-			</div>
-		</div>
-		<div class="flex gap-4">
-			<div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--accent-dim)] flex items-center justify-center text-sm font-bold text-[var(--accent-bright)]">3</div>
-			<div class="min-w-0 flex-1">
-				<p class="font-medium mb-2">Review your code</p>
-				<code class="block px-4 py-3 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm font-mono text-[var(--muted-foreground)] overflow-x-auto">
-					<span class="cmd-highlight">cora</span> review <span class="cmd-flag">--staged</span>
-				</code>
-			</div>
-		</div>
-		<div class="flex gap-4">
-			<div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--accent-dim)] flex items-center justify-center text-sm font-bold text-[var(--accent)]">✓</div>
-			<div class="min-w-0 flex-1">
-				<p class="font-medium text-[var(--success)]">That's it. No account. No server. No lock-in.</p>
-				<p class="text-sm text-[var(--muted-foreground)] mt-1">Works out of the box with sensible defaults. Customize with <code class="font-mono">.cora.yaml</code> when you need more control.</p>
-			</div>
-		</div>
-	</div>
-</section>
 
-<div class="separator-gradient"></div>
-
-<!-- Comparison -->
-<section class="max-w-4xl mx-auto px-6 py-16 md:py-24">
-	<div class="text-center mb-14">
-		<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase">Compare</p>
-		<h2 class="text-2xl md:text-4xl font-bold">Why developers choose cora</h2>
-	</div>
-
-	<div class="overflow-x-auto rounded-xl border border-[var(--border)]">
-		<table class="compare-table w-full text-sm">
-			<thead>
-				<tr class="border-b border-[var(--border)]">
-					<th class="text-left px-4 py-3 font-medium text-[var(--muted-foreground)]">Feature</th>
-					<th class="highlight-col text-center px-4 py-3 font-semibold text-[var(--accent)]">cora</th>
-					<th class="text-center px-4 py-3 font-medium text-[var(--muted-foreground)] hidden sm:table-cell">CodeRabbit</th>
-					<th class="text-center px-4 py-3 font-medium text-[var(--muted-foreground)] hidden md:table-cell">Copilot</th>
-					<th class="text-center px-4 py-3 font-medium text-[var(--muted-foreground)] hidden lg:table-cell">SonarQube</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each comparisons as row}
-					<tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--card)] transition-colors">
-						<td class="px-4 py-3 text-[var(--muted-foreground)]">{row.feature}</td>
-						<td class="highlight-col px-4 py-3 text-center font-medium">{row.cora}</td>
-						<td class="px-4 py-3 text-center text-[var(--muted-foreground)] hidden sm:table-cell">{row.coderabbit}</td>
-						<td class="px-4 py-3 text-center text-[var(--muted-foreground)] hidden md:table-cell">{row.copilot}</td>
-						<td class="px-4 py-3 text-center text-[var(--muted-foreground)] hidden lg:table-cell">{row.sonarqube}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
-</section>
-
-<div class="separator-gradient"></div>
-
-<!-- FAQ -->
-<section class="max-w-4xl mx-auto px-6 py-16 md:py-24">
-	<div class="text-center mb-14">
-		<p class="text-sm font-medium text-[var(--accent)] mb-4 tracking-wide uppercase">FAQ</p>
-		<h2 class="text-2xl md:text-4xl font-bold">Frequently asked questions</h2>
-	</div>
-
-	<div class="max-w-2xl mx-auto space-y-3">
-		{#each faqs as faq, i}
-			<div
-				class="feature-card w-full text-left px-5 py-4 rounded-xl border border-[var(--border)] bg-[var(--card)] cursor-pointer"
-				role="button"
-				tabindex="0"
-				onclick={() => openFaq = openFaq === i ? null : i}
-				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFaq = openFaq === i ? null : i; } }}
-			>
-				<div class="flex items-center justify-between gap-4">
-					<span class="font-medium text-sm">{faq.q}</span>
-					<span class="text-[var(--muted-foreground)] transition-transform duration-200 {openFaq === i ? 'rotate-45' : ''}">+</span>
+		<!-- Footer — mt-20 (80px) -->
+		<footer class="border-t border-[var(--border)] mt-20 py-8">
+			<div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+				<div>
+					<span class="text-sm font-semibold text-[var(--foreground)]">cora</span>
+					<span class="text-xs text-[var(--muted-foreground)] ml-3">MIT License</span>
 				</div>
-				{#if openFaq === i}
-					<span class="text-sm text-[var(--muted-foreground)] mt-3 leading-relaxed block">{faq.a}</span>
-				{/if}
+				<div class="flex items-center gap-6">
+					<a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">GitHub</a>
+					<a href="/docs" class="text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 inline-flex items-center hover:text-[var(--foreground)]">Docs</a>
+				</div>
 			</div>
-		{/each}
-	</div>
-</section>
-
-<div class="separator-gradient"></div>
-
-<!-- CTA -->
-<section class="max-w-4xl mx-auto px-6 py-20 md:py-28 text-center">
-	<h2 class="text-2xl md:text-4xl font-bold mb-4">
-		Ready to ship<br />
-		<span class="hero-gradient">better code?</span>
-	</h2>
-	<p class="text-[var(--muted-foreground)] mb-8 text-base">Free forever · No account required · Start in 30 seconds</p>
-	<div class="flex items-center justify-center gap-4">
-		<a
-			href="https://github.com/codecoradev/cora-cli"
-			target="_blank"
-			rel="noopener"
-			class="cta-primary inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[var(--accent)] text-[var(--accent-foreground)] font-semibold"
-		>
-			<svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></svg>
-			Star on GitHub
-		</a>
-		<a
-			href="/docs"
-			class="cta-secondary inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] font-medium"
-		>
-			Read the Docs
-		</a>
-	</div>
-</section>
+		</footer>
+	</section>
+</div>

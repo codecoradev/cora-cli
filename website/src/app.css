@@ -587,3 +587,113 @@ code, .font-mono {
 		padding: var(--space-6) var(--space-4) var(--space-12);
 	}
 }
+
+/* ---- Separator Gradient ---- */
+.separator-gradient {
+  max-width: 1152px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    oklch(0.65 0.22 270 / 0.3),
+    transparent
+  );
+}
+
+@media (min-width: 768px) {
+  .separator-gradient {
+    padding-left: var(--space-8);
+    padding-right: var(--space-8);
+  }
+}
+
+@media (min-width: 1280px) {
+  .separator-gradient {
+    padding-left: var(--space-10);
+    padding-right: var(--space-10);
+  }
+}
+
+/* ---- Grid Background ---- */
+.grid-bg {
+  background-image:
+    linear-gradient(oklch(0.27 0.01 270 / 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.27 0.01 270 / 0.3) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ---- Architecture Flow ---- */
+.arch-step {
+  width: 100%;
+  max-width: 320px;
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--space-4);
+  background: var(--card);
+  border: 1px solid oklch(0.27 0.01 270 / 0.5);
+  text-align: center;
+}
+
+.arch-step-highlight {
+  width: 100%;
+  max-width: 320px;
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--space-4);
+  text-align: center;
+  border: 2px solid var(--accent);
+  background: oklch(0.65 0.22 270 / 0.08);
+}
+
+.arch-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-1) 0;
+}
+
+.arch-connector-line {
+  width: 1px;
+  height: var(--space-4);
+  background: oklch(0.65 0.22 270 / 0.3);
+}
+
+.arch-connector-label {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--card);
+  border: 1px solid oklch(0.65 0.22 270 / 0.2);
+}
+
+/* ---- Audience Table ---- */
+.audience-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.audience-table th,
+.audience-table td {
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid oklch(0.27 0.01 270 / 0.5);
+  text-align: left;
+  font-size: 14px;
+  color: var(--foreground);
+}
+
+.audience-table thead th {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: var(--space-3);
+}
+
+.audience-table tbody tr:last-child td {
+  border-bottom: none;
+}
