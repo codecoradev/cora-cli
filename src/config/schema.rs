@@ -105,7 +105,7 @@ impl Default for Config {
             hook: HookConfig {
                 mode: "warn".to_string(),
                 min_severity: "major".to_string(),
-                max_diff_size: 50 * 1024,
+                max_diff_size: 5 * 1024 * 1024,
                 on_violation: "warn".to_string(),
             },
             output: OutputConfig {
@@ -449,7 +449,7 @@ mod tests {
         let cfg = Config::default();
         assert_eq!(cfg.hook.mode, "warn");
         assert_eq!(cfg.hook.min_severity, "major");
-        assert_eq!(cfg.hook.max_diff_size, 50 * 1024);
+        assert_eq!(cfg.hook.max_diff_size, 5 * 1024 * 1024);
         assert_eq!(cfg.hook.on_violation, "warn");
     }
 
