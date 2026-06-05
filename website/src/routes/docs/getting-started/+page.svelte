@@ -28,38 +28,107 @@
 
 <div class="docs-section scroll-reveal">
 	<h2>Quick Start</h2>
-	<p>Get up and running with cora in four simple steps.</p>
+	<p>Get up and running with cora in three simple steps.</p>
 
 	<div class="docs-card">
 		<div class="docs-card-number primary">1</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<strong class="text-[var(--foreground)]">Install cora</strong> — Single binary via Cargo:
-			<code>cargo install cora-cli</code>
+			<strong class="text-[var(--foreground)]">Install cora</strong> — Single binary, no runtime dependencies:
+			<code>curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh</code>
 		</div>
 	</div>
 
 	<div class="docs-card">
 		<div class="docs-card-number primary">2</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<strong class="text-[var(--foreground)]">Configure</strong> — Initialize your project:
-			<code>cora init</code> creates <code>.cora.yaml</code>
+			<strong class="text-[var(--foreground)]">Authenticate</strong> — Run <code>cora auth login</code> to pick your provider and enter your API key.
+			Cora stores it securely in <code>~/.cora/auth.toml</code> (never committed to git).
 		</div>
 	</div>
 
 	<div class="docs-card">
 		<div class="docs-card-number primary">3</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<strong class="text-[var(--foreground)]">Add API key</strong> — Run <code>cora auth login</code> or set <code>CORA_API_KEY</code> environment variable
-		</div>
-	</div>
-
-	<div class="docs-card">
-		<div class="docs-card-number primary">4</div>
-		<div class="text-sm text-[var(--muted-foreground)]">
 			<strong class="text-[var(--foreground)]">Review</strong> — Analyze your staged changes:
 			<code>cora review</code>
 		</div>
 	</div>
+</div>
+
+<div class="docs-section scroll-reveal">
+	<h2>Authentication — <code>cora auth login</code></h2>
+	<p>
+		The interactive login guides you through provider selection:
+	</p>
+
+	<div class="docs-terminal">
+		<div class="terminal-bar">
+			<span class="terminal-dot-red"></span>
+			<span class="terminal-dot-yellow"></span>
+			<span class="terminal-dot-green"></span>
+		</div>
+		<div class="terminal-body">
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora auth login</span></div>
+			<div></div>
+			<div><span class="syntax-cmd">🔑 Cora Auth Setup</span></div>
+			<div>   Choose your LLM provider:</div>
+			<div></div>
+			<div>  <span class="syntax-flag">[1]</span> <span class="syntax-highlight">openai</span> — https://api.openai.com/v1</div>
+			<div>  <span class="syntax-flag">[2]</span> <span class="syntax-highlight">anthropic</span> — https://api.anthropic.com/v1</div>
+			<div>  <span class="syntax-flag">[3]</span> <span class="syntax-highlight">groq</span> — https://api.groq.com/openai/v1</div>
+			<div>  <span class="syntax-flag">[4]</span> <span class="syntax-highlight">ollama</span> — http://localhost:11434/v1</div>
+			<div>  <span class="syntax-flag">[5]</span> <span class="syntax-highlight">zai</span> — https://api.z.ai/api/coding/paas/v4</div>
+			<div>  <span class="syntax-flag">[6]</span> <span class="syntax-highlight">custom</span> — any OpenAI-compatible endpoint</div>
+			<div></div>
+			<div>  Select provider [1-6]: <span class="syntax-string">1</span></div>
+			<div></div>
+			<div>  → Provider: <span class="syntax-success">openai</span></div>
+			<div>  → Model: <span class="syntax-success">gpt-4o-mini</span></div>
+			<div>  → Base URL: https://api.openai.com/v1</div>
+			<div></div>
+			<div>  🔑 Enter your API key: <span class="syntax-string">****</span></div>
+			<div></div>
+			<div><span class="syntax-success">✅</span> API key saved to ~/.cora/auth.toml</div>
+		</div>
+	</div>
+
+	<div class="docs-term-list">
+		<div class="docs-term-item">
+			<span class="docs-term-key">Known providers</span>
+			<span>Just enter your API key — model and base URL are pre-configured</span>
+		</div>
+		<div class="docs-term-item">
+			<span class="docs-term-key">Custom provider</span>
+			<span>Enter your own base URL, model name, and API key for any OpenAI-compatible API</span>
+		</div>
+		<div class="docs-term-item">
+			<span class="docs-term-key">Provider info stored</span>
+			<span>Provider name, model, and base URL are saved alongside your API key for easy reference</span>
+		</div>
+	</div>
+
+	<p>Check your auth status anytime:</p>
+	<div class="docs-terminal">
+		<div class="terminal-bar">
+			<span class="terminal-dot-red"></span>
+			<span class="terminal-dot-yellow"></span>
+			<span class="terminal-dot-green"></span>
+		</div>
+		<div class="terminal-body">
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora auth status</span></div>
+			<div><span class="syntax-success">✅</span> API key is configured.</div>
+			<div>   Source: ~/.cora/auth.toml</div>
+			<div></div>
+			<div>   <span class="syntax-flag">Provider:</span> <span class="syntax-success">openai</span></div>
+			<div>   <span class="syntax-flag">Model:</span> <span class="syntax-success">gpt-4o-mini</span></div>
+			<div>   <span class="syntax-flag">Base URL:</span> https://api.openai.com/v1</div>
+		</div>
+	</div>
+
+	<p>
+		You can also use environment variables instead of <code>cora auth login</code>:
+		<code>CORA_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, etc.
+	</p>
 </div>
 
 <div class="docs-section scroll-reveal">
@@ -109,8 +178,11 @@
 </div>
 
 <div class="docs-section scroll-reveal">
-	<h2>Customizing Your Review</h2>
-	<p>The <code>.cora.yaml</code> file controls how cora reviews your code.</p>
+	<h2>Project Configuration — <code>cora init</code></h2>
+	<p>
+		Create a <code>.cora.yaml</code> config file in your project root to customize review settings.
+		The CI action automatically reads this file when it exists.
+	</p>
 
 	<div class="docs-terminal">
 		<div class="terminal-bar">
@@ -119,26 +191,24 @@
 			<span class="terminal-dot-green"></span>
 		</div>
 		<div class="terminal-body">
-			<div><span class="syntax-comment"># .cora.yaml</span></div>
-			<div><span class="syntax-highlight">review:</span></div>
-			<div>  <span class="syntax-flag">severity:</span> <span class="syntax-string">warning</span></div>
-			<div>  <span class="syntax-flag">focus:</span> <span class="syntax-string">security,performance</span></div>
-			<div></div>
-			<div><span class="syntax-highlight">providers:</span></div>
-			<div>  <span class="syntax-flag">openai:</span></div>
-			<div>    <span class="syntax-flag">model:</span> <span class="syntax-string">gpt-4o</span></div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora init</span></div>
+			<div><span class="syntax-success">✅</span> Created .cora.yaml with example configuration.</div>
 		</div>
 	</div>
 
+	<p>Key configuration options:</p>
 	<div class="docs-term-list">
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="docs-term-key">review.severity</span> — Minimum severity level (info, minor, major, critical)
+			<span class="docs-term-key">focus</span> — Review focus areas: security, performance, bugs, best_practice
 		</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="docs-term-key">review.focus</span> — Focus areas for review (e.g., security, performance)
+			<span class="docs-term-key">ignore</span> — File patterns and rules to skip
 		</div>
 		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="docs-term-key">providers</span> — Provider-specific model overrides (openai, anthropic, groq, ollama, zai)
+			<span class="docs-term-key">hook</span> — Pre-commit hook settings: mode, severity threshold, max diff size
+		</div>
+		<div class="text-sm text-[var(--muted-foreground)]">
+			<span class="docs-term-key">llm</span> — LLM parameters: temperature, max_tokens, timeout
 		</div>
 	</div>
 </div>

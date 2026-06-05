@@ -87,37 +87,42 @@ cargo install --path .
 
 ## 🚀 Quick Start
 
-### 1. Set Your API Key
+### 1. Install
 
 ```bash
-export OPENAI_API_KEY="sk-..."
-# or
-export ANTHROPIC_API_KEY="sk-ant-..."
+curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
 ```
 
-### 2. Initialize Config (Optional)
+### 2. Set Up Authentication
+
+```bash
+cora auth login
+```
+
+Pick your provider, enter your API key — done. Cora stores it securely in `~/.cora/auth.toml` (never committed to git).
+
+> **No API key yet?** Set any provider env var instead: `export OPENAI_API_KEY="..."`
+
+### 3. Review Your Code
+
+```bash
+# Review staged changes
+cora review
+
+# Review vs a branch
+cora review --base origin/main
+
+# Review the last commit
+cora review --commit HEAD
+```
+
+### 4. Optional — Project Config
 
 ```bash
 cora init
 ```
 
-### 3. Review Staged Changes
-
-```bash
-cora review --staged
-```
-
-### 4. Review the Last Commit
-
-```bash
-cora review --commit HEAD
-```
-
-### 5. Scan the Entire Project
-
-```bash
-cora scan
-```
+Creates `.cora.yaml` in your project root for custom settings (focus areas, ignore patterns, hook config). The CI action automatically reads this file.
 
 ## 📖 Commands
 
@@ -324,15 +329,67 @@ output:
 
 ### Authentication
 
-API keys can be provided via environment variable (`CORA_API_KEY`), provider-specific env vars (`OPENAI_API_KEY`, etc.), or stored in `~/.cora/auth.toml` (auto-created by `cora auth login`, permission `0600`).
+API keys can be provided via environment variables, stored in `~/.cora/auth.toml` (auto-created by `cora auth login`, permission `0600`), or passed via CLI flags.
+
+#### Interactive Login (Recommended)
 
 ```bash
-# Interactive login (stores key in ~/.cora/auth.toml)
 cora auth login
-
-# Or set via environment variable
-export CORA_API_KEY=sk-...
 ```
+
+This starts an interactive setup that:
+
+1. **Lists known providers** — OpenAI, Anthropic, Groq, Ollama, Z.AI
+2. **Lets you pick one** — known providers only need an API key
+3. **Or choose "custom"** — enter your own base URL, model, and API key for any OpenAI-compatible endpoint
+
+Example flow:
+
+```
+$ cora auth login
+
+🔑 Cora Auth Setup
+   Choose your LLM provider:
+
+  [1] openai — https://api.openai.com/v1 (model: gpt-4o-mini)
+  [2] anthropic — https://api.anthropic.com/v1 (model: claude-3-haiku-20240307)
+  [3] groq — https://api.groq.com/openai/v1 (model: llama-3.1-8b-instant)
+  [4] ollama — http://localhost:11434/v1 (model: llama3.1)
+  [5] zai — https://api.z.ai/api/coding/paas/v4 (model: glm-5.1)
+  [6] custom — use any OpenAI-compatible endpoint
+
+  Select provider [1-6]: 1
+
+  → Provider: openai
+  → Model: gpt-4o-mini
+  → Base URL: https://api.openai.com/v1
+
+  🔑 Enter your API key: sk-...
+
+✅ API key saved to ~/.cora/auth.toml
+   Provider: openai | Model: gpt-4o-mini | Base: https://api.openai.com/v1
+```
+
+#### Check Auth Status
+
+```bash
+cora auth status
+```
+
+Shows your configured provider, model, and key source.
+
+#### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `CORA_API_KEY` | API key (overrides all other sources) |
+| `OPENAI_API_KEY` | OpenAI API key (auto-detected) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (auto-detected) |
+| `GROQ_API_KEY` | Groq API key (auto-detected) |
+| `ZAI_API_KEY` | Z.AI API key (auto-detected) |
+| `CORA_PROVIDER` | Override provider name |
+| `CORA_MODEL` | Override model |
+| `CORA_BASE_URL` | Override API base URL |
 
 ## 🔗 CI/CD Integration
 
