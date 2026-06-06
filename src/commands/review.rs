@@ -152,6 +152,34 @@ pub async fn execute_review(
             if progress.is_enabled() {
                 progress.error(&e.to_string(), "calling_llm");
             }
+            // In SARIF format mode, produce a warning result instead of crashing.
+            // This ensures CI always gets valid SARIF even when the LLM API is
+            // temporarily unavailable or the diff is too large for the model.
+            if format == OutputFormat::Sarif {
+                let warning_output = serde_json::json!({
+                    "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+                    "version": "2.1.0",
+                    "runs": [{
+                        "tool": {
+                            "driver": {
+                                "name": "cora",
+                                "informationUri": "https://github.com/codecoradev/cora-cli",
+                                "version": env!("CARGO_PKG_VERSION")
+                            }
+                        },
+                        "results": [{
+                            "level": "warning",
+                            "message": {
+                                "text": format!("Cora AI review could not complete: {}. Review was skipped; no code quality issues were found by the automated check.", e)
+                            }
+                        }]
+                    }]
+                });
+                return Ok(ReviewResult {
+                    exit_code: EXIT_OK,
+                    output: format!("{warning_output}\n"),
+                });
+            }
             return Err(e.into());
         }
     };

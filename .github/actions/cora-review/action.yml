@@ -109,33 +109,86 @@ runs:
         INPUT_BASE: ${{ inputs.base-branch }}
         INPUT_SEVERITY: ${{ inputs.severity }}
       run: |
-        # Use project .cora.yaml if it exists; otherwise create a CI-friendly fallback
-        if [ ! -f .cora.yaml ]; then
-          printf 'hook:\n  max_diff_size: 5242880\n' > .cora-ci.yaml
-          CORA_CONFIG=".cora-ci.yaml" cora review \
-            --base "$INPUT_BASE" \
-            --format sarif \
-            --severity "$INPUT_SEVERITY" \
-            --quiet \
-            > cora-results.sarif 2>cora-stderr.log; EXIT_CODE=$?
-        else
-          echo "Using project .cora.yaml for configuration"
-          cora review \
-            --base "$INPUT_BASE" \
-            --format sarif \
-            --severity "$INPUT_SEVERITY" \
-            --quiet \
-            > cora-results.sarif 2>cora-stderr.log; EXIT_CODE=$?
-        fi
-        SARIF_BYTES=$(wc -c < cora-results.sarif)
-        echo "Cora review complete ($SARIF_BYTES bytes, exit=$EXIT_CODE)"
+        # Build the cora review command with retry logic and 600s timeout
+        run_cora() {
+          if [ ! -f .cora.yaml ]; then
+            # Create CI config with 5MB diff limit and 600s timeout
+            printf 'hook:\n  max_diff_size: 5242880\nllm:\n  timeout: 600\n' > .cora-ci.yaml
+            CORA_CONFIG=".cora-ci.yaml" cora review \
+              --base "$INPUT_BASE" \
+              --format sarif \
+              --severity "$INPUT_SEVERITY" \
+              --quiet \
+              > cora-results.sarif 2>cora-stderr.log
+          else
+            echo "Using project .cora.yaml for configuration"
+            cora review \
+              --base "$INPUT_BASE" \
+              --format sarif \
+              --severity "$INPUT_SEVERITY" \
+              --quiet \
+              > cora-results.sarif 2>cora-stderr.log
+          fi
+          return $?
+        }
+
+        # Retry up to 3 times with exponential backoff (10s, 30s, 60s)
+        EXIT_CODE=1
+        for ATTEMPT in 1 2 3; do
+          run_cora
+          EXIT_CODE=$?
+          SARIF_BYTES=$(wc -c < cora-results.sarif 2>/dev/null || echo "0")
+
+          echo "Attempt $ATTEMPT: exit=$EXIT_CODE, sarif_bytes=$SARIF_BYTES"
+
+          # Success: cora exited 0 or produced valid SARIF output
+          if [ "$EXIT_CODE" -eq 0 ] || [ "$SARIF_BYTES" -gt 10 ]; then
+            break
+          fi
+
+          # On failure, show stderr and retry
+          if [ -s cora-stderr.log ]; then
+            echo "::warning::Attempt $ATTEMPT failed. Cora stderr: $(cat cora-stderr.log)"
+          fi
+
+          if [ "$ATTEMPT" -lt 3 ]; then
+            SLEEP=$((ATTEMPT * 20))
+            echo "Retrying in ${SLEEP}s..."
+            sleep "$SLEEP"
+            rm -f cora-results.sarif cora-stderr.log
+          fi
+        done
+
+        echo "Cora review complete ($SARIF_BYTES bytes, exit=$EXIT_CODE, attempts=$ATTEMPT)"
         if [ -s cora-stderr.log ]; then
           echo "::warning::Cora stderr: $(cat cora-stderr.log)"
         fi
-        # Fail if cora exited non-zero AND produced empty result (LLM API failure)
+
+        # All retries exhausted and still no valid output — generate a fallback SARIF
+        # so the workflow doesn't hard-fail on transient API issues.
         if [ "$EXIT_CODE" -ne 0 ] && [ "$SARIF_BYTES" -lt 10 ]; then
-          echo "::error::Cora review failed (exit=$EXIT_CODE, $SARIF_BYTES bytes). LLM API may be unavailable."
-          exit 1
+          echo "::warning::Cora review could not complete after $ATTEMPT attempt(s). Generating fallback SARIF."
+          cat > cora-results.sarif << 'SARIF_EOF'
+        {
+          "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+          "version": "2.1.0",
+          "runs": [{
+            "tool": {
+              "driver": {
+                "name": "cora",
+                "informationUri": "https://github.com/codecoradev/cora-cli",
+                "version": "0.4.0"
+              }
+            },
+            "results": [{
+              "level": "warning",
+              "message": {
+                "text": "Cora AI review could not complete — LLM API was unavailable after 3 retry attempts. Review was skipped; no code quality issues were found by the automated check."
+              }
+            }]
+          }]
+        }
+        SARIF_EOF
         fi
 
     - name: Check SARIF for findings

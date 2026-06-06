@@ -306,7 +306,7 @@ mod tests {
         assert_eq!(cfg.provider, "openai");
         assert_eq!(cfg.temperature, 0.0);
         assert_eq!(cfg.max_tokens, 4096);
-        assert_eq!(cfg.timeout, 120);
+        assert_eq!(cfg.timeout, 600);
     }
 
     // ─── TokenUsage::default ───
@@ -435,14 +435,12 @@ impl Default for LLMConfig {
             provider: "openai".to_string(),
             temperature: 0.0,
             max_tokens: 4096,
-            timeout: 120,
+            timeout: 600,
         }
     }
 }
 
 /// CLI exit codes.
-///
-/// Kept for API completeness — consumers and tests may reference these.
 #[allow(dead_code)]
 pub const EXIT_OK: i32 = 0;
 #[allow(dead_code)]
