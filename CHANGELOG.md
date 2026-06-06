@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-06-06
+
+### Fixed
+
+- **Cora Review now works on fork PRs** — changed trigger from `pull_request` to `pull_request_target` so `GITHUB_TOKEN` has write access for PR comments on external contributor PRs. Explicitly checks out PR head SHA for correct diff (#178 context)
+
+### Added
+
+- **Top-level provider shortcuts in `.cora.yaml`** — `model:`, `base_url:`, and bare `provider:` string now accepted at top level without needing nested `provider:` section (#178, closes #176)
+
 ## [0.4.1] - 2026-06-06
 
 ### Fixed
