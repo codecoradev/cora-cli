@@ -109,14 +109,24 @@ runs:
         INPUT_BASE: ${{ inputs.base-branch }}
         INPUT_SEVERITY: ${{ inputs.severity }}
       run: |
-        # Set higher diff limit for CI (default 50K is too small for large PRs)
-        printf 'hook:\n  max_diff_size: 200000\n' > .cora-ci.yaml
-        CORA_CONFIG=".cora-ci.yaml" cora review \
-          --base "$INPUT_BASE" \
-          --format sarif \
-          --severity "$INPUT_SEVERITY" \
-          --quiet \
-          > cora-results.sarif 2>cora-stderr.log; EXIT_CODE=$?
+        # Use project .cora.yaml if it exists; otherwise create a CI-friendly fallback
+        if [ ! -f .cora.yaml ]; then
+          printf 'hook:\n  max_diff_size: 5242880\n' > .cora-ci.yaml
+          CORA_CONFIG=".cora-ci.yaml" cora review \
+            --base "$INPUT_BASE" \
+            --format sarif \
+            --severity "$INPUT_SEVERITY" \
+            --quiet \
+            > cora-results.sarif 2>cora-stderr.log; EXIT_CODE=$?
+        else
+          echo "Using project .cora.yaml for configuration"
+          cora review \
+            --base "$INPUT_BASE" \
+            --format sarif \
+            --severity "$INPUT_SEVERITY" \
+            --quiet \
+            > cora-results.sarif 2>cora-stderr.log; EXIT_CODE=$?
+        fi
         SARIF_BYTES=$(wc -c < cora-results.sarif)
         echo "Cora review complete ($SARIF_BYTES bytes, exit=$EXIT_CODE)"
         if [ -s cora-stderr.log ]; then

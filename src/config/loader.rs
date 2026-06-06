@@ -478,3 +478,134 @@ pub struct AuthStatus {
     pub source: String,
     pub has_key: bool,
 }
+
+/// Stored provider information alongside the API key.
+#[derive(Debug, Clone)]
+pub struct ProviderInfo {
+    pub provider: String,
+    pub base_url: String,
+    pub model: String,
+}
+
+/// Save provider info (name, base_url, model) to `~/.cora/auth.toml`
+/// alongside the existing `api_key`.
+pub fn save_provider_info(
+    provider: &str,
+    base_url: &str,
+    model: &str,
+) -> std::result::Result<(), CoraError> {
+    let dir = cora_dir()?;
+    let path = dir.join(AUTH_FILENAME);
+
+    // Read existing auth.toml or start fresh
+    let mut table = if path.is_file() {
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+        content
+            .parse::<toml::Table>()
+            .unwrap_or_else(|_| toml::Table::new())
+    } else {
+        toml::Table::new()
+    };
+
+    // Set provider info fields
+    table.insert(
+        "provider".to_string(),
+        toml::Value::String(provider.to_string()),
+    );
+    table.insert(
+        "base_url".to_string(),
+        toml::Value::String(base_url.to_string()),
+    );
+    table.insert("model".to_string(), toml::Value::String(model.to_string()));
+
+    let content = table.to_string();
+    std::fs::write(&path, content)
+        .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+
+    // Restrict permissions to owner only (0o600)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = std::fs::Permissions::from_mode(0o600);
+        std::fs::set_permissions(&path, perms)?;
+    }
+
+    debug!(provider = provider, "saved provider info");
+    Ok(())
+}
+
+/// Load stored provider info from `~/.cora/auth.toml`.
+/// Returns `None` if no provider info is stored.
+pub fn load_provider_info() -> std::result::Result<Option<ProviderInfo>, CoraError> {
+    let dir = cora_dir()?;
+    let path = dir.join(AUTH_FILENAME);
+    if !path.is_file() {
+        return Ok(None);
+    }
+
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+
+    let table: toml::Table = content
+        .parse::<toml::Table>()
+        .map_err(|e| CoraError::AuthError(format!("invalid TOML: {}", e)))?;
+
+    let provider = table
+        .get("provider")
+        .and_then(toml::Value::as_str)
+        .unwrap_or("");
+    let base_url = table
+        .get("base_url")
+        .and_then(toml::Value::as_str)
+        .unwrap_or("");
+    let model = table
+        .get("model")
+        .and_then(toml::Value::as_str)
+        .unwrap_or("");
+
+    if provider.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(ProviderInfo {
+        provider: provider.to_string(),
+        base_url: base_url.to_string(),
+        model: model.to_string(),
+    }))
+}
+
+/// Remove stored provider info from `~/.cora/auth.toml` while keeping the api_key if present.
+pub fn remove_provider_info() -> std::result::Result<(), CoraError> {
+    let dir = cora_dir()?;
+    let path = dir.join(AUTH_FILENAME);
+    if !path.is_file() {
+        return Ok(());
+    }
+
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+
+    let mut table: toml::Table = content
+        .parse::<toml::Table>()
+        .map_err(|e| CoraError::AuthError(format!("invalid TOML: {}", e)))?;
+
+    let changed = table.remove("provider").is_some()
+        | table.remove("base_url").is_some()
+        | table.remove("model").is_some();
+
+    if changed {
+        // If only provider info was left (no api_key), just delete the file
+        if table.is_empty() {
+            std::fs::remove_file(&path)
+                .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+        } else {
+            let content = table.to_string();
+            std::fs::write(&path, content)
+                .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+        }
+        debug!("removed provider info from auth.toml");
+    }
+
+    Ok(())
+}
