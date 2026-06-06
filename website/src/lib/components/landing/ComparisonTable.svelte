@@ -1,9 +1,9 @@
 <!-- ====== S6 — COMPARISON TABLE ====== -->
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 
-	let revealed = false;
-	let sectionEl;
+	let revealed = $state(false);
+	let sectionEl: HTMLElement;
 
 	onMount(() => {
 		const observer = new IntersectionObserver(
@@ -19,7 +19,14 @@
 		return () => observer.disconnect();
 	});
 
-	const features = [
+	type CellValue = boolean | string | null;
+
+	interface Feature {
+		name: string;
+		[key: string]: CellValue;
+	}
+
+	const features: Feature[] = [
 		{ name: 'BYOK', cora: true, coderabbit: false, copilot: false, sonarqube: null },
 		{ name: 'Self-hosted', cora: true, coderabbit: false, copilot: false, sonarqube: true },
 		{ name: 'Gitea / Forgejo', cora: true, coderabbit: false, copilot: false, sonarqube: true },
@@ -36,7 +43,7 @@
 		{ key: 'sonarqube', label: 'SonarQube' }
 	];
 
-	function cellIcon(value) {
+	function cellIcon(value: CellValue): string {
 		if (value === true) return 'check';
 		if (value === false) return 'cross';
 		if (value === null) return 'dash';
