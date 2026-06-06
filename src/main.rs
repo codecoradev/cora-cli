@@ -192,11 +192,15 @@ enum Command {
         token: Option<String>,
     },
 
-    /// Create a .cora.yaml config file in the current directory
+    /// Create a .cora.yaml config file and install pre-commit hook
     Init {
         /// Overwrite existing config file
         #[clap(long)]
         force: bool,
+
+        /// Skip pre-commit hook installation
+        #[clap(long)]
+        no_hook: bool,
     },
 
     /// Manage pre-commit git hooks
@@ -371,11 +375,11 @@ async fn main() -> Result<()> {
             };
             upload::execute_upload(&opts).await?
         }
-        Command::Init { force } => {
+        Command::Init { force, no_hook } => {
             if force {
-                init::execute_init_force()?;
+                init::execute_init_force(no_hook)?;
             } else {
-                init::execute_init()?;
+                init::execute_init(no_hook)?;
             }
             0
         }

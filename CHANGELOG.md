@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-06
+
+### Fixed
+
+- **Regex panic on optional hunk groups** — bare hunk headers like `@@ -1 +1 @@` (without `,count`) caused `caps[4]` index-out-of-bounds panic. Now uses `caps.get(N)` with safe fallback (#167)
+- **Default max_diff_size raised to 5MB** — 50KB was too small for most real PRs (#167)
+- **CI action resilience** — 3× retry on cora review failure, 600s timeout, graceful SARIF fallback when LLM API is unavailable (#174)
+
+### Added
+
+- **`cora init` now installs pre-commit hook** — automatically creates `.git/hooks/pre-commit` alongside `.cora.yaml`. Use `--no-hook` to skip. Falls back gracefully when not in a git repo (#176)
+- **Tiered `cora auth login`** — interactive provider selection with numbered menu. Known providers (openai, anthropic, groq, ollama, zai) pre-fill base URL and model. Custom providers ask for base URL + model + key (#172)
+- **Configurable CI action** — reads `.cora.yaml` from repo when present, falls back to 5MB limit when absent. Removes hardcoded `max_diff_size: 200000` (#172)
+- **`on_violation` config + `--ci` mode** — hard gate for CI: `on_violation: disallow` makes cora exit non-zero on any finding. `--ci` flag enables strict non-interactive mode (#152)
+- **`cora hook install/uninstall`** — explicit hook management commands (previously only via `cora init`)
+
+### Changed
+
+- **CI action reads `.cora.yaml`** — project config takes precedence over hardcoded fallback. `max_diff_size`, `hook.mode`, `llm.timeout` all respected in CI (#172)
+
 ## [0.4.0] - 2026-06-03
 
 ### Added

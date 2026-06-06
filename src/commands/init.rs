@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 use tracing::debug;
 
+use crate::hook;
+
 /// Example .cora.yaml template content.
 const CONFIG_TEMPLATE: &str = r#"# Cora Code Review Configuration
 # See: https://github.com/codecoradev/cora-cli
@@ -48,8 +50,8 @@ output:
   color: true
 "#;
 
-/// Execute the init command: create a `.cora.yaml` file in the current directory.
-pub fn execute_init() -> Result<()> {
+/// Execute the init command: create a `.cora.yaml` file and install pre-commit hook.
+pub fn execute_init(skip_hook: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let config_path = cwd.join(".cora.yaml");
 
@@ -78,11 +80,21 @@ pub fn execute_init() -> Result<()> {
         "   API keys should be set via CORA_API_KEY env var or `cora auth login`.".dimmed()
     );
 
+    // Install pre-commit hook unless --no-hook is specified
+    if !skip_hook {
+        install_hook_silent();
+    } else {
+        println!(
+            "{}",
+            "   Skipped hook installation (--no-hook). Run `cora hook install` later.".dimmed()
+        );
+    }
+
     Ok(())
 }
 
 /// Execute the init command with --force flag.
-pub fn execute_init_force() -> Result<()> {
+pub fn execute_init_force(skip_hook: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let config_path = cwd.join(".cora.yaml");
 
@@ -96,5 +108,44 @@ pub fn execute_init_force() -> Result<()> {
         config_path.display()
     );
 
+    // Install pre-commit hook unless --no-hook is specified
+    if !skip_hook {
+        install_hook_silent();
+    } else {
+        println!(
+            "{}",
+            "   Skipped hook installation (--no-hook). Run `cora hook install` later.".dimmed()
+        );
+    }
+
     Ok(())
+}
+
+/// Install hook silently — warns on failure but doesn't fail init.
+fn install_hook_silent() {
+    match hook::install_hook() {
+        Ok(path) => {
+            println!(
+                "{} Installed pre-commit hook to {}",
+                "✅".green().bold(),
+                path
+            );
+            println!(
+                "{}",
+                "   The hook will run `cora review --staged --format compact` before each commit.".dimmed()
+            );
+        }
+        Err(e) => {
+            // Don't fail init if hook install fails (e.g. not a git repo)
+            println!(
+                "{} Could not install pre-commit hook: {}",
+                "⚠️".yellow().bold(),
+                e
+            );
+            println!(
+                "{}",
+                "   Run `cora hook install` later from inside a git repository.".dimmed()
+            );
+        }
+    }
 }
