@@ -40,7 +40,7 @@ ignore:
 hook:
   mode: warn          # "warn" (print but allow) or "block" (fail commit)
   min_severity: major # minimum severity to trigger hook action
-  max_diff_size: 50000 # max diff chars before refusing
+  max_diff_size: 5242880 # max 5MB diff chars before refusing
 
 # Output settings
 output:
