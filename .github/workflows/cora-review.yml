@@ -1,12 +1,12 @@
 name: Cora AI Code Review
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [develop, main]
     types: [opened, synchronize, ready_for_review, reopened]
 
 concurrency:
-  group: cora-review-${{ github.ref }}
+  group: cora-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
@@ -21,9 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
+      - name: Checkout PR head
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
 
