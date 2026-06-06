@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use tracing::Level;
@@ -116,6 +116,10 @@ enum Command {
         /// Suppress all output except the formatted review result
         #[clap(long, short)]
         quiet: bool,
+
+        /// Write formatted output to a file instead of stdout
+        #[clap(long, value_name = "PATH")]
+        output_file: Option<String>,
 
         /// Filter results by minimum severity (info, minor, major, critical)
         #[clap(long, value_parser = ["info", "minor", "major", "critical"])]
@@ -324,6 +328,7 @@ async fn main() -> Result<()> {
             stream,
             progress,
             quiet,
+            output_file,
             severity,
             no_cache,
             ci,
@@ -345,6 +350,7 @@ async fn main() -> Result<()> {
                     stream,
                     progress,
                     quiet,
+                    output_file,
                     severity,
                     upload,
                     repo,
@@ -468,6 +474,7 @@ struct ReviewOpts {
     stream: bool,
     progress: bool,
     quiet: bool,
+    output_file: Option<String>,
     severity: Option<String>,
     upload: bool,
     repo: Option<String>,
@@ -552,8 +559,16 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
     )
     .await?;
 
-    // Print the formatted output
-    print!("{}", result.output);
+    // Print the formatted output (to file if --output-file, else stdout)
+    if let Some(ref path) = opts.output_file {
+        std::fs::write(path, &result.output)
+            .with_context(|| format!("failed to write output file: {path}"))?;
+        if !opts.quiet {
+            eprintln!("{}", format!("Output written to {path}").dimmed());
+        }
+    } else {
+        print!("{}", result.output);
+    }
 
     // If --upload, send the SARIF output to GitHub Code Scanning
     if opts.upload {

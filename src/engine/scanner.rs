@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
+use std::io::IsTerminal;
 use std::path::Path;
 
 use crate::error::CoraError;
 use glob::Pattern;
 use ignore::WalkBuilder;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use tracing::debug;
 
 /// A file to be scanned, with its relative path and content.
@@ -64,13 +65,18 @@ pub fn walk_project(
     let mut entries = Vec::new();
 
     let spinner = ProgressBar::new_spinner();
-    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
-    spinner.set_style(
-        ProgressStyle::with_template("{spinner:.cyan} {msg}")
-            .unwrap()
-            .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ "),
-    );
-    spinner.set_message("Scanning files…");
+    // Hide spinner when stderr is not a terminal (piped/redirected)
+    if std::io::stderr().is_terminal() {
+        spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+        spinner.set_style(
+            ProgressStyle::with_template("{spinner:.cyan} {msg}")
+                .unwrap()
+                .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ "),
+        );
+        spinner.set_message("Scanning files…");
+    } else {
+        spinner.set_draw_target(ProgressDrawTarget::hidden());
+    }
 
     let walker = WalkBuilder::new(root)
         .hidden(true) // respect hidden files (skip dotfiles)

@@ -1,5 +1,5 @@
 use crate::error::CoraError;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::LazyLock;
@@ -244,8 +244,16 @@ async fn chat_completion(
 }
 
 /// Create an animated spinner for LLM operations.
+///
+/// Automatically hidden when stderr is not a TTY (piped/redirected),
+/// preventing ANSI pollution in captured output.
 fn create_spinner(message: &str) -> ProgressBar {
     let spinner = ProgressBar::new_spinner();
+    // Hide spinner when stderr is not a terminal (piped/redirected)
+    if !atty_check() {
+        spinner.set_draw_target(ProgressDrawTarget::hidden());
+        return spinner;
+    }
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
     spinner.set_style(
         ProgressStyle::with_template("{spinner:.cyan} {msg}")
@@ -254,6 +262,12 @@ fn create_spinner(message: &str) -> ProgressBar {
     );
     spinner.set_message(message.to_string());
     spinner
+}
+
+/// Check if stderr is connected to a TTY.
+fn atty_check() -> bool {
+    use std::io::IsTerminal;
+    std::io::stderr().is_terminal()
 }
 
 /// Review a diff using the LLM. Returns a `ReviewResponse`.
@@ -650,8 +664,30 @@ pub(crate) fn parse_review_response(
     // Repair common LLM JSON mistakes before strict parse
     let json_str = repair_json_string(&json_str);
 
-    let issues: Vec<ReviewIssue> =
-        serde_json::from_str(&json_str).map_err(|e| CoraError::LlmParse(e.to_string()))?;
+    // Attempt strict parse first; if it fails due to truncation, try to repair
+    let issues: Vec<ReviewIssue> = match serde_json::from_str(&json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            let err_msg = e.to_string();
+            if err_msg.contains("EOF") || err_msg.contains("unexpected end") {
+                debug!(error = %err_msg, "attempting truncated JSON repair");
+                let repaired = repair_truncated_json(&json_str);
+                match serde_json::from_str(&repaired) {
+                    Ok(v) => {
+                        debug!("truncated JSON repair succeeded — some data may be partial");
+                        v
+                    }
+                    Err(repair_err) => {
+                        return Err(CoraError::LlmParse(format!(
+                            "parse failed (original: {err_msg}, after repair: {repair_err})"
+                        )));
+                    }
+                }
+            } else {
+                return Err(CoraError::LlmParse(e.to_string()));
+            }
+        }
+    };
 
     Ok((issues, summary, None))
 }
@@ -667,8 +703,30 @@ pub(crate) fn parse_scan_response(
     // Repair common LLM JSON mistakes before strict parse
     let json_str = repair_json_string(&json_str);
 
-    let issues: Vec<ReviewIssue> =
-        serde_json::from_str(&json_str).map_err(|e| CoraError::LlmParse(e.to_string()))?;
+    // Attempt strict parse first; if it fails due to truncation, try to repair
+    let issues: Vec<ReviewIssue> = match serde_json::from_str(&json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            let err_msg = e.to_string();
+            if err_msg.contains("EOF") || err_msg.contains("unexpected end") {
+                debug!(error = %err_msg, "attempting truncated JSON repair for scan response");
+                let repaired = repair_truncated_json(&json_str);
+                match serde_json::from_str(&repaired) {
+                    Ok(v) => {
+                        debug!("truncated JSON repair succeeded — some data may be partial");
+                        v
+                    }
+                    Err(repair_err) => {
+                        return Err(CoraError::LlmParse(format!(
+                            "parse failed (original: {err_msg}, after repair: {repair_err})"
+                        )));
+                    }
+                }
+            } else {
+                return Err(CoraError::LlmParse(e.to_string()));
+            }
+        }
+    };
 
     let summary = if summary.is_empty() {
         None
@@ -730,6 +788,55 @@ fn repair_json_string(json_str: &str) -> String {
         debug!("applied backslash repair to LLM JSON output");
         repaired
     }
+}
+
+/// Repair truncated JSON by closing unclosed strings, arrays, and objects.
+///
+/// When an LLM response is cut off due to max_tokens, the JSON is often
+/// incomplete — unclosed string values, missing `]` or `}` brackets.
+/// This function walks the JSON tracking nesting depth and string state,
+/// then appends the necessary closing characters.
+fn repair_truncated_json(json: &str) -> String {
+    let mut stack: Vec<char> = Vec::new();
+    let mut in_string = false;
+    let mut escape_next = false;
+
+    for ch in json.chars() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_string => escape_next = true,
+            '"' => in_string = !in_string,
+            '{' | '[' if !in_string => stack.push(ch),
+            '}' if !in_string && stack.last() == Some(&'{') => {
+                stack.pop();
+            }
+            ']' if !in_string && stack.last() == Some(&'[') => {
+                stack.pop();
+            }
+            _ => {}
+        }
+    }
+
+    let mut repaired = json.to_string();
+
+    // Close unclosed string
+    if in_string {
+        repaired.push('"');
+    }
+
+    // Close brackets in reverse order
+    for ch in stack.iter().rev() {
+        match ch {
+            '{' => repaired.push('}'),
+            '[' => repaired.push(']'),
+            _ => {}
+        }
+    }
+
+    repaired
 }
 
 /// Replace invalid escape sequences in JSON string values.
