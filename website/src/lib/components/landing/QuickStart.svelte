@@ -18,7 +18,7 @@
 		<TimelineStep number={1} title="Install" description="Single binary, no dependencies.">
 			{#snippet terminalCode()}
 				<TerminalBlock>
-					<span class="syntax-cmd">$</span> <span class="syntax-highlight">curl -fsSL</span> <span class="syntax-string">https://cora.dev/install</span> <span class="syntax-highlight">|</span> <span class="syntax-string">sh</span>
+					<span class="syntax-cmd">$</span> <span class="syntax-highlight">curl -fsSL</span> <span class="syntax-string">https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh</span> <span class="syntax-highlight">|</span> <span class="syntax-string">sh</span>
 				</TerminalBlock>
 			{/snippet}
 		</TimelineStep>

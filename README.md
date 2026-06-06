@@ -49,7 +49,7 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
 Pin a specific version with `CORA_VERSION`:
 
 ```bash
-CORA_VERSION=v0.4.0 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+CORA_VERSION=v0.4.2 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
 ```
 
 ### Pre-built Binaries
@@ -122,7 +122,28 @@ cora review --commit HEAD
 cora init
 ```
 
-Creates `.cora.yaml` in your project root for custom settings (focus areas, ignore patterns, hook config). The CI action automatically reads this file.
+Creates `.cora.yaml` in your project root and **automatically installs a pre-commit hook**. The hook runs `cora review --staged --format compact` before each commit. Use `--no-hook` to skip.
+
+```bash
+# Skip hook installation
+cora init --no-hook
+
+# Manage hooks separately
+cora hook install
+cora hook uninstall
+```
+
+### 5. Provider Shortcuts (v0.4.2+)
+
+You can set `model`, `base_url`, and `provider` directly in `.cora.yaml`:
+
+```yaml
+provider: openai
+model: gpt-4o-mini
+base_url: https://api.openai.com/v1
+```
+
+No need for nested `provider:` section. Run `cora config show` to verify resolved config.
 
 ## 📖 Commands
 
@@ -254,11 +275,16 @@ Create a `.cora.yaml` in your project root, or use `~/.cora/config.yaml` for glo
 ```yaml
 # .cora.yaml
 
-# Provider configuration
-provider:
-  provider: openai          # openai | anthropic | google | ollama | custom
-  model: gpt-4o-mini
-  base_url: https://api.openai.com/v1   # Override for custom/self-hosted endpoints
+# Provider configuration (shortcut format — v0.4.2+)
+provider: openai
+model: gpt-4o-mini
+base_url: https://api.openai.com/v1
+
+# Or use nested format for multiple keys:
+# provider:
+#   provider: openai
+#   model: gpt-4o-mini
+#   base_url: https://api.openai.com/v1
 
 # LLM parameters
 llm:

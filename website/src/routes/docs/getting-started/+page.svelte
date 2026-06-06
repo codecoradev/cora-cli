@@ -180,8 +180,9 @@
 <div class="docs-section scroll-reveal">
 	<h2>Project Configuration — <code>cora init</code></h2>
 	<p>
-		Create a <code>.cora.yaml</code> config file in your project root to customize review settings.
-		The CI action automatically reads this file when it exists.
+		Create a <code>.cora.yaml</code> config file in your project root.
+		<strong>Automatically installs a pre-commit hook</strong> that runs <code>cora review --staged --format compact</code> before each commit.
+		Use <code>--no-hook</code> to skip hook installation.
 	</p>
 
 	<div class="docs-terminal">
@@ -193,6 +194,22 @@
 		<div class="terminal-body">
 			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora init</span></div>
 			<div><span class="syntax-success">✅</span> Created .cora.yaml with example configuration.</div>
+			<div><span class="syntax-success">✅</span> Pre-commit hook installed at .git/hooks/pre-commit</div>
+		</div>
+	</div>
+
+	<p>Set provider, model, and base URL directly in <code>.cora.yaml</code> (no nested section needed):</p>
+	<div class="docs-terminal">
+		<div class="terminal-bar">
+			<span class="terminal-dot-red"></span>
+			<span class="terminal-dot-yellow"></span>
+			<span class="terminal-dot-green"></span>
+		</div>
+		<div class="terminal-body">
+			<div><span class="syntax-comment"># .cora.yaml — shortcut format</span></div>
+			<div><span class="syntax-flag">provider:</span> openai</div>
+			<div><span class="syntax-flag">model:</span> gpt-4o-mini</div>
+			<div><span class="syntax-flag">base_url:</span> https://api.openai.com/v1</div>
 		</div>
 	</div>
 

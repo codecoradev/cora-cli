@@ -27,22 +27,8 @@
 </h1>
 
 <div class="docs-section scroll-reveal">
-	<h2>Prerequisites</h2>
-	<p>cora is a Rust binary. You have two installation paths:</p>
-	<div class="docs-term-list">
-		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="font-semibold text-[var(--accent)]">Via Cargo (recommended)</span> — Requires Rust 1.85 or later with Cargo installed
-		</div>
-		<div class="text-sm text-[var(--muted-foreground)]">
-			<span class="font-semibold text-[var(--accent)]">Binary download</span> — No Rust required; just download and place in your PATH
-		</div>
-	</div>
-	<p>cora works on Linux (x86_64 and arm64), macOS (arm64), and Windows.</p>
-</div>
-
-<div class="docs-section scroll-reveal">
-	<h2>Install via Cargo</h2>
-	<p>The recommended way to install cora is through Cargo:</p>
+	<h2>Quick Install (Recommended)</h2>
+	<p>The fastest way to get cora — single command, no Rust required:</p>
 
 	<div class="docs-terminal">
 		<div class="terminal-bar">
@@ -51,7 +37,49 @@
 			<span class="terminal-dot-green"></span>
 		</div>
 		<div class="terminal-body">
-			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cargo install</span>			<span class="syntax-string">cora-cli</span></div>
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">curl -fsSL</span> <span class="syntax-string">https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh</span> <span class="syntax-highlight">|</span> <span class="syntax-string">sh</span></div>
+		</div>
+	</div>
+
+	<p>Installs to <code>~/.local/bin</code>. Add to PATH if needed:</p>
+
+	<div class="docs-terminal">
+		<div class="terminal-bar">
+			<span class="terminal-dot-red"></span>
+			<span class="terminal-dot-yellow"></span>
+			<span class="terminal-dot-green"></span>
+		</div>
+		<div class="terminal-body">
+			<div><span class="syntax-highlight">echo</span> <span class="syntax-string">'export PATH="$HOME/.local/bin:$PATH"'</span> >> ~/.bashrc</div>
+		</div>
+	</div>
+
+	<p>Pin a specific version:</p>
+
+	<div class="docs-terminal">
+		<div class="terminal-bar">
+			<span class="terminal-dot-red"></span>
+			<span class="terminal-dot-yellow"></span>
+			<span class="terminal-dot-green"></span>
+		</div>
+		<div class="terminal-body">
+			<div><span class="syntax-cmd">$</span> <span class="syntax-flag">CORA_VERSION</span>=<span class="syntax-string">v0.4.2</span> <span class="syntax-highlight">curl -fsSL</span> <span class="syntax-string">https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh</span> <span class="syntax-highlight">|</span> <span class="syntax-string">sh</span></div>
+		</div>
+	</div>
+</div>
+
+<div class="docs-section scroll-reveal">
+	<h2>Install via Cargo</h2>
+	<p>If you have Rust 1.85+ installed:</p>
+
+	<div class="docs-terminal">
+		<div class="terminal-bar">
+			<span class="terminal-dot-red"></span>
+			<span class="terminal-dot-yellow"></span>
+			<span class="terminal-dot-green"></span>
+		</div>
+		<div class="terminal-body">
+			<div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cargo install</span> <span class="syntax-string">cora-cli</span></div>
 		</div>
 	</div>
 
