@@ -119,7 +119,7 @@ impl Default for Config {
             scan_system_prompt_file: None,
             temperature: 0.0,
             max_tokens: 4096,
-            timeout: 120,
+            timeout: 600,
             cache_ttl: 1440, // 24h in minutes
             static_analysis: StaticAnalysisConfig::default(),
             rules_config: RulesConfig::default(),
@@ -860,7 +860,7 @@ scan:
     #[test]
     fn config_default_timeout() {
         let cfg = Config::default();
-        assert_eq!(cfg.timeout, 120);
+        assert_eq!(cfg.timeout, 600);
     }
 
     #[test]
@@ -916,7 +916,7 @@ llm:
         assert_eq!(cfg.temperature, 0.7);
         // Other LLM fields should remain at defaults
         assert_eq!(cfg.max_tokens, 4096);
-        assert_eq!(cfg.timeout, 120);
+        assert_eq!(cfg.timeout, 600);
         assert_eq!(cfg.cache_ttl, 1440);
     }
 
