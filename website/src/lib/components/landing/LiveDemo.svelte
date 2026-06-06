@@ -21,7 +21,7 @@
 		{ text: '3 issues found in 3 files', color: 'var(--foreground)' },
 	];
 
-	let node: HTMLDivElement | undefined = $state();
+	let node: HTMLElement | undefined = $state();
 
 	$effect(() => {
 		if (!node) return;

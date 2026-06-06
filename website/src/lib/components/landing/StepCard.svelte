@@ -10,7 +10,7 @@
 		delayMs = 0,
 	}: {
 		number: string;
-		icon: typeof import('lucide-svelte').default;
+		icon: typeof import('@lucide/svelte').Icon;
 		title: string;
 		description: string;
 		class?: string;

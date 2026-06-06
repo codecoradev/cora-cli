@@ -9,7 +9,7 @@
 		class: className,
 		delayMs = 0,
 	}: {
-		icon: typeof import('lucide-svelte').default;
+		icon: typeof import('@lucide/svelte').Icon;
 		title: string;
 		accent: string;
 		description: string;
