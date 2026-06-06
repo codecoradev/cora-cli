@@ -132,7 +132,8 @@ fn install_hook_silent() {
             );
             println!(
                 "{}",
-                "   The hook will run `cora review --staged --format compact` before each commit.".dimmed()
+                "   The hook will run `cora review --staged --format compact` before each commit."
+                    .dimmed()
             );
         }
         Err(e) => {
