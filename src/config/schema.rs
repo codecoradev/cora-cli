@@ -139,8 +139,16 @@ impl HookConfig {
 /// Serde-compatible schema for the `.cora.yaml` configuration file.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CoraFile {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_provider_section",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub provider: Option<ProviderSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub focus: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -171,6 +179,29 @@ pub struct ProviderSection {
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
+}
+
+fn deserialize_provider_section<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<ProviderSection>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum ProviderField {
+        Section(ProviderSection),
+        Name(String),
+    }
+
+    match Option::<ProviderField>::deserialize(deserializer)? {
+        Some(ProviderField::Section(section)) => Ok(Some(section)),
+        Some(ProviderField::Name(provider)) => Ok(Some(ProviderSection {
+            provider: Some(provider),
+            ..Default::default()
+        })),
+        None => Ok(None),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -295,6 +326,12 @@ impl CoraFile {
     /// Merge this file config into a `Config`, overwriting only fields that are present.
     #[allow(clippy::assigning_clones)]
     pub fn merge_into(&self, config: &mut Config) {
+        if let Some(v) = &self.model {
+            config.provider.model.clone_from(v);
+        }
+        if let Some(v) = &self.base_url {
+            config.provider.base_url.clone_from(v);
+        }
         if let Some(p) = &self.provider {
             if let Some(v) = &p.provider {
                 config.provider.provider.clone_from(v);
@@ -487,6 +524,25 @@ mod tests {
         assert_eq!(cfg.provider.provider, "anthropic");
         assert_eq!(cfg.provider.model, "claude-3-haiku");
         assert_eq!(cfg.provider.base_url, "https://api.anthropic.com/v1");
+    }
+
+    #[test]
+    fn merge_top_level_provider_shortcuts() {
+        let mut cfg = Config::default();
+        let cora = CoraFile::from_str(
+            r"
+provider: openai
+model: glm-5.1
+base_url: https://api.z.ai/api/coding/paas/v4
+",
+        )
+        .unwrap();
+
+        cora.merge_into(&mut cfg);
+
+        assert_eq!(cfg.provider.provider, "openai");
+        assert_eq!(cfg.provider.model, "glm-5.1");
+        assert_eq!(cfg.provider.base_url, "https://api.z.ai/api/coding/paas/v4");
     }
 
     #[test]
