@@ -7,6 +7,7 @@
 	import HowItWorks from '$lib/components/landing/HowItWorks.svelte';
 	import FeatureGrid from '$lib/components/landing/FeatureGrid.svelte';
 	import ComparisonTable from '$lib/components/landing/ComparisonTable.svelte';
+	import FaqSection from '$lib/components/landing/FaqSection.svelte';
 	import QuickStart from '$lib/components/landing/QuickStart.svelte';
 
 	onMount(() => {
@@ -23,20 +24,20 @@
 			{ threshold: 0.1 }
 		);
 
-	document.querySelectorAll('.scroll-reveal').forEach((el) => observer.observe(el));
+		document.querySelectorAll('.scroll-reveal').forEach((el) => observer.observe(el));
 
-	// Comparison table rows — stagger reveal
-	document.querySelectorAll('.compare-table tbody tr').forEach((tr, i) => {
-		(tr as HTMLElement).style.transitionDelay = `${i * 60}ms`;
-		observer.observe(tr);
-	});
+		// Comparison table rows — stagger reveal
+		document.querySelectorAll('.compare-table tbody tr').forEach((tr, i) => {
+			(tr as HTMLElement).style.transitionDelay = `${i * 60}ms`;
+			observer.observe(tr);
+		});
 
-	// Timeline numbers — pulse on reveal
-	document.querySelectorAll('.timeline-number').forEach((el) => observer.observe(el));
+		// Timeline numbers — pulse on reveal
+		document.querySelectorAll('.timeline-number').forEach((el) => observer.observe(el));
 
-	return () => {
-		observer.disconnect();
-	};
+		return () => {
+			observer.disconnect();
+		};
 	});
 </script>
 
@@ -52,5 +53,6 @@
 	<HowItWorks />
 	<FeatureGrid />
 	<ComparisonTable />
+	<FaqSection />
 	<QuickStart />
 </div>
