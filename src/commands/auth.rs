@@ -6,8 +6,100 @@ use colored::Colorize;
 use crate::config::loader;
 use crate::config::providers::PRESETS;
 
-/// Execute `auth login` — interactive tiered provider selection and API key setup.
-pub fn execute_auth_login() -> Result<()> {
+/// Execute `auth login` — interactive or non-interactive provider selection and API key setup.
+///
+/// When `--provider` and `--api-key` flags are provided, runs non-interactively (scriptable).
+/// Otherwise falls back to interactive mode.
+pub fn execute_auth_login(
+    cli_provider: Option<&str>,
+    cli_api_key: Option<&str>,
+    cli_model: Option<&str>,
+    cli_base_url: Option<&str>,
+    force: bool,
+) -> Result<()> {
+    // Non-interactive mode: both provider and api_key provided via flags
+    if let (Some(provider), Some(api_key)) = (cli_provider, cli_api_key) {
+        return execute_auth_login_noninteractive(
+            provider,
+            api_key,
+            cli_model,
+            cli_base_url,
+            force,
+        );
+    }
+
+    // If only one of provider/api_key is given, that's an error
+    if cli_provider.is_some() || cli_api_key.is_some() {
+        anyhow::bail!("Both --provider and --api-key are required for non-interactive login");
+    }
+
+    // Interactive mode (original behavior)
+    execute_auth_login_interactive()
+}
+
+/// Non-interactive auth login — used when --provider and --api-key flags are provided.
+fn execute_auth_login_noninteractive(
+    provider: &str,
+    api_key: &str,
+    cli_model: Option<&str>,
+    cli_base_url: Option<&str>,
+    force: bool,
+) -> Result<()> {
+    // Check if already logged in
+    if !force {
+        let status = loader::auth_status()?;
+        if status.has_key {
+            eprintln!(
+                "{}",
+                "⚠️  An API key is already configured.".yellow().bold()
+            );
+            eprintln!("   Source: {}", status.source);
+            eprintln!("   Use --force to overwrite.");
+            anyhow::bail!("Aborted: key already exists. Use --force to overwrite.");
+        }
+    }
+
+    if api_key.is_empty() {
+        anyhow::bail!("API key cannot be empty");
+    }
+
+    // Resolve preset defaults for the provider
+    let (base_url, model) = if let Some(preset) = PRESETS.iter().find(|p| p.name == provider) {
+        (
+            cli_base_url.unwrap_or(preset.default_base_url).to_string(),
+            cli_model.unwrap_or(preset.default_model).to_string(),
+        )
+    } else {
+        // Custom provider — model and base_url required
+        let base_url = cli_base_url
+            .ok_or_else(|| anyhow::anyhow!("--base-url is required for custom provider '{}'. Use a known provider or provide all flags.", provider))?;
+        let model = cli_model
+            .ok_or_else(|| anyhow::anyhow!("--model is required for custom provider '{}'. Use a known provider or provide all flags.", provider))?;
+        (base_url.to_string(), model.to_string())
+    };
+
+    // Save
+    loader::save_api_key(api_key)?;
+    loader::save_provider_info(provider, &base_url, &model)?;
+
+    println!(
+        "{} API key saved to {}",
+        "✅".green().bold(),
+        "~/.cora/auth.toml".green()
+    );
+    println!(
+        "{} Provider: {} | Model: {} | Base: {}",
+        "   ".dimmed(),
+        provider.bold(),
+        model.bold(),
+        base_url.dimmed()
+    );
+
+    Ok(())
+}
+
+/// Interactive auth login — original behavior with prompts.
+fn execute_auth_login_interactive() -> Result<()> {
     // Check if already logged in
     let status = loader::auth_status()?;
     if status.has_key {
@@ -194,6 +286,10 @@ pub fn execute_auth_status() -> Result<()> {
         println!("{} No API key configured.", "❌".red().bold());
         println!("   Set it via:");
         println!("     • {} (interactive setup)", "cora auth login".cyan());
+        println!(
+            "     • {} (non-interactive)",
+            "cora auth login --provider zai --api-key KEY".cyan()
+        );
         println!("     • CORA_API_KEY environment variable");
         println!("     • Provider-specific env vars: OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.");
     }

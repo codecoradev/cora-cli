@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-06-06
+
+### Fixed
+
+- **Provider shortcut now resolves preset defaults** — bare `provider: zai` in `.cora.yaml` auto-fills `base_url` and `model` from the preset table (#183)
+- **Env var override warnings** — `CORA_PROVIDER`, `CORA_MODEL`, `CORA_BASE_URL` now warn when they override config file settings (#182)
+- **`config show` displays effective (resolved) config** — shows actual runtime values with `[from: env ...]` annotations when env vars override config (#189)
+- **Auth file permissions auto-fix** — `~/.cora/auth.toml` permissions auto-corrected to 600 instead of just warning (#187)
+- **Deterministic rules exclude own source files** — security rules no longer match against `rules/` and `tests/` directories, eliminating false positives (#185)
+
+### Added
+
+- **Non-interactive `cora auth login`** — `--provider`, `--api-key`, `--model`, `--base-url`, `--force` flags for scriptable setup (#184)
+
 ## [0.4.2] - 2026-06-06
 
 ### Fixed

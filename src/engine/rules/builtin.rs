@@ -13,7 +13,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             severity: Severity::Critical,
             message: "Possible hardcoded secret/credential detected. Use environment variables or a secrets manager.".to_string(),
             languages: vec!["all".to_string()],
-            exclude: vec![],
+            exclude: vec!["rules/".to_string(), "tests/".to_string(), "test/".to_string()],
         },
         CustomRule {
             id: "sec-sql-concat".to_string(),
@@ -22,7 +22,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             severity: Severity::Critical,
             message: "Possible SQL injection via string concatenation in query. Use parameterized queries.".to_string(),
             languages: vec!["all".to_string()],
-            exclude: vec![],
+            exclude: vec!["rules/".to_string(), "tests/".to_string(), "test/".to_string()],
         },
         CustomRule {
             id: "sec-hardcoded-url".to_string(),
@@ -31,7 +31,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             severity: Severity::Major,
             message: "Insecure HTTP URL detected (not https). Use HTTPS for all external connections.".to_string(),
             languages: vec!["all".to_string()],
-            exclude: vec![],
+            exclude: vec!["rules/".to_string(), "tests/".to_string(), "test/".to_string()],
         },
         CustomRule {
             id: "sec-tls-disabled".to_string(),
@@ -39,7 +39,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             severity: Severity::Critical,
             message: "TLS verification disabled. This allows man-in-the-middle attacks.".to_string(),
             languages: vec!["rs".to_string(), "py".to_string(), "go".to_string()],
-            exclude: vec![],
+            exclude: vec!["rules/".to_string(), "tests/".to_string(), "test/".to_string()],
         },
         // --- Bugs ---
         CustomRule {

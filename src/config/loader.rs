@@ -333,6 +333,32 @@ pub fn build_llm_config(
     let cora_model = std::env::var("CORA_MODEL").ok();
     let cora_base_url = std::env::var("CORA_BASE_URL").ok();
 
+    // Warn when env vars override config file settings
+    if let Some(ref env_p) = cora_provider {
+        if env_p != &config.provider.provider {
+            eprintln!(
+                "⚠️  CORA_PROVIDER={env_p} overrides config provider={}",
+                config.provider.provider
+            );
+        }
+    }
+    if let Some(ref env_m) = cora_model {
+        if env_m != &config.provider.model {
+            eprintln!(
+                "⚠️  CORA_MODEL={env_m} overrides config model={}",
+                config.provider.model
+            );
+        }
+    }
+    if let Some(ref env_u) = cora_base_url {
+        if env_u != &config.provider.base_url {
+            eprintln!(
+                "⚠️  CORA_BASE_URL overrides config base_url={}",
+                config.provider.base_url
+            );
+        }
+    }
+
     let provider = cora_provider
         .or_else(|| auto_preset.map(|p| p.name.to_string()))
         .unwrap_or_else(|| config.provider.provider.clone());
@@ -382,11 +408,17 @@ pub fn load_api_key_from_auth_file() -> std::result::Result<Option<String>, Cora
         if let Ok(meta) = std::fs::metadata(&path) {
             let mode = meta.permissions().mode();
             if mode & 0o077 != 0 {
-                tracing::warn!(
-                    "auth file has overly permissive permissions ({:o}). Run: chmod 600 {}",
-                    mode & 0o777,
-                    path.display()
-                );
+                // Auto-fix: restrict permissions to owner-only
+                let fixed = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+                if fixed.is_ok() {
+                    debug!("auto-fixed auth file permissions: {:o} → 600", mode & 0o777);
+                } else {
+                    tracing::warn!(
+                        "auth file has overly permissive permissions ({:o}). Run: chmod 600 {}",
+                        mode & 0o777,
+                        path.display()
+                    );
+                }
             }
         }
     }

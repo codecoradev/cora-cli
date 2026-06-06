@@ -242,7 +242,23 @@ enum HookAction {
 #[derive(Subcommand, Debug)]
 enum AuthAction {
     /// Save an API key to local config
-    Login,
+    Login {
+        /// Provider name (e.g. openai, zai, anthropic, ollama) — skips interactive selection
+        #[clap(long)]
+        provider: Option<String>,
+        /// API key — skips interactive prompt
+        #[clap(long)]
+        api_key: Option<String>,
+        /// Model name (e.g. glm-5.1, gpt-4o-mini) — used with --provider
+        #[clap(long)]
+        model: Option<String>,
+        /// Base URL — used with --provider for custom endpoints
+        #[clap(long)]
+        base_url: Option<String>,
+        /// Skip confirmation when overwriting existing key
+        #[clap(long)]
+        force: bool,
+    },
     /// Check if an API key is configured
     Status,
     /// Remove the stored API key
@@ -395,7 +411,21 @@ async fn main() -> Result<()> {
         },
         Command::Auth { action } => {
             match action {
-                AuthAction::Login => auth::execute_auth_login()?,
+                AuthAction::Login {
+                    provider,
+                    api_key,
+                    model,
+                    base_url,
+                    force,
+                } => {
+                    auth::execute_auth_login(
+                        provider.as_deref(),
+                        api_key.as_deref(),
+                        model.as_deref(),
+                        base_url.as_deref(),
+                        force,
+                    )?;
+                }
                 AuthAction::Status => auth::execute_auth_status()?,
                 AuthAction::Remove => auth::execute_auth_remove()?,
             }

@@ -10,13 +10,41 @@ use crate::config::schema::{CoraFile, HookSection, OutputSection, ProviderSectio
 pub fn execute_config_show() -> Result<()> {
     let config = loader::load_config(None, None, None, None, None, false)?;
 
+    // Resolve effective values (env vars can override config file)
+    let eff_provider = std::env::var("CORA_PROVIDER")
+        .ok()
+        .unwrap_or_else(|| config.provider.provider.clone());
+    let eff_model = std::env::var("CORA_MODEL")
+        .ok()
+        .unwrap_or_else(|| config.provider.model.clone());
+    let eff_base_url = std::env::var("CORA_BASE_URL")
+        .ok()
+        .unwrap_or_else(|| config.provider.base_url.clone());
+
+    // Source annotations
+    let provider_src = if std::env::var("CORA_PROVIDER").is_ok() {
+        " [from: env CORA_PROVIDER]"
+    } else {
+        ""
+    };
+    let model_src = if std::env::var("CORA_MODEL").is_ok() {
+        " [from: env CORA_MODEL]"
+    } else {
+        ""
+    };
+    let url_src = if std::env::var("CORA_BASE_URL").is_ok() {
+        " [from: env CORA_BASE_URL]"
+    } else {
+        ""
+    };
+
     println!(
         "{}",
         "╔══════════════════════════════════════════╗".cyan().bold()
     );
     println!(
         "{}",
-        "║          Current Configuration            ║"
+        "║       Effective Configuration             ║"
             .cyan()
             .bold()
     );
@@ -27,15 +55,22 @@ pub fn execute_config_show() -> Result<()> {
     println!();
 
     println!(
-        "{} {}",
+        "{} {}{}",
         "provider:".bold(),
-        config.provider.provider.green()
+        eff_provider.green(),
+        provider_src.dimmed()
     );
-    println!("{} {}", "  model:".dimmed(), config.provider.model.green());
     println!(
-        "{} {}",
-        "  base_url:".dimmed(),
-        config.provider.base_url.green()
+        "  {} {}{}",
+        "model:".dimmed(),
+        eff_model.green(),
+        model_src.dimmed()
+    );
+    println!(
+        "  {} {}{}",
+        "base_url:".dimmed(),
+        eff_base_url.green(),
+        url_src.dimmed()
     );
 
     println!(

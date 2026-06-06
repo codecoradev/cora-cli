@@ -335,6 +335,20 @@ impl CoraFile {
         if let Some(p) = &self.provider {
             if let Some(v) = &p.provider {
                 config.provider.provider.clone_from(v);
+
+                // Resolve preset defaults (base_url, model) when provider is a known preset
+                // and the corresponding field wasn't explicitly set in the config file.
+                if let Some(preset) = crate::config::providers::PRESETS
+                    .iter()
+                    .find(|pr| pr.name == v)
+                {
+                    if p.base_url.is_none() && self.base_url.is_none() {
+                        config.provider.base_url = preset.default_base_url.to_string();
+                    }
+                    if p.model.is_none() && self.model.is_none() {
+                        config.provider.model = preset.default_model.to_string();
+                    }
+                }
             }
             if let Some(v) = &p.model {
                 config.provider.model.clone_from(v);
@@ -558,8 +572,24 @@ base_url: https://api.z.ai/api/coding/paas/v4
         };
         cora.merge_into(&mut cfg);
         assert_eq!(cfg.provider.provider, "ollama");
-        assert_eq!(cfg.provider.model, "gpt-4o-mini"); // unchanged
-        assert_eq!(cfg.provider.base_url, "https://api.openai.com/v1"); // unchanged
+        assert_eq!(cfg.provider.model, "llama3.1"); // resolved from ollama preset
+        assert_eq!(cfg.provider.base_url, "http://localhost:11434/v1"); // resolved from ollama preset
+    }
+
+    #[test]
+    fn merge_shortcut_provider_resolves_preset() {
+        let mut cfg = Config::default();
+        let cora = CoraFile::from_str(
+            r"
+provider: zai
+",
+        )
+        .unwrap();
+
+        cora.merge_into(&mut cfg);
+        assert_eq!(cfg.provider.provider, "zai");
+        assert_eq!(cfg.provider.model, "glm-5.1"); // resolved from zai preset
+        assert_eq!(cfg.provider.base_url, "https://api.z.ai/api/coding/paas/v4"); // resolved from zai preset
     }
 
     #[test]
