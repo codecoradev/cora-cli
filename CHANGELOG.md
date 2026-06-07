@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-06-06
+
+### Fixed
+
+- **Spinner auto-hides in non-TTY** — `indicatif` progress spinners in `llm.rs` and `scanner.rs` now detect piped/redirected stderr and auto-hide, preventing ANSI pollution in captured output (#181)
+- **Truncated JSON repair** — LLM responses cut off by max_tokens are now auto-repaired by closing unclosed strings/brackets before parse, preserving partial findings instead of failing completely (#186)
+
+### Added
+
+- **`--output-file <PATH>` flag** — write formatted review output to a file instead of stdout, guaranteeing capture in CI/batch pipelines (#181)
+
 ## [0.4.3] - 2026-06-06
 
 ### Fixed
@@ -289,7 +300,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.4.0...develop
+[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...develop
+[0.4.4]: https://github.com/codecoradev/cora-cli/compare/v0.4.3...v0.4.4
 [0.4.0]: https://github.com/codecoradev/cora-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/codecoradev/cora-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/codecoradev/cora-cli/compare/v0.1.8...v0.2.0
