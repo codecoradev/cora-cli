@@ -75,6 +75,7 @@ jobs:
           CORA_BASE_URL: ${{ secrets.CORA_BASE_URL }}
           CORA_MODEL: ${{ secrets.CORA_MODEL }}
         run: |
+          # Install cora — pin version with CORA_VERSION=v0.4.5 for reproducibility
           curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
           cora review --base main --format sarif
 ```
