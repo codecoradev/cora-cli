@@ -70,7 +70,8 @@ static RE_FILE_HEADER_NEW: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\+\+\+\s+(?:b/)?(.*)").unwrap());
 static RE_HUNK_HEADER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^@@\s-(\d+)(?:,(\d+))?\s\+(\d+)(?:,(\d+))?\s@@\s?(.*)").unwrap());
-static RE_BINARY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^Binary files").unwrap());
+static RE_BINARY: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?:Binary files|Binary file|GIT binary patch)").unwrap());
 
 /// Parse a unified diff string into a list of [`FileChunk`] entries.
 pub fn parse_diff(diff: &str) -> Vec<FileChunk> {
@@ -329,6 +330,42 @@ impl FileChunkBuilder {
         if let Some(hunk) = self.current_hunk.take() {
             self.hunks.push(hunk);
         }
+
+        // Validate hunk line counts — warn if actual lines don't match header counts
+        for hunk in &self.hunks {
+            let actual_old = hunk
+                .lines
+                .iter()
+                .filter(|l| {
+                    l.line_type == DiffLineType::Remove || l.line_type == DiffLineType::Context
+                })
+                .count() as u32;
+            let actual_new = hunk
+                .lines
+                .iter()
+                .filter(|l| {
+                    l.line_type == DiffLineType::Add || l.line_type == DiffLineType::Context
+                })
+                .count() as u32;
+
+            if actual_old > 0 && actual_old != hunk.old_count {
+                debug!(
+                    old_expected = hunk.old_count,
+                    old_actual = actual_old,
+                    new_path = ?self.new_path,
+                    "hunk line count mismatch (old) — diff may be truncated"
+                );
+            }
+            if actual_new > 0 && actual_new != hunk.new_count {
+                debug!(
+                    new_expected = hunk.new_count,
+                    new_actual = actual_new,
+                    new_path = ?self.new_path,
+                    "hunk line count mismatch (new) — diff may be truncated"
+                );
+            }
+        }
+
         FileChunk {
             old_path: self.old_path,
             new_path: self.new_path,
@@ -590,5 +627,48 @@ diff --git a/src/foo.rs b/src/foo.rs
         assert_eq!(hunk.old_count, 1);
         assert_eq!(hunk.new_start, 1);
         assert_eq!(hunk.new_count, 1);
+    }
+
+    #[test]
+    fn truncated_diff_returns_partial_parse() {
+        // Simulate truncated diff — hunk declares 3 lines but only 1 present
+        let diff = r#"diff --git a/src/main.rs b/src/main.rs
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,3 +1,3 @@
+ fn main() {
++    println!("hello");
+"#;
+        let files = parse_diff(diff);
+        assert_eq!(files.len(), 1);
+        // Should still parse the lines that are present
+        assert_eq!(files[0].chunks[0].lines.len(), 2);
+    }
+
+    #[test]
+    fn git_binary_patch_detected() {
+        let diff = r#"diff --git a/image.png b/image.png
+--- a/image.png
++++ b/image.png
+GIT binary patch
+literal 1234
+zcmexABCDE
+"#;
+        let files = parse_diff(diff);
+        assert_eq!(files.len(), 1);
+        assert!(files[0].is_binary);
+    }
+
+    #[test]
+    fn binary_file_marker_variants() {
+        // Test "Binary file" singular form
+        let diff = r#"diff --git a/logo.png b/logo.png
+--- a/logo.png
++++ b/logo.png
+Binary file a/logo.png differs from b/logo.png
+"#;
+        let files = parse_diff(diff);
+        assert_eq!(files.len(), 1);
+        assert!(files[0].is_binary);
     }
 }
