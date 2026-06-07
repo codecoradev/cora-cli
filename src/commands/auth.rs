@@ -243,15 +243,8 @@ fn execute_auth_login_interactive() -> Result<()> {
         .unwrap_or("");
 
     let api_key = if let Ok(key) = std::env::var(env_key) {
-        println!(
-            "  {} Found {} in environment",
-            "→".green(),
-            env_key.green()
-        );
-        print!(
-            "  {} Use it? [Y/n]: ",
-            "🔑".to_string().bold()
-        );
+        println!("  {} Found {} in environment", "→".green(), env_key.green());
+        print!("  {} Use it? [Y/n]: ", "🔑".to_string().bold());
         io::stdout().flush()?;
 
         let mut answer = String::new();

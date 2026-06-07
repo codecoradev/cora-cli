@@ -349,10 +349,7 @@ pub fn build_llm_config(
     if let Some(ref env_m) = cora_model {
         if let Some(ref info) = stored_provider_info {
             if env_m != &info.model {
-                eprintln!(
-                    "⚠️  CORA_MODEL={env_m} overrides auth model={}",
-                    info.model
-                );
+                eprintln!("⚠️  CORA_MODEL={env_m} overrides auth model={}", info.model);
             }
         }
     }
