@@ -234,8 +234,11 @@ pub fn load_config(
 ) -> std::result::Result<Config, CoraError> {
     let mut config = Config::default();
 
-    // Run migration silently on first access
+    // Run migrations silently on first access
     migrate_old_config();
+    migrate_provider_info_from_auth().unwrap_or_else(|e| {
+        debug!("provider migration failed: {}", e);
+    });
 
     // 1. Load global config (~/.cora/config.yaml)
     if let Some(cora) = load_global_config()? {
@@ -284,18 +287,18 @@ pub fn load_config(
 }
 
 /// Build an `LLMConfig` from the resolved `Config`, fetching the API key
-/// from: CLI flag → ~/.cora/auth.toml → provider-specific env vars.
+/// from: CLI flag / CORA_API_KEY env → ~/.cora/auth.toml → provider-specific env vars.
 ///
 /// If none of those are set, auto-detect from known provider env vars (`OPENAI_API_KEY`, etc.)
 /// and configure `provider/model/base_url` from the matching preset.
+///
+/// Provider/model/base_url resolution:
+///   CORA_* env vars > .cora.yaml (project) > ~/.cora/config.yaml (global) > auto-detect > defaults
 pub fn build_llm_config(
     config: &Config,
     cli_api_key: Option<&str>,
 ) -> std::result::Result<LLMConfig, CoraError> {
-    // Resolve the API key and optional auto-detected preset in one pass.
-    // Also load stored provider info from auth.toml (if any).
-    let stored_provider_info = load_provider_info()?;
-
+    // Resolve the API key: CLI flag / CORA_API_KEY → auth.toml → auto-detect
     let (api_key, auto_preset) = if let Some(key) = cli_api_key {
         (key.to_string(), None)
     } else if let Some(key) = load_api_key_from_auth_file()? {
@@ -330,52 +333,20 @@ pub fn build_llm_config(
     };
 
     // Resolve provider/model/base_url priority:
-    //   CORA_* env vars > stored auth.toml provider info > auto-detected preset > config defaults
+    //   CORA_* env vars > config (already merged: project > global > defaults) > auto-detected preset
     let cora_provider = std::env::var("CORA_PROVIDER").ok();
     let cora_model = std::env::var("CORA_MODEL").ok();
     let cora_base_url = std::env::var("CORA_BASE_URL").ok();
 
-    // Warn when env vars override auth.toml settings
-    if let Some(ref env_p) = cora_provider {
-        if let Some(ref info) = stored_provider_info {
-            if env_p != &info.provider {
-                eprintln!(
-                    "⚠️  CORA_PROVIDER={env_p} overrides auth provider={}",
-                    info.provider
-                );
-            }
-        }
-    }
-    if let Some(ref env_m) = cora_model {
-        if let Some(ref info) = stored_provider_info {
-            if env_m != &info.model {
-                eprintln!("⚠️  CORA_MODEL={env_m} overrides auth model={}", info.model);
-            }
-        }
-    }
-    if let Some(ref env_u) = cora_base_url {
-        if let Some(ref info) = stored_provider_info {
-            if env_u != &info.base_url {
-                eprintln!(
-                    "⚠️  CORA_BASE_URL overrides auth base_url={}",
-                    info.base_url
-                );
-            }
-        }
-    }
-
     let provider = cora_provider
-        .or_else(|| stored_provider_info.as_ref().map(|i| i.provider.clone()))
         .or_else(|| auto_preset.map(|p| p.name.to_string()))
         .unwrap_or_else(|| config.provider.provider.clone());
 
     let model = cora_model
-        .or_else(|| stored_provider_info.as_ref().map(|i| i.model.clone()))
         .or_else(|| auto_preset.map(|p| p.default_model.to_string()))
         .unwrap_or_else(|| config.provider.model.clone());
 
     let base_url = cora_base_url
-        .or_else(|| stored_provider_info.as_ref().map(|i| i.base_url.clone()))
         .or_else(|| {
             // Check if the auto-detected preset has a custom URL override
             auto_preset.and_then(|p| std::env::var(p.env_url).ok())
@@ -494,18 +465,25 @@ pub fn remove_api_key() -> std::result::Result<(), CoraError> {
 
 /// Check the auth status: whether an API key is available.
 pub fn auth_status() -> std::result::Result<AuthStatus, CoraError> {
+    // CORA_API_KEY env var (for CI)
+    if std::env::var("CORA_API_KEY").is_ok() {
+        return Ok(AuthStatus {
+            source: "env var CORA_API_KEY".to_string(),
+            has_key: true,
+        });
+    }
+    // ~/.cora/auth.toml
     if load_api_key_from_auth_file()?.is_some() {
         let dir = cora_dir()?;
-        Ok(AuthStatus {
+        return Ok(AuthStatus {
             source: format!("{}", dir.join(AUTH_FILENAME).display()),
             has_key: true,
-        })
-    } else {
-        Ok(AuthStatus {
-            source: String::new(),
-            has_key: false,
-        })
+        });
     }
+    Ok(AuthStatus {
+        source: String::new(),
+        has_key: false,
+    })
 }
 
 /// Auth status information.
@@ -514,7 +492,7 @@ pub struct AuthStatus {
     pub has_key: bool,
 }
 
-/// Stored provider information alongside the API key.
+/// Stored provider information from global config.
 #[derive(Debug, Clone)]
 pub struct ProviderInfo {
     pub provider: String,
@@ -522,74 +500,68 @@ pub struct ProviderInfo {
     pub model: String,
 }
 
-/// Save provider info (name, base_url, model) to `~/.cora/auth.toml`
-/// alongside the existing `api_key`.
+/// Save provider info (name, base_url, model) to `~/.cora/config.yaml`
+/// (global config, not secrets).
 pub fn save_provider_info(
     provider: &str,
     base_url: &str,
     model: &str,
 ) -> std::result::Result<(), CoraError> {
     let dir = cora_dir()?;
-    let path = dir.join(AUTH_FILENAME);
+    std::fs::create_dir_all(&dir).map_err(|e| CoraError::AuthError(e.to_string()))?;
 
-    // Read existing auth.toml or start fresh
-    let mut table = if path.is_file() {
+    let path = dir.join(GLOBAL_CONFIG_FILENAME);
+
+    // Read existing config.yaml or start fresh
+    let mut cora = if path.is_file() {
         let content = std::fs::read_to_string(&path)
             .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
-        content
-            .parse::<toml::Table>()
-            .unwrap_or_else(|_| toml::Table::new())
+        CoraFile::from_str(&content).unwrap_or_default()
     } else {
-        toml::Table::new()
+        CoraFile::default()
     };
 
-    // Set provider info fields
-    table.insert(
-        "provider".to_string(),
-        toml::Value::String(provider.to_string()),
-    );
-    table.insert(
-        "base_url".to_string(),
-        toml::Value::String(base_url.to_string()),
-    );
-    table.insert("model".to_string(), toml::Value::String(model.to_string()));
+    // Set provider info
+    let ps = cora.provider.get_or_insert_with(Default::default);
+    ps.provider = Some(provider.to_string());
+    ps.model = Some(model.to_string());
+    ps.base_url = Some(base_url.to_string());
 
-    let content = table.to_string();
-    std::fs::write(&path, content)
+    let yaml = serde_yaml_ng::to_string(&cora)
+        .map_err(|e| CoraError::AuthError(format!("failed to serialize config: {}", e)))?;
+    std::fs::write(&path, yaml)
         .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
 
-    // Restrict permissions to owner only (0o600)
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o600);
-        std::fs::set_permissions(&path, perms)?;
-    }
-
-    debug!(provider = provider, "saved provider info");
+    debug!(provider = provider, "saved provider info to config.yaml");
     Ok(())
 }
 
-/// Load stored provider info from `~/.cora/auth.toml`.
-/// Returns `None` if no provider info is stored.
-pub fn load_provider_info() -> std::result::Result<Option<ProviderInfo>, CoraError> {
+/// Migrate provider info from auth.toml → config.yaml if needed.
+/// Called lazily on first load.
+fn migrate_provider_info_from_auth() -> std::result::Result<(), CoraError> {
     let dir = cora_dir()?;
-    let path = dir.join(AUTH_FILENAME);
-    if !path.is_file() {
-        return Ok(None);
+    let auth_path = dir.join(AUTH_FILENAME);
+    if !auth_path.is_file() {
+        return Ok(());
     }
 
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+    let content = std::fs::read_to_string(&auth_path)
+        .map_err(|e| CoraError::AuthError(format!("{}: {}", auth_path.display(), e)))?;
 
-    let table: toml::Table = content
-        .parse::<toml::Table>()
-        .map_err(|e| CoraError::AuthError(format!("invalid TOML: {}", e)))?;
+    let table: toml::Table = match content.parse::<toml::Table>() {
+        Ok(t) => t,
+        Err(_) => return Ok(()),
+    };
 
+    // Check if auth.toml has provider info that needs migrating
     let provider = table
         .get("provider")
         .and_then(toml::Value::as_str)
         .unwrap_or("");
+    if provider.is_empty() {
+        return Ok(()); // No provider info to migrate
+    }
+
     let base_url = table
         .get("base_url")
         .and_then(toml::Value::as_str)
@@ -599,21 +571,114 @@ pub fn load_provider_info() -> std::result::Result<Option<ProviderInfo>, CoraErr
         .and_then(toml::Value::as_str)
         .unwrap_or("");
 
+    debug!("migrating provider info from auth.toml → config.yaml");
+
+    // Save to config.yaml
+    save_provider_info(provider, base_url, model)?;
+
+    // Strip provider info from auth.toml, keep only api_key
+    let mut clean_table = toml::Table::new();
+    if let Some(key) = table
+        .get("auth")
+        .and_then(|a| a.get("api_key"))
+        .and_then(|k| k.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            table
+                .get("api_key")
+                .and_then(|k| k.as_str())
+                .map(|s| s.to_string())
+        })
+    {
+        clean_table.insert("api_key".to_string(), toml::Value::String(key));
+    }
+
+    if clean_table.is_empty() {
+        // No api_key left, remove the file
+        let _ = std::fs::remove_file(&auth_path);
+    } else {
+        let clean_content = clean_table.to_string();
+        std::fs::write(&auth_path, clean_content)
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", auth_path.display(), e)))?;
+        // Re-apply permissions
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o600);
+            let _ = std::fs::set_permissions(&auth_path, perms);
+        }
+    }
+
+    debug!("migrated provider info from auth.toml → config.yaml");
+    Ok(())
+}
+
+/// Load stored provider info from `~/.cora/config.yaml`.
+/// Returns `None` if no provider info is stored.
+pub fn load_provider_info() -> std::result::Result<Option<ProviderInfo>, CoraError> {
+    // Migrate auth.toml provider info → config.yaml if needed
+    migrate_provider_info_from_auth()?;
+
+    let dir = cora_dir()?;
+    let path = dir.join(GLOBAL_CONFIG_FILENAME);
+    if !path.is_file() {
+        return Ok(None);
+    }
+
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+
+    let cora = CoraFile::from_str(&content)?;
+
+    let provider = cora
+        .provider
+        .as_ref()
+        .and_then(|p| p.provider.as_deref())
+        .unwrap_or("");
+
     if provider.is_empty() {
         return Ok(None);
     }
 
+    // Load from config.yaml — may need to resolve from preset if model/base_url missing
+    let ps = cora.provider.as_ref().unwrap();
+    let model = ps.model.as_deref().unwrap_or("");
+    let base_url = ps.base_url.as_deref().unwrap_or("");
+
+    // If model/base_url missing, resolve from preset
+    let (resolved_model, resolved_base_url) = if model.is_empty() || base_url.is_empty() {
+        if let Some(preset) = PRESETS.iter().find(|p| p.name == provider) {
+            (
+                if model.is_empty() {
+                    preset.default_model
+                } else {
+                    model
+                },
+                if base_url.is_empty() {
+                    preset.default_base_url
+                } else {
+                    base_url
+                },
+            )
+        } else {
+            (model, base_url)
+        }
+    } else {
+        (model, base_url)
+    };
+
     Ok(Some(ProviderInfo {
         provider: provider.to_string(),
-        base_url: base_url.to_string(),
-        model: model.to_string(),
+        model: resolved_model.to_string(),
+        base_url: resolved_base_url.to_string(),
     }))
 }
 
-/// Remove stored provider info from `~/.cora/auth.toml` while keeping the api_key if present.
+/// Remove stored provider info from `~/.cora/config.yaml`
+/// while keeping other settings.
 pub fn remove_provider_info() -> std::result::Result<(), CoraError> {
     let dir = cora_dir()?;
-    let path = dir.join(AUTH_FILENAME);
+    let path = dir.join(GLOBAL_CONFIG_FILENAME);
     if !path.is_file() {
         return Ok(());
     }
@@ -621,25 +686,15 @@ pub fn remove_provider_info() -> std::result::Result<(), CoraError> {
     let content = std::fs::read_to_string(&path)
         .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
 
-    let mut table: toml::Table = content
-        .parse::<toml::Table>()
-        .map_err(|e| CoraError::AuthError(format!("invalid TOML: {}", e)))?;
+    let mut cora = CoraFile::from_str(&content)?;
 
-    let changed = table.remove("provider").is_some()
-        | table.remove("base_url").is_some()
-        | table.remove("model").is_some();
-
-    if changed {
-        // If only provider info was left (no api_key), just delete the file
-        if table.is_empty() {
-            std::fs::remove_file(&path)
-                .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
-        } else {
-            let content = table.to_string();
-            std::fs::write(&path, content)
-                .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
-        }
-        debug!("removed provider info from auth.toml");
+    if cora.provider.is_some() {
+        cora.provider = None;
+        let yaml = serde_yaml_ng::to_string(&cora)
+            .map_err(|e| CoraError::AuthError(format!("failed to serialize: {}", e)))?;
+        std::fs::write(&path, yaml)
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+        debug!("removed provider info from config.yaml");
     }
 
     Ok(())

@@ -7,7 +7,22 @@ use crate::config::loader;
 use crate::config::schema::{CoraFile, HookSection, OutputSection, ProviderSection};
 
 /// Execute `cora config show` — print the current resolved configuration.
-pub fn execute_config_show() -> Result<()> {
+///
+/// `--global` shows only ~/.cora/config.yaml
+/// `--project` shows only .cora.yaml
+/// (default) shows the fully merged effective config
+pub fn execute_config_show(global_only: bool, project_only: bool) -> Result<()> {
+    if global_only {
+        return show_global_config();
+    }
+    if project_only {
+        return show_project_config();
+    }
+    show_effective_config()
+}
+
+/// Show the fully merged effective config (default behavior).
+fn show_effective_config() -> Result<()> {
     let config = loader::load_config(None, None, None, None, None, false)?;
 
     // Resolve effective values (env vars can override config file)
@@ -131,7 +146,195 @@ pub fn execute_config_show() -> Result<()> {
     Ok(())
 }
 
-/// Execute `cora config set [--global] <key> <value>` — write a key-value pair
+/// Show only the global config (~/.cora/config.yaml).
+fn show_global_config() -> Result<()> {
+    let dir = loader::cora_dir()?;
+    let path = dir.join("config.yaml");
+
+    println!(
+        "{}",
+        "╔══════════════════════════════════════════╗".cyan().bold()
+    );
+    println!(
+        "{}",
+        "║         Global Configuration             ║".cyan().bold()
+    );
+    println!(
+        "{}",
+        "╚══════════════════════════════════════════╝".cyan().bold()
+    );
+    println!();
+
+    if !path.is_file() {
+        println!(
+            "{} No global config found at {}",
+            "⚠️".yellow(),
+            path.display()
+        );
+        println!(
+            "   Run {} or {} to create one.",
+            "cora auth login".cyan(),
+            "cora config set --global provider zai".cyan()
+        );
+        return Ok(());
+    }
+
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let cora = CoraFile::from_str(&content)
+        .with_context(|| format!("failed to parse {}", path.display()))?;
+
+    println!("{} {}", "File:".bold(), path.display());
+    println!();
+    print_cora_file(&cora);
+
+    // Also show auth status
+    println!();
+    let auth = loader::auth_status()?;
+    if auth.has_key {
+        println!(
+            "{} API key: configured ({})",
+            "✅".green().bold(),
+            auth.source
+        );
+    } else {
+        println!("{} API key: not configured", "❌".red().bold());
+    }
+
+    Ok(())
+}
+
+/// Show only the project config (.cora.yaml).
+fn show_project_config() -> Result<()> {
+    println!(
+        "{}",
+        "╔══════════════════════════════════════════╗".cyan().bold()
+    );
+    println!(
+        "{}",
+        "║        Project Configuration             ║".cyan().bold()
+    );
+    println!(
+        "{}",
+        "╚══════════════════════════════════════════╝".cyan().bold()
+    );
+    println!();
+
+    let found = loader::find_cora_file(&std::env::current_dir()?)?;
+    match found {
+        Some((path, cora)) => {
+            println!("{} {}", "File:".bold(), path.display());
+            println!();
+            print_cora_file(&cora);
+        }
+        None => {
+            println!("{} No .cora.yaml found in this project.", "⚠️".yellow());
+            println!("   Run {} to create one.", "cora init".cyan());
+        }
+    }
+
+    Ok(())
+}
+
+/// Print a CoraFile's non-empty fields.
+fn print_cora_file(cora: &CoraFile) {
+    if let Some(ps) = &cora.provider {
+        if let Some(v) = &ps.provider {
+            println!("{} {}", "provider:".bold(), v.green());
+        }
+        if let Some(v) = &ps.model {
+            println!("  {} {}", "model:".dimmed(), v.green());
+        }
+        if let Some(v) = &ps.base_url {
+            println!("  {} {}", "base_url:".dimmed(), v.dimmed());
+        }
+    }
+    if let Some(v) = &cora.model {
+        println!("{} {}", "model:".bold(), v.green());
+    }
+    if let Some(v) = &cora.base_url {
+        println!("{} {}", "base_url:".bold(), v.dimmed());
+    }
+    if let Some(v) = &cora.focus {
+        println!(
+            "{} {}",
+            "focus:".bold(),
+            v.iter()
+                .map(|f| format!("{}", f.green()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    if let Some(v) = &cora.rules {
+        if !v.is_empty() {
+            println!(
+                "{} {}",
+                "rules:".bold(),
+                v.iter()
+                    .map(|r| format!("{}", r.green()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+    }
+    if let Some(ig) = &cora.ignore {
+        if let Some(v) = &ig.files {
+            println!(
+                "{} {}",
+                "ignore files:".bold(),
+                v.iter()
+                    .map(|f| format!("{}", f.dimmed()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+    }
+    if let Some(h) = &cora.hook {
+        let mut parts = vec![];
+        if let Some(v) = &h.mode {
+            parts.push(format!("mode={}", v));
+        }
+        if let Some(v) = &h.min_severity {
+            parts.push(format!("min_severity={}", v));
+        }
+        if let Some(v) = h.max_diff_size {
+            parts.push(format!("max_diff_size={}", v));
+        }
+        if !parts.is_empty() {
+            println!("{} {}", "hook:".bold(), parts.join(" ").yellow());
+        }
+    }
+    if let Some(o) = &cora.output {
+        let mut parts = vec![];
+        if let Some(v) = &o.format {
+            parts.push(format!("format={}", v));
+        }
+        if let Some(v) = o.color {
+            parts.push(format!("color={}", v));
+        }
+        if !parts.is_empty() {
+            println!("{} {}", "output:".bold(), parts.join(" ").green());
+        }
+    }
+    if let Some(llm) = &cora.llm {
+        let mut parts = vec![];
+        if let Some(v) = llm.temperature {
+            parts.push(format!("temperature={}", v));
+        }
+        if let Some(v) = llm.max_tokens {
+            parts.push(format!("max_tokens={}", v));
+        }
+        if let Some(v) = llm.timeout {
+            parts.push(format!("timeout={}", v));
+        }
+        if let Some(v) = llm.cache_ttl {
+            parts.push(format!("cache_ttl={}", v));
+        }
+        if !parts.is_empty() {
+            println!("{} {}", "llm:".bold(), parts.join(" ").yellow());
+        }
+    }
+}
 /// to a YAML config file.
 ///
 /// Supported keys: model, provider, `base_url`, format, severity
