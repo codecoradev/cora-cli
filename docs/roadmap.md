@@ -60,8 +60,8 @@ Demand-gated — we build what people actually need. Track progress on [GitHub I
 ## v0.4.6 — Polish & Docs
 
 - [#162](https://github.com/codecoradev/cora-cli/issues/162) README overhaul — market-facing copy — ✓ Done
-- [#204](https://github.com/codecoradev/cora-cli/issues/204) Deterministic secrets pre-scan — ◎ Planned
-- [#195](https://github.com/codecoradev/cora-cli/issues/195) Diff parser hardening — ◎ Planned
+- [#204](https://github.com/codecoradev/cora-cli/issues/204) Deterministic secrets pre-scan — ✓ Done
+- [#195](https://github.com/codecoradev/cora-cli/issues/195) Diff parser hardening Phase 1 — ✓ Done
 
 ## v0.5 — Agent & Quality
 

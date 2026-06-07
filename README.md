@@ -22,7 +22,7 @@
 - ⚡ **Native Rust** — fast binary, no runtime dependencies, cross-platform
 - 🪝 **Pre-commit hooks** — catch issues before they reach CI
 - 📋 **SARIF output** — upload to GitHub Code Scanning
-- 🛡️ **Deterministic rules** — regex-based pre-scan that always catches known patterns
+- 🛡️ **Deterministic rules + secrets scanner** — regex-based pre-scan that always catches known patterns and leaked credentials
 - 💾 **Diff-hash caching** — skip repeat reviews automatically
 - 🔧 **Configurable** — per-project `.cora.yaml`, global `~/.cora/config.yaml`, or env vars
 

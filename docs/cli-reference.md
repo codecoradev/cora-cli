@@ -35,6 +35,9 @@ Complete command reference for the cora CLI.
 | `cora scan` `<path>` | Scan files for issues |
 | `cora scan .` `[--incremental]` | Scan only changed files |
 | `cora config show` | Show resolved configuration |
+| `cora config show --global` | Show global config (`~/.cora/config.yaml`) |
+| `cora config show --project` | Show project config (`.cora.yaml`) |
+| `cora config set` `<key>` `<value>` | Set a config value |
 | `cora hook install` | Install pre-commit hook |
 | `cora hook uninstall` | Remove pre-commit hook |
 | `cora auth login` | Save API key to `~/.cora/auth.toml` |

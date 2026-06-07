@@ -21,7 +21,7 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 Pin a specific version:
 
 ```bash
-$ CORA_VERSION=v0.4.5 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+$ CORA_VERSION=v0.4.6 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
 ```
 
 ## Install via Cargo
