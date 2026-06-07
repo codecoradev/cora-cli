@@ -31,6 +31,7 @@
 - 🎯 **Custom System Prompts** — Override review/scan prompts via config or file path
 - 🛡️ **Anti-Hallucination** — File path injection and post-parse filtering keep LLM output grounded
 - 🌡️ **Configurable LLM Params** — Tune temperature, max tokens, timeout, and cache TTL per project
+- 📄 **Output Capture** — `--output-file` writes review results to file, clean non-TTY output for CI/batch pipelines
 
 ## 📦 Installation
 
@@ -49,7 +50,7 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
 Pin a specific version with `CORA_VERSION`:
 
 ```bash
-CORA_VERSION=v0.4.2 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+CORA_VERSION=v0.4.4 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
 ```
 
 ### Pre-built Binaries
@@ -190,6 +191,9 @@ cora review --quiet
 
 # Skip cached reviews
 cora review --no-cache
+
+# Save review output to file (v0.4.4+)
+cora review --output-file review.txt
 ```
 
 ### `cora scan`
@@ -559,6 +563,6 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 <div align="center">
 
-**Made with 🦀 by [Anaz S Aji](https://github.com/ajianaz)**
+**Made with 🦀 by [codecoradev](https://github.com/codecoradev)**
 
 </div>
