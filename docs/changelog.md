@@ -6,6 +6,27 @@ title: Changelog
 
 For the full changelog, see the [repository](https://github.com/codecoradev/cora-cli/blob/develop/CHANGELOG.md).
 
+## [0.4.6] - 2026-06-07
+
+### Changed
+
+- **README redesigned** — 568 → 148 lines, professional layout with star badge and docs index (#162)
+- **All docs updated** — changelog, getting-started, usage, roadmap, examples, installation
+
+### Added
+
+- **Deterministic secrets pre-scan** — 12 built-in patterns (AWS, GitHub, OpenAI, Anthropic, Groq, xAI, Slack, Stripe, Google, JWT, Private Key) (#204)
+  - Masked output, auto-skip test files, injected into LLM context
+  - Fallback blocks on critical findings when LLM fails
+- **Diff parser hardening** — hunk line count validation, broader binary detection, truncated diff handling (#195 Phase 1)
+- **`.agent.md` release checklist** — prevents docs drift between versions
+
+### Fixed
+
+- `cora config show` flags documented in cli-reference.md
+- `cora auth login` path corrected in cli-reference.md
+- CI example includes all required secrets
+
 ## [0.4.5] - 2026-06-07
 
 ### Changed

@@ -151,3 +151,19 @@ cora uses two mechanisms to prevent the LLM from fabricating findings:
 
 - **File path injection** — Actual file paths are embedded in the prompt, anchoring the LLM to real files in the diff.
 - **Post-parse filtering** — After parsing, any reported file paths or line numbers that don't exist in the actual diff are discarded.
+
+## Secrets Pre-Scan
+
+cora runs a deterministic secrets scan before the AI review. 12 built-in patterns detect leaked credentials:
+
+| Pattern | Severity |
+|---------|----------|
+| AWS Access Key (`AKIA...`) | Critical |
+| GitHub Token (`ghp_`/`gho_`/`ghu_`) | Critical |
+| OpenAI API Key (`sk-`/`sk-proj-`) | Critical |
+| Anthropic API Key (`sk-ant-`) | Critical |
+| Private Key Block | Critical |
+| JWT Token | Major |
+| And more (Groq, xAI, Slack, Stripe, Google) | Varies |
+
+Secrets are automatically **masked** in output (e.g. `AKIA****CDEF`). Test/spec/fixture files are auto-skipped.

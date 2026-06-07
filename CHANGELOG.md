@@ -5,6 +5,29 @@ All notable changes to cora-cli are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.6] - 2026-06-07
+
+### Changed
+
+- **README redesigned** — 568 → 148 lines, professional layout with star badge, docs index table, links to docs/ for details (#162)
+- **All docs updated for v0.4.5+** — changelog, getting-started, usage, roadmap, examples, installation
+
+### Added
+
+- **Deterministic secrets pre-scan** — 12 built-in patterns (AWS, GitHub, OpenAI, Anthropic, Groq, xAI, Slack, Stripe, Google, JWT, Private Key) run before AI review (#204)
+  - Masked output: `AKIA****CDEF` (first 4 + last 4 chars shown)
+  - Auto-skip test/spec/fixture/mock/example files
+  - Secrets findings injected into LLM context for consistent summary
+  - Fallback path blocks on critical findings even when LLM fails
+- **Diff parser hardening** — hunk line count validation, broader binary detection (GIT binary patch, singular form), graceful truncated diff handling (#195 Phase 1)
+- **`.agent.md` release checklist** — pre-release checklist to prevent docs drift between versions
+
+### Fixed
+
+- `cora config show --global` / `--project` documented in cli-reference.md (was missing)
+- `cora auth login` path corrected from `config.toml` to `auth.toml` in cli-reference.md
+- CI example in docs now includes CORA_BASE_URL and CORA_MODEL secrets
+
 ## [Unreleased]
 
 ## [0.4.5] - 2026-06-07
@@ -330,7 +353,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...develop
+[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.4.6...develop
+[0.4.6]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/codecoradev/cora-cli/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/codecoradev/cora-cli/compare/v0.4.2...v0.4.3
