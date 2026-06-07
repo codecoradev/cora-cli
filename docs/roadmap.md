@@ -48,17 +48,37 @@ Demand-gated — we build what people actually need. Track progress on [GitHub I
 - [#114](https://github.com/codecoradev/cora-cli/issues/114) AST-based cross-file dependency extraction — ✓ Done
 - [#159](https://github.com/codecoradev/cora-cli/issues/159) Hunk header regex panic fix + 5MB diff support — ✓ Done
 
-## v0.5 — Install & Distribution
+## v0.4.5 — Config Architecture
 
-- [#151](https://github.com/codecoradev/cora-cli/issues/151) Easy install — Homebrew tap & install script — ✓ Done
-- [#149](https://github.com/codecoradev/cora-cli/issues/149) CI gate mode — block PRs on review findings — ✓ Done
-- [#163](https://github.com/codecoradev/cora-cli/issues/163) Website redesign — landing page + docs — ✓ Done
-- [#172](https://github.com/codecoradev/cora-cli/issues/172) Interactive auth login with tiered provider selection — ✓ Done
-- [#162](https://github.com/codecoradev/cora-cli/issues/162) README overhaul — market-facing copy — ◎ Planned
+- [#209](https://github.com/codecoradev/cora-cli/issues/209) Config redesign — auth.toml for secrets, config.yaml for settings — ✓ Done
+- [#203](https://github.com/codecoradev/cora-cli/issues/203) Auth login auto-detect provider env vars — ✓ Done
+- [#189](https://github.com/codecoradev/cora-cli/issues/189) `cora config show` effective resolved config — ✓ Done
+- [#182](https://github.com/codecoradev/cora-cli/issues/182) Env var override visibility — ✓ Done
+- [#185](https://github.com/codecoradev/cora-cli/issues/185) Deterministic rules exclude `rules/` — ✓ Done
+- [#186](https://github.com/codecoradev/cora-cli/issues/186) Truncated JSON repair tests — ✓ Done
+
+## v0.4.6 — Polish & Docs
+
+- [#162](https://github.com/codecoradev/cora-cli/issues/162) README overhaul — market-facing copy — ✓ Done
+- [#204](https://github.com/codecoradev/cora-cli/issues/204) Deterministic secrets pre-scan — ◎ Planned
+- [#195](https://github.com/codecoradev/cora-cli/issues/195) Diff parser hardening — ◎ Planned
+
+## v0.5 — Agent & Quality
+
+- [#205](https://github.com/codecoradev/cora-cli/issues/205) Quality gate — CI pass/fail thresholds — ◎ Planned
+- [#207](https://github.com/codecoradev/cora-cli/issues/207) MCP server — expose rules to AI agents — ◎ Planned
+- [#208](https://github.com/codecoradev/cora-cli/issues/208) Quality profiles — preset rule sets — ◎ Planned
+- [#206](https://github.com/codecoradev/cora-cli/issues/206) Tech debt metrics — review history — ◎ Planned
+- [#188](https://github.com/codecoradev/cora-cli/issues/188) Auto-chunking for large diffs — ◎ Planned
+
+## v0.6 — Growth & Marketplace
+
+- [#47](https://github.com/codecoradev/cora-cli/issues/47) GitHub Marketplace action — ◎ Planned
+- [#161](https://github.com/codecoradev/cora-cli/issues/161) `cora gain` — local stats + viral sharing — ◎ Planned
+- [#196](https://github.com/codecoradev/cora-cli/issues/196) VitePress docs site — ◎ Planned
+- [#160](https://github.com/codecoradev/cora-cli/issues/160) Landing page redesign — ◎ Planned
 
 ## Future — What's Next
 
 - [#117](https://github.com/codecoradev/cora-cli/issues/117) Lightweight agent follow-up — 1 capped tool-call — → Planned
-- [#161](https://github.com/codecoradev/cora-cli/issues/161) `cora gain` — local productivity stats + viral sharing — → Planned
 - [#132](https://github.com/codecoradev/cora-cli/issues/132) GitHub App backend MVP in Rust (Axum) — → Planned
-- [#47](https://github.com/codecoradev/cora-cli/issues/47) Publish cora-review as GitHub Marketplace action — → Planned
