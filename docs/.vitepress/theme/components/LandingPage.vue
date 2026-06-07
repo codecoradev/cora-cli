@@ -388,9 +388,91 @@ import FadeIn from './FadeIn.vue'
 
 /* Responsive */
 @media (max-width: 768px) {
-  .hero-title { font-size: 32px; }
-  .stats-bar { gap: 20px; flex-wrap: wrap; }
-  .steps { grid-template-columns: 1fr; }
-  .hero-actions, .cta-actions { flex-direction: column; align-items: center; }
+  .landing {
+    padding: 0 16px;
+  }
+
+  .hero {
+    padding: 48px 0 40px;
+  }
+
+  .hero-title {
+    font-size: 28px;
+  }
+
+  .hero-badge {
+    font-size: 12px;
+    padding: 4px 12px;
+  }
+
+  .hero-subtitle {
+    font-size: 14px;
+  }
+
+  .hero-actions,
+  .cta-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .btn {
+    justify-content: center;
+    padding: 12px 20px;
+    font-size: 15px;
+  }
+
+  .stats-bar {
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 24px 0;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+  }
+
+  .install-cmd {
+    padding: 12px 16px;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .install-cmd code {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .steps {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .step {
+    padding: 24px 20px;
+  }
+
+  .cta h2 {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 24px;
+  }
+
+  .stats-bar {
+    gap: 12px;
+  }
+
+  .stat {
+    min-width: 60px;
+  }
 }
 </style>

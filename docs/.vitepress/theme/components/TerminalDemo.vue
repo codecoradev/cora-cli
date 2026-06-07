@@ -132,4 +132,35 @@ onUnmounted(() => {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+@media (max-width: 768px) {
+  .terminal {
+    border-radius: 8px;
+  }
+
+  .terminal-body {
+    padding: 12px 14px;
+    font-size: 11px;
+    line-height: 1.6;
+    min-height: 80px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .terminal-bar {
+    padding: 8px 12px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .terminal-body {
+    font-size: 10px;
+    padding: 10px;
+  }
+}
 </style>
