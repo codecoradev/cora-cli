@@ -516,7 +516,13 @@ pub fn save_provider_info(
     let mut cora = if path.is_file() {
         let content = std::fs::read_to_string(&path)
             .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
-        CoraFile::from_str(&content).unwrap_or_default()
+        CoraFile::from_str(&content).map_err(|e| {
+            CoraError::AuthError(format!(
+                "cannot parse {}: {}. Fix or remove the file before saving.",
+                path.display(),
+                e
+            ))
+        })?
     } else {
         CoraFile::default()
     };

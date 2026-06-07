@@ -12,6 +12,8 @@ use crate::config::schema::{CoraFile, HookSection, OutputSection, ProviderSectio
 /// `--project` shows only .cora.yaml
 /// (default) shows the fully merged effective config
 pub fn execute_config_show(global_only: bool, project_only: bool) -> Result<()> {
+    // Clap conflicts_with handles the --global + --project case,
+    // but add a defensive check in case of programmatic invocation.
     if global_only {
         return show_global_config();
     }

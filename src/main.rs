@@ -274,10 +274,10 @@ enum ConfigAction {
     /// Show the current resolved configuration
     Show {
         /// Show only global config (~/.cora/config.yaml)
-        #[clap(long)]
+        #[clap(long, conflicts_with = "project")]
         global: bool,
         /// Show only project config (.cora.yaml)
-        #[clap(long)]
+        #[clap(long, conflicts_with = "global")]
         project: bool,
     },
     /// Set a configuration value (keys: model, provider, `base_url`, format, severity)
