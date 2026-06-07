@@ -160,9 +160,10 @@ import FadeIn from './FadeIn.vue'
 }
 
 .hero-logo {
+  display: block;
   width: 80px;
   height: 80px;
-  margin-bottom: 20px;
+  margin: 0 auto 20px;
   animation: float 3s ease-in-out infinite;
 }
 
@@ -403,8 +404,10 @@ import FadeIn from './FadeIn.vue'
   }
 
   .hero-logo {
+    display: block;
     width: 64px;
     height: 64px;
+    margin: 0 auto 16px;
   }
 
   .hero-badge {
