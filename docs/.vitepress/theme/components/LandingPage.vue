@@ -11,8 +11,8 @@ import FadeIn from './FadeIn.vue'
     <section class="hero">
       <div class="hero-inner">
         <div class="hero-badge">🧪 Open Source · MIT License</div>
+        <img src="/logo.svg" alt="cora" class="hero-logo" />
         <h1 class="hero-title">
-          <span class="hero-icon">👁️</span>
           AI Code Review
           <br />
           <span class="hero-brand">in your terminal</span>
@@ -159,6 +159,13 @@ import FadeIn from './FadeIn.vue'
   animation: fadeIn 0.6s ease-out;
 }
 
+.hero-logo {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 20px;
+  animation: float 3s ease-in-out infinite;
+}
+
 .hero-title {
   font-size: 48px;
   font-weight: 800;
@@ -166,11 +173,6 @@ import FadeIn from './FadeIn.vue'
   letter-spacing: -0.02em;
   margin: 0 0 20px;
   animation: fadeIn 0.6s ease-out 0.1s both;
-}
-
-.hero-icon {
-  display: inline-block;
-  animation: float 3s ease-in-out infinite;
 }
 
 .hero-brand {
@@ -398,6 +400,11 @@ import FadeIn from './FadeIn.vue'
 
   .hero-title {
     font-size: 28px;
+  }
+
+  .hero-logo {
+    width: 64px;
+    height: 64px;
   }
 
   .hero-badge {
