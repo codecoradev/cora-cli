@@ -102,6 +102,7 @@ const DEFAULT_EXCLUDE_PATHS: &[&str] = &[
     "spec/",
     "fixtures/",
     "examples/",
+    "rules/",
     // File patterns handled in glob_matches: *_test.*, *_spec.*
 ];
 
