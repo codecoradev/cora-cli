@@ -35,10 +35,9 @@ Complete command reference for the cora CLI.
 | `cora scan` `<path>` | Scan files for issues |
 | `cora scan .` `[--incremental]` | Scan only changed files |
 | `cora config show` | Show resolved configuration |
-| `cora config set` `<key>` `<value>` | Set a config value |
 | `cora hook install` | Install pre-commit hook |
 | `cora hook uninstall` | Remove pre-commit hook |
-| `cora auth login` | Save API key to `~/.cora/config.toml` |
+| `cora auth login` | Save API key to `~/.cora/auth.toml` |
 | `cora auth status` | Check current auth status |
 | `cora auth remove` | Remove stored API key |
 | `cora providers` | List detected AI providers |
