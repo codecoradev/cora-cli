@@ -284,7 +284,7 @@ pub fn load_config(
 }
 
 /// Build an `LLMConfig` from the resolved `Config`, fetching the API key
-/// from: CLI flag → env `CORA_API_KEY` → ~/.cora/auth.toml.
+/// from: CLI flag → ~/.cora/auth.toml → provider-specific env vars.
 ///
 /// If none of those are set, auto-detect from known provider env vars (`OPENAI_API_KEY`, etc.)
 /// and configure `provider/model/base_url` from the matching preset.
@@ -293,14 +293,15 @@ pub fn build_llm_config(
     cli_api_key: Option<&str>,
 ) -> std::result::Result<LLMConfig, CoraError> {
     // Resolve the API key and optional auto-detected preset in one pass.
+    // Also load stored provider info from auth.toml (if any).
+    let stored_provider_info = load_provider_info()?;
+
     let (api_key, auto_preset) = if let Some(key) = cli_api_key {
         (key.to_string(), None)
-    } else if let Ok(key) = std::env::var("CORA_API_KEY") {
-        (key, None)
     } else if let Some(key) = load_api_key_from_auth_file()? {
         (key, None)
     } else {
-        // No CORA_API_KEY or stored key — auto-detect from provider presets
+        // No stored key — auto-detect from provider presets
         let detected = detected_presets();
         if detected.is_empty() {
             let _available: Vec<String> = PRESETS
@@ -328,46 +329,53 @@ pub fn build_llm_config(
         (key, Some(preset))
     };
 
-    // Resolve provider/model/base_url: CORA_* env > auto-detected preset > config defaults
+    // Resolve provider/model/base_url priority:
+    //   CORA_* env vars > stored auth.toml provider info > auto-detected preset > config defaults
     let cora_provider = std::env::var("CORA_PROVIDER").ok();
     let cora_model = std::env::var("CORA_MODEL").ok();
     let cora_base_url = std::env::var("CORA_BASE_URL").ok();
 
-    // Warn when env vars override config file settings
+    // Warn when env vars override auth.toml settings
     if let Some(ref env_p) = cora_provider {
-        if env_p != &config.provider.provider {
-            eprintln!(
-                "⚠️  CORA_PROVIDER={env_p} overrides config provider={}",
-                config.provider.provider
-            );
+        if let Some(ref info) = stored_provider_info {
+            if env_p != &info.provider {
+                eprintln!(
+                    "⚠️  CORA_PROVIDER={env_p} overrides auth provider={}",
+                    info.provider
+                );
+            }
         }
     }
     if let Some(ref env_m) = cora_model {
-        if env_m != &config.provider.model {
-            eprintln!(
-                "⚠️  CORA_MODEL={env_m} overrides config model={}",
-                config.provider.model
-            );
+        if let Some(ref info) = stored_provider_info {
+            if env_m != &info.model {
+                eprintln!("⚠️  CORA_MODEL={env_m} overrides auth model={}", info.model);
+            }
         }
     }
     if let Some(ref env_u) = cora_base_url {
-        if env_u != &config.provider.base_url {
-            eprintln!(
-                "⚠️  CORA_BASE_URL overrides config base_url={}",
-                config.provider.base_url
-            );
+        if let Some(ref info) = stored_provider_info {
+            if env_u != &info.base_url {
+                eprintln!(
+                    "⚠️  CORA_BASE_URL overrides auth base_url={}",
+                    info.base_url
+                );
+            }
         }
     }
 
     let provider = cora_provider
+        .or_else(|| stored_provider_info.as_ref().map(|i| i.provider.clone()))
         .or_else(|| auto_preset.map(|p| p.name.to_string()))
         .unwrap_or_else(|| config.provider.provider.clone());
 
     let model = cora_model
+        .or_else(|| stored_provider_info.as_ref().map(|i| i.model.clone()))
         .or_else(|| auto_preset.map(|p| p.default_model.to_string()))
         .unwrap_or_else(|| config.provider.model.clone());
 
     let base_url = cora_base_url
+        .or_else(|| stored_provider_info.as_ref().map(|i| i.base_url.clone()))
         .or_else(|| {
             // Check if the auto-detected preset has a custom URL override
             auto_preset.and_then(|p| std::env::var(p.env_url).ok())
@@ -486,12 +494,7 @@ pub fn remove_api_key() -> std::result::Result<(), CoraError> {
 
 /// Check the auth status: whether an API key is available.
 pub fn auth_status() -> std::result::Result<AuthStatus, CoraError> {
-    if std::env::var("CORA_API_KEY").is_ok() {
-        Ok(AuthStatus {
-            source: "env var CORA_API_KEY".to_string(),
-            has_key: true,
-        })
-    } else if load_api_key_from_auth_file()?.is_some() {
+    if load_api_key_from_auth_file()?.is_some() {
         let dir = cora_dir()?;
         Ok(AuthStatus {
             source: format!("{}", dir.join(AUTH_FILENAME).display()),

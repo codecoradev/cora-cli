@@ -43,7 +43,7 @@ pub fn execute_providers() {
         );
         println!(
             "{}",
-            "   Or set CORA_API_KEY with --provider to use any OpenAI-compatible endpoint."
+            "   Or use `cora auth login --provider <name>` to configure any OpenAI-compatible endpoint."
                 .dimmed()
         );
     } else if detected.len() == 1 {

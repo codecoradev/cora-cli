@@ -77,7 +77,7 @@ pub fn execute_init(skip_hook: bool) -> Result<()> {
     );
     println!(
         "{}",
-        "   API keys should be set via CORA_API_KEY env var or `cora auth login`.".dimmed()
+        "   API keys should be set via `cora auth login`.".dimmed()
     );
 
     // Install pre-commit hook unless --no-hook is specified
