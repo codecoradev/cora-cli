@@ -8,7 +8,7 @@ use crate::config::providers::PRESETS;
 
 /// Execute `auth login` — interactive or non-interactive provider selection and API key setup.
 ///
-/// When `--provider` and `--api-key` flags are provided, runs non-interactively (scriptable).
+/// When `--provider` flag is provided, runs non-interactively (scriptable).
 /// Otherwise falls back to interactive mode.
 pub fn execute_auth_login(
     cli_provider: Option<&str>,
@@ -17,30 +17,28 @@ pub fn execute_auth_login(
     cli_base_url: Option<&str>,
     force: bool,
 ) -> Result<()> {
-    // Non-interactive mode: both provider and api_key provided via flags
-    if let (Some(provider), Some(api_key)) = (cli_provider, cli_api_key) {
+    // Non-interactive mode: provider flag provided
+    if let Some(provider) = cli_provider {
         return execute_auth_login_noninteractive(
             provider,
-            api_key,
+            cli_api_key,
             cli_model,
             cli_base_url,
             force,
         );
     }
 
-    // If only one of provider/api_key is given, that's an error
-    if cli_provider.is_some() || cli_api_key.is_some() {
-        anyhow::bail!("Both --provider and --api-key are required for non-interactive login");
-    }
-
-    // Interactive mode (original behavior)
+    // Interactive mode
     execute_auth_login_interactive()
 }
 
-/// Non-interactive auth login — used when --provider and --api-key flags are provided.
+/// Non-interactive auth login — used when --provider flag is provided.
+///
+/// API key resolution:
+///   --api-key flag → provider env var (e.g. ZAI_API_KEY) → error
 fn execute_auth_login_noninteractive(
     provider: &str,
-    api_key: &str,
+    cli_api_key: Option<&str>,
     cli_model: Option<&str>,
     cli_base_url: Option<&str>,
     force: bool,
@@ -59,9 +57,35 @@ fn execute_auth_login_noninteractive(
         }
     }
 
-    if api_key.is_empty() {
-        anyhow::bail!("API key cannot be empty");
-    }
+    // Resolve API key: --api-key flag → provider env var
+    let api_key = if let Some(key) = cli_api_key {
+        if key.is_empty() {
+            anyhow::bail!("API key cannot be empty");
+        }
+        key.to_string()
+    } else {
+        // Try to auto-detect from provider-specific env var
+        if let Some(preset) = PRESETS.iter().find(|p| p.name == provider) {
+            if let Ok(key) = std::env::var(preset.env_key) {
+                eprintln!(
+                    "   {} Using {} from environment",
+                    "→".green(),
+                    preset.env_key.green()
+                );
+                key
+            } else {
+                anyhow::bail!(
+                    "No API key provided. Set --api-key or export {}",
+                    preset.env_key
+                );
+            }
+        } else {
+            anyhow::bail!(
+                "No API key provided. Use --api-key for custom provider '{}'",
+                provider
+            );
+        }
+    };
 
     // Resolve preset defaults for the provider
     let (base_url, model) = if let Some(preset) = PRESETS.iter().find(|p| p.name == provider) {
@@ -79,7 +103,7 @@ fn execute_auth_login_noninteractive(
     };
 
     // Save
-    loader::save_api_key(api_key)?;
+    loader::save_api_key(&api_key)?;
     loader::save_provider_info(provider, &base_url, &model)?;
 
     println!(
@@ -98,7 +122,7 @@ fn execute_auth_login_noninteractive(
     Ok(())
 }
 
-/// Interactive auth login — original behavior with prompts.
+/// Interactive auth login — guided setup with suggestions and auto-detection.
 fn execute_auth_login_interactive() -> Result<()> {
     // Check if already logged in
     let status = loader::auth_status()?;
@@ -127,11 +151,9 @@ fn execute_auth_login_interactive() -> Result<()> {
     // List known providers
     for (i, preset) in PRESETS.iter().enumerate() {
         println!(
-            "  {} {} — {} (model: {})",
+            "  {} {}",
             format!("[{}]", i + 1).cyan().bold(),
             preset.name.bold(),
-            preset.default_base_url.dimmed(),
-            preset.default_model.dimmed(),
         );
     }
     // Custom option
@@ -162,29 +184,8 @@ fn execute_auth_login_interactive() -> Result<()> {
         );
     }
 
-    let (provider, base_url, model) = if choice_num <= PRESETS.len() {
-        // Known provider — just need API key
+    let (provider, default_base_url, default_model) = if choice_num <= PRESETS.len() {
         let preset = &PRESETS[choice_num - 1];
-        println!();
-        println!(
-            "  {} {} ({})",
-            "→".green(),
-            "Provider:".bold(),
-            preset.name.green()
-        );
-        println!(
-            "  {} {} ({})",
-            "→".green(),
-            "Model:".bold(),
-            preset.default_model.green()
-        );
-        println!(
-            "  {} {} ({})",
-            "→".green(),
-            "Base URL:".bold(),
-            preset.default_base_url.dimmed()
-        );
-        println!();
         (
             preset.name.to_string(),
             preset.default_base_url.to_string(),
@@ -204,39 +205,87 @@ fn execute_auth_login_interactive() -> Result<()> {
             anyhow::bail!("Provider name, base URL, and model are required for custom providers");
         }
 
-        (provider, base_url, model)
+        // Skip further prompts — custom provider already has everything
+        println!();
+        print!("  🔑 Enter your API key: ");
+        io::stdout().flush()?;
+
+        let mut key = String::new();
+        io::stdin().read_line(&mut key)?;
+        let key = key.trim().to_string();
+
+        if key.is_empty() {
+            anyhow::bail!("API key cannot be empty");
+        }
+
+        loader::save_api_key(&key)?;
+        loader::save_provider_info(&provider, &base_url, &model)?;
+
+        println!();
+        print_saved(&provider, &model, &base_url);
+        return Ok(());
     };
 
-    // Collect API key
+    // Known provider flow
     println!();
-    print!("  🔑 Enter your API key: ");
-    io::stdout().flush()?;
+    println!(
+        "  {} {} ({})",
+        "→".green(),
+        "Provider:".bold(),
+        provider.green()
+    );
 
-    let mut key = String::new();
-    io::stdin().read_line(&mut key)?;
-    let key = key.trim().to_string();
+    // --- API Key: auto-detect from provider env var ---
+    let env_key = PRESETS
+        .iter()
+        .find(|p| p.name == provider)
+        .map(|p| p.env_key)
+        .unwrap_or("");
 
-    if key.is_empty() {
+    let api_key = if let Ok(key) = std::env::var(env_key) {
+        println!(
+            "  {} Found {} in environment",
+            "→".green(),
+            env_key.green()
+        );
+        print!(
+            "  {} Use it? [Y/n]: ",
+            "🔑".to_string().bold()
+        );
+        io::stdout().flush()?;
+
+        let mut answer = String::new();
+        io::stdin().read_line(&mut answer)?;
+        if answer.trim().is_empty() || answer.trim().eq_ignore_ascii_case("y") {
+            println!(
+                "  {} Using {} from environment",
+                "✅".green(),
+                env_key.green()
+            );
+            key
+        } else {
+            prompt_secret("  🔑 Enter your API key:")?
+        }
+    } else {
+        prompt_secret("  🔑 Enter your API key:")?
+    };
+
+    if api_key.is_empty() {
         anyhow::bail!("API key cannot be empty");
     }
 
-    // Save API key + provider info
-    loader::save_api_key(&key)?;
+    // --- Model: suggest default, allow override ---
+    let model = prompt_with_default("  Model", &default_model)?;
+
+    // --- Base URL: suggest default, allow override ---
+    let base_url = prompt_with_default("  Base URL", &default_base_url)?;
+
+    // Save
+    loader::save_api_key(&api_key)?;
     loader::save_provider_info(&provider, &base_url, &model)?;
 
     println!();
-    println!(
-        "{} API key saved to {}",
-        "✅".green().bold(),
-        "~/.cora/auth.toml".green()
-    );
-    println!(
-        "{} Provider: {} | Model: {} | Base: {}",
-        "   ".dimmed(),
-        provider.bold(),
-        model.bold(),
-        base_url.dimmed()
-    );
+    print_saved(&provider, &model, &base_url);
     println!(
         "{}",
         "   This file is local to your machine and not committed to git.".dimmed()
@@ -259,6 +308,50 @@ fn prompt_input(label: &str) -> Result<String> {
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
     Ok(input.trim().to_string())
+}
+
+/// Prompt for a secret value (API key) — reads line without echoing.
+/// Falls back to normal readline if terminal control unavailable.
+fn prompt_secret(prompt: &str) -> Result<String> {
+    print!("{} ", prompt);
+    io::stdout().flush()?;
+
+    // Fallback: normal readline (no hidden echo — user can use --api-key for secrets)
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    Ok(input.trim().to_string())
+}
+
+/// Prompt with a default value. Enter = accept default.
+fn prompt_with_default(label: &str, default: &str) -> Result<String> {
+    print!("  {} [{}]: ", label.bold(), default.dimmed());
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let trimmed = input.trim().to_string();
+
+    Ok(if trimmed.is_empty() {
+        default.to_string()
+    } else {
+        trimmed
+    })
+}
+
+/// Print the saved confirmation message.
+fn print_saved(provider: &str, model: &str, base_url: &str) {
+    println!(
+        "{} API key saved to {}",
+        "✅".green().bold(),
+        "~/.cora/auth.toml".green()
+    );
+    println!(
+        "{} Provider: {} | Model: {} | Base: {}",
+        "   ".dimmed(),
+        provider.bold(),
+        model.bold(),
+        base_url.dimmed()
+    );
 }
 
 /// Execute `auth status` — show whether an API key is configured and which provider.
@@ -288,10 +381,11 @@ pub fn execute_auth_status() -> Result<()> {
         println!("     • {} (interactive setup)", "cora auth login".cyan());
         println!(
             "     • {} (non-interactive)",
-            "cora auth login --provider zai --api-key KEY".cyan()
+            "cora auth login --provider zai".cyan()
         );
-        println!("     • CORA_API_KEY environment variable");
-        println!("     • Provider-specific env vars: OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.");
+        println!(
+            "     • Provider-specific env vars will be auto-detected (e.g. ZAI_API_KEY, OPENAI_API_KEY)"
+        );
     }
 
     Ok(())
@@ -300,7 +394,7 @@ pub fn execute_auth_status() -> Result<()> {
 /// Execute `auth remove` — delete the stored API key and provider info.
 pub fn execute_auth_remove() -> Result<()> {
     let status = loader::auth_status()?;
-    if !status.has_key && std::env::var("CORA_API_KEY").is_err() {
+    if !status.has_key {
         println!("{}", "No API key found to remove.".yellow());
         return Ok(());
     }
@@ -310,10 +404,6 @@ pub fn execute_auth_remove() -> Result<()> {
     println!(
         "{} API key and provider info removed from local config.",
         "✅".green().bold()
-    );
-    println!(
-        "{}",
-        "   If you set CORA_API_KEY in your shell, remove it there too.".dimmed()
     );
 
     Ok(())

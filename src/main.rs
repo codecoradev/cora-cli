@@ -64,8 +64,8 @@ struct GlobalOptions {
     #[clap(long, global = true, env = "CORA_BASE_URL")]
     pub base_url: Option<String>,
 
-    /// API key (or set `CORA_API_KEY` env var, or use `cora auth login`)
-    #[clap(long, global = true, env = "CORA_API_KEY")]
+    /// API key (or use `cora auth login` to save one persistently)
+    #[clap(long, global = true)]
     pub api_key: Option<String>,
 
     /// Enable verbose logging
