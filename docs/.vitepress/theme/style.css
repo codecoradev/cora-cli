@@ -1,0 +1,41 @@
+/* cora brand overrides — dark-first */
+:root {
+  --vp-c-brand-1: #818cf8;
+  --vp-c-brand-2: #6366f1;
+  --vp-c-brand-3: #4f46e5;
+  --vp-c-brand-soft: rgba(99, 102, 241, 0.14);
+}
+
+/* Dark mode (default) */
+.dark {
+  --vp-c-brand-1: #a5b4fc;
+  --vp-c-brand-2: #818cf8;
+  --vp-c-brand-3: #6366f1;
+  --vp-c-brand-soft: rgba(129, 140, 248, 0.14);
+}
+
+/* Hero gradient */
+.VPHero .name clip {
+  background: linear-gradient(135deg, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Slightly wider content area */
+.VPDoc .content-container {
+  max-width: 800px !important;
+}
+
+/* Code blocks — slightly rounded */
+.vp-code-group .tabs {
+  border-radius: 8px 8px 0 0;
+}
+
+/* Feature grid spacing on landing page */
+.VPFeatures .container {
+  max-width: 1152px;
+}
+
+.VPFeature {
+  padding: 16px;
+}
