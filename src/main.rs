@@ -64,8 +64,8 @@ struct GlobalOptions {
     #[clap(long, global = true, env = "CORA_BASE_URL")]
     pub base_url: Option<String>,
 
-    /// API key (or use `cora auth login` to save one persistently)
-    #[clap(long, global = true)]
+    /// API key (or set `CORA_API_KEY` env var for CI, or use `cora auth login`)
+    #[clap(long, global = true, env = "CORA_API_KEY")]
     pub api_key: Option<String>,
 
     /// Enable verbose logging
@@ -272,7 +272,14 @@ enum AuthAction {
 #[derive(Subcommand, Debug)]
 enum ConfigAction {
     /// Show the current resolved configuration
-    Show,
+    Show {
+        /// Show only global config (~/.cora/config.yaml)
+        #[clap(long)]
+        global: bool,
+        /// Show only project config (.cora.yaml)
+        #[clap(long)]
+        project: bool,
+    },
     /// Set a configuration value (keys: model, provider, `base_url`, format, severity)
     Set {
         /// Configuration key to set
@@ -438,8 +445,8 @@ async fn main() -> Result<()> {
             0
         }
         Command::Config { action } => match action {
-            ConfigAction::Show => {
-                config_cmd::execute_config_show()?;
+            ConfigAction::Show { global, project } => {
+                config_cmd::execute_config_show(global, project)?;
                 0
             }
             ConfigAction::Set { key, value, global } => {
