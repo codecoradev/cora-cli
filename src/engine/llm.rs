@@ -1312,4 +1312,92 @@ mod tests {
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.0[0].title, "SQL Injection");
     }
+
+    // ─── repair_truncated_json ───
+
+    #[test]
+    fn repair_truncated_unclosed_string() {
+        let input = r#"[{"file":"main.rs","title":"Bug","body":"incomplete"#;
+        let repaired = repair_truncated_json(input);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed[0]["file"], "main.rs");
+        assert_eq!(parsed[0]["body"], "incomplete");
+    }
+
+    #[test]
+    fn repair_truncated_unclosed_array_and_object() {
+        let input = r#"[{"file":"main.rs","title":"Bug""#;
+        let repaired = repair_truncated_json(input);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed[0]["file"], "main.rs");
+    }
+
+    #[test]
+    fn repair_truncated_multiple_unclosed_brackets() {
+        let input = r#"[{"file":"a.rs","issues":[{"title":"x""#;
+        let repaired = repair_truncated_json(input);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed[0]["file"], "a.rs");
+    }
+
+    #[test]
+    fn repair_truncated_string_with_escaped_quote() {
+        let input = r#"[{"file":"main.rs","body":"has \"quote inside"#;
+        let repaired = repair_truncated_json(input);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed[0]["file"], "main.rs");
+    }
+
+    #[test]
+    fn repair_truncated_nothing_to_fix() {
+        let input = r#"[{"file":"main.rs"}]"#;
+        let repaired = repair_truncated_json(input);
+        assert_eq!(repaired, input);
+    }
+
+    #[test]
+    fn repair_truncated_after_complete_first_item() {
+        // First item complete, second item truncated
+        let input = r#"[{"file":"a.rs","line":1,"severity":"critical","issue_type":"security","title":"SQL","body":"bad","suggested_fix":"fix"},{"file":"b.rs","title":"X","body":"incomplete"#;
+        let repaired = repair_truncated_json(input);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0]["file"], "a.rs");
+        assert_eq!(parsed[1]["file"], "b.rs");
+    }
+
+    #[test]
+    fn repair_truncated_empty_array_unclosed() {
+        let input = "[";
+        let repaired = repair_truncated_json(input);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&repaired).unwrap();
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn repair_truncated_nested_object_with_string_value() {
+        let input = r#"{"findings":[{"file":"a.rs","severity":"critical"}],"summary":"partial"#;
+        let repaired = repair_truncated_json(input);
+        let parsed: serde_json::Value = serde_json::from_str(&repaired).unwrap();
+        assert_eq!(parsed["findings"][0]["file"], "a.rs");
+    }
+
+    #[test]
+    fn parse_response_truncated_e2e() {
+        // End-to-end: truncated LLM response should be repaired and parsed
+        let raw = r#"[{"file":"src/main.rs","line":42,"severity":"critical","issue_type":"security","title":"Hardcoded secret","body":"API key found in source","suggested_fix":"Use env vars"},{"file":"src/lib.rs","line":10,"severity":"major","issue_type":"bugs","title":"Unwrap panic","body":"incomplete"#;
+        let result = parse_review_response(raw).unwrap();
+        assert_eq!(result.0.len(), 2);
+        assert_eq!(result.0[0].file, "src/main.rs");
+        assert_eq!(result.0[0].severity, crate::engine::Severity::Critical);
+        assert_eq!(result.0[1].file, "src/lib.rs");
+    }
+
+    #[test]
+    fn parse_scan_response_truncated_e2e() {
+        let raw = r#"[{"file":"config.rs","line":5,"severity":"info","issue_type":"style","title":"Formatting","body":"Bad style"#;
+        let result = parse_scan_response(raw).unwrap();
+        assert_eq!(result.0.len(), 1);
+        assert_eq!(result.0[0].file, "config.rs");
+    }
 }
