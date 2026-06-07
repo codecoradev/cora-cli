@@ -100,7 +100,7 @@ curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.s
 cora auth login
 ```
 
-Pick your provider, enter your API key — done. Cora stores it securely in `~/.cora/auth.toml` (never committed to git).
+Pick your provider, enter your API key — done. Cora stores the API key in `~/.cora/auth.toml` (never committed to git) and provider settings in `~/.cora/config.yaml`.
 
 > **No API key yet?** Set any provider env var instead: `export OPENAI_API_KEY="..."`
 
@@ -225,6 +225,12 @@ Manage configuration. Supports both project-level (`.cora.yaml`) and global (`~/
 # Show current resolved configuration
 cora config show
 
+# Show only global config (~/.cora/config.yaml)
+cora config show --global
+
+# Show only project config (.cora.yaml)
+cora config show --project
+
 # Set a project-level value (writes to .cora.yaml)
 cora config set model claude-sonnet-4-20250514
 cora config set base_url https://api.openai.com/v1
@@ -348,7 +354,7 @@ output:
 | `OPENAI_API_KEY` | OpenAI API key | — |
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |
 | `GOOGLE_API_KEY` | Google AI API key | — |
-| `CORA_API_KEY` | API key (overrides provider-specific keys) | — |
+| `CORA_API_KEY` | API key (for CI — overrides all other sources) | — |
 | `CORA_MODEL` | Override model | — |
 | `CORA_PROVIDER` | Override provider | — |
 | `CORA_BASE_URL` | Override API base URL | — |
@@ -381,24 +387,28 @@ $ cora auth login
 🔑 Cora Auth Setup
    Choose your LLM provider:
 
-  [1] openai — https://api.openai.com/v1 (model: gpt-4o-mini)
-  [2] anthropic — https://api.anthropic.com/v1 (model: claude-3-haiku-20240307)
-  [3] groq — https://api.groq.com/openai/v1 (model: llama-3.1-8b-instant)
-  [4] ollama — http://localhost:11434/v1 (model: llama3.1)
-  [5] zai — https://api.z.ai/api/coding/paas/v4 (model: glm-5.1)
-  [6] custom — use any OpenAI-compatible endpoint
+  [1] openai
+  [2] anthropic
+  [3] groq
+  [4] ollama
+  [5] zai
+  [6] custom
 
-  Select provider [1-6]: 1
+  Select provider [1-6]: 5
 
-  → Provider: openai
-  → Model: gpt-4o-mini
-  → Base URL: https://api.openai.com/v1
+  → Provider: zai
+  🔑 Found ZAI_API_KEY in environment
+     Use it? [Y/n]: Y
+     ✅ Using ZAI_API_KEY from environment
 
-  🔑 Enter your API key: sk-...
+  Model [glm-5.1]:          ← press Enter to accept default
+  Base URL [https://api.z.ai/api/coding/paas/v4]:  ← press Enter to accept default
 
 ✅ API key saved to ~/.cora/auth.toml
-   Provider: openai | Model: gpt-4o-mini | Base: https://api.openai.com/v1
+   Provider: zai | Model: glm-5.1 | Base: https://api.z.ai/api/coding/paas/v4
 ```
+
+> Provider env vars are auto-detected — pick ZAI and `ZAI_API_KEY` is found automatically.
 
 #### Check Auth Status
 

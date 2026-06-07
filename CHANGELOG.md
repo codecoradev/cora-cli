@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-06-07
+
+### Changed
+
+- **Config architecture redesign** — clear separation of concerns between config files (#209)
+  - `~/.cora/auth.toml` now stores **only the API key** (secret)
+  - `~/.cora/config.yaml` stores provider, model, base_url, and other settings (global)
+  - `.cora.yaml` (project) overrides global config per-project
+  - `CORA_API_KEY` env var reserved for CI use only
+- **Provider info auto-migration** — if `auth.toml` still contains provider/model/base_url, automatically moved to `config.yaml` on first run
+- **Deterministic rules** — `rules/` added to default exclude paths, preventing rules from matching their own source definitions (#185)
+
+### Fixed
+
+- **`cora config show`** — now displays the **effective resolved config** with source annotations like `[from: env CORA_PROVIDER]` instead of raw file values (#189)
+- **`cora config show --global`** — new flag to show only `~/.cora/config.yaml` contents
+- **`cora config show --project`** — new flag to show only `.cora.yaml` contents (mutually exclusive with `--global`)
+- **`cora review` sends to wrong provider** — provider info from `auth.toml`/`config.yaml` was ignored at runtime, always defaulting to OpenAI. Now correctly reads from merged config (#209)
+- **`save_provider_info` data loss** — parse failure on `config.yaml` no longer silently replaces the entire file with defaults (now returns error)
+- **`cora auth login` interactive flow** — now auto-detects provider env vars (e.g. pick ZAI → detects `ZAI_API_KEY`), suggests model and base URL defaults from presets (enter to accept) (#203)
+- **`cora auth login --provider zai`** — now auto-detects `ZAI_API_KEY` from environment, no need for `--api-key` flag (#184)
+- **Env var override visibility** — `cora config show` now annotates which values come from env vars vs config files (#182)
+- **Truncated JSON repair tests** — 12 new tests confirming `repair_truncated_json()` works correctly for all edge cases (#186)
+
+### Added
+
+- **`--global` / `--project` flags** on `cora config show` for scoped config inspection
+- **Clap `conflicts_with`** on `--global`/`--project` — `cora config show --global --project` now rejected at CLI level
+- **Interactive model/base URL prompts** — during `cora auth login`, shows preset defaults and allows override with enter-to-accept
+
 ## [0.4.4] - 2026-06-06
 
 ### Fixed
@@ -300,7 +330,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...develop
+[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...develop
+[0.4.5]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/codecoradev/cora-cli/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/codecoradev/cora-cli/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/codecoradev/cora-cli/compare/v0.4.1...v0.4.2
