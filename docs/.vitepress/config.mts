@@ -5,11 +5,12 @@ export default defineConfig({
   description: 'AI-Powered Code Review CLI — BYOK, zero config, runs in your terminal',
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
+    ['link', { rel: 'icon', type: 'image/png', href: '/favicon.png' }],
     ['meta', { name: 'theme-color', content: '#6366f1' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'cora — AI Code Review CLI' }],
     ['meta', { property: 'og:description', content: 'BYOK, zero config, runs in your terminal' }],
+    ['meta', { property: 'og:image', content: 'https://codecora.dev/og.png' }],
     ['meta', { property: 'og:url', content: 'https://codecora.dev/' }],
   ],
 
