@@ -223,7 +223,7 @@ Manage configuration. Supports both project-level (`.cora.yaml`) and global (`~/
 
 ```bash
 # Show current resolved configuration
- cora config show
+cora config show
 
 # Show only global config (~/.cora/config.yaml)
 cora config show --global
