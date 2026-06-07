@@ -4,9 +4,9 @@ use regex::Regex;
 use std::sync::LazyLock;
 use tracing::debug;
 
+use crate::engine::Severity;
 use crate::engine::diff_parser::{DiffLineType, FileChunk};
 use crate::engine::rules::types::RuleFinding;
-use crate::engine::Severity;
 
 // ─── Built-in secret patterns ───
 
@@ -101,8 +101,9 @@ static COMPILED: LazyLock<Vec<(Regex, &'static SecretPattern)>> = LazyLock::new(
 
 // ─── Test fixture patterns to ignore ───
 
-static TEST_FIXTURE_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)(?:^|/)(?:tests?|specs?|fixtures?|mocks?|examples?)[/_\\-]").unwrap());
+static TEST_FIXTURE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(?:^|/)(?:tests?|specs?|fixtures?|mocks?|examples?)[/_\\.-]|(?:^|/)(?:tests?|specs?)_.*\.").unwrap()
+});
 
 // ─── Public API ───
 
@@ -207,7 +208,11 @@ mod tests {
     fn detect_aws_access_key() {
         let chunks = [make_chunk("config.py", &["key = 'AKIAIOSFODNN7EXAMPLE'"])];
         let findings = scan_secrets(&chunks, 10);
-        assert!(findings.iter().any(|f| f.rule_id == "secrets/aws-access-key"));
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.rule_id == "secrets/aws-access-key")
+        );
     }
 
     #[test]
@@ -237,7 +242,11 @@ mod tests {
             &["key = 'sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'"],
         )];
         let findings = scan_secrets(&chunks, 10);
-        assert!(findings.iter().any(|f| f.rule_id == "secrets/anthropic-key"));
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.rule_id == "secrets/anthropic-key")
+        );
     }
 
     #[test]
@@ -254,7 +263,9 @@ mod tests {
     fn detect_jwt_token() {
         let chunks = [make_chunk(
             "auth.py",
-            &["token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'"],
+            &[
+                "token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'",
+            ],
         )];
         let findings = scan_secrets(&chunks, 10);
         assert!(findings.iter().any(|f| f.rule_id == "secrets/jwt-token"));
@@ -289,7 +300,11 @@ mod tests {
             &["key = 'AIzaSyA1234567890abcdefghijklmnopqrstuvwxyz'"],
         )];
         let findings = scan_secrets(&chunks, 10);
-        assert!(findings.iter().any(|f| f.rule_id == "secrets/google-api-key"));
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.rule_id == "secrets/google-api-key")
+        );
     }
 
     #[test]

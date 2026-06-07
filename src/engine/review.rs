@@ -124,15 +124,26 @@ async fn review_diff_inner(
     );
 
     let rule_context = crate::engine::rules::format_rule_context(&rule_findings);
+    let secrets_context = crate::engine::rules::format_rule_context(&secrets_findings);
     // Keep a clone for merging after LLM (rule_findings may be consumed in error fallback)
     let rule_findings_clone = rule_findings.clone();
     let secrets_findings_clone = secrets_findings.clone();
 
-    // Combine static analysis + rule engine context for LLM prompt
-    let combined_context = match (static_context.as_deref(), rule_context.as_str()) {
-        (Some(sa), rc) if !rc.is_empty() => Some(format!("{sa}\n\n{rc}")),
-        (Some(sa), _) => Some(sa.to_string()),
-        (_, rc) if !rc.is_empty() => Some(rc.to_string()),
+    // Combine static analysis + rule engine + secrets findings for LLM prompt
+    let combined_context = match (
+        static_context.as_deref(),
+        rule_context.as_str(),
+        secrets_context.as_str(),
+    ) {
+        (Some(sa), rc, sc) if !rc.is_empty() && !sc.is_empty() => {
+            Some(format!("{sa}\n\n{rc}\n\n{sc}"))
+        }
+        (Some(sa), rc, _) if !rc.is_empty() => Some(format!("{sa}\n\n{rc}")),
+        (Some(sa), _, sc) if !sc.is_empty() => Some(format!("{sa}\n\n{sc}")),
+        (Some(sa), _, _) => Some(sa.to_string()),
+        (_, rc, sc) if !rc.is_empty() && !sc.is_empty() => Some(format!("{rc}\n\n{sc}")),
+        (_, rc, _) if !rc.is_empty() => Some(rc.to_string()),
+        (_, _, sc) if !sc.is_empty() => Some(sc.to_string()),
         _ => None,
     };
 
