@@ -69,22 +69,29 @@ $ cora review --staged --format json
 
 ## Configuration File
 
-The `.cora.yaml` file provides persistent configuration. Place it in your project root. API keys are stored at `~/.cora/config.toml`.
+The `.cora.yaml` file provides persistent configuration. Place it in your project root.
+
+**File roles:**
+
+| File | Purpose |
+|------|---------|
+| `~/.cora/auth.toml` | API key (secret, chmod 600) |
+| `~/.cora/config.yaml` | Global defaults (provider, model, etc.) |
+| `.cora.yaml` | Per-project overrides |
 
 ```yaml
 # .cora.yaml — example
+provider: zai
+model: glm-5.1
 
-review:
-  severity: warning
-  focus: security,performance
+focus:
+  - security
+  - performance
 
 ignore:
-  - "vendor/**"
-  - "*.min.js"
-
-providers:
-  openai:
-    model: gpt-4o
+  files:
+    - "vendor/**"
+    - "*.min.js"
 ```
 
 ## Environment Variables
@@ -93,11 +100,13 @@ Environment variables override configuration file settings:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `CORA_API_KEY` | API key for the configured provider | Yes (unless using cora auth) |
+| `CORA_API_KEY` | API key for CI (overrides auth.toml) | CI only |
 | `CORA_PROVIDER` | Override the LLM provider | No |
 | `CORA_MODEL` | Override the model name | No |
 | `CORA_BASE_URL` | Override the API base URL | No |
 | `CORA_CONFIG` | Path to alternative config file | No |
+
+Provider-specific keys are auto-detected: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `ZAI_API_KEY`
 
 ## Working with Monorepos
 

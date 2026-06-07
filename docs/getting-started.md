@@ -12,7 +12,7 @@ Get up and running with cora in three simple steps.
    `curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh`
 
 2. **Authenticate** — Run `cora auth login` to pick your provider and enter your API key.
-   Cora stores it securely in `~/.cora/auth.toml` (never committed to git).
+   Cora stores the API key in `~/.cora/auth.toml` (never committed to git) and provider settings in `~/.cora/config.yaml`.
 
 3. **Review** — Analyze your staged changes:
    `cora review`
@@ -27,29 +27,33 @@ $ cora auth login
 🔑 Cora Auth Setup
    Choose your LLM provider:
 
-  [1] openai — https://api.openai.com/v1
-  [2] anthropic — https://api.anthropic.com/v1
-  [3] groq — https://api.groq.com/openai/v1
-  [4] ollama — http://localhost:11434/v1
-  [5] zai — https://api.z.ai/api/coding/paas/v4
-  [6] custom — any OpenAI-compatible endpoint
+  [1] openai
+  [2] anthropic
+  [3] groq
+  [4] ollama
+  [5] zai
+  [6] custom
 
-  Select provider [1-6]: 1
+  Select provider [1-6]: 5
 
-  → Provider: openai
-  → Model: gpt-4o-mini
-  → Base URL: https://api.openai.com/v1
+  → Provider: zai
+  🔑 Found ZAI_API_KEY in environment
+     Use it? [Y/n]: Y
+     ✅ Using ZAI_API_KEY from environment
 
-  🔑 Enter your API key: ****
+  Model [glm-5.1]:          ← press Enter to accept default
+  Base URL [https://api.z.ai/api/coding/paas/v4]:  ← press Enter to accept default
 
 ✅ API key saved to ~/.cora/auth.toml
+   Provider: zai | Model: glm-5.1 | Base: https://api.z.ai/api/coding/paas/v4
 ```
 
 | Term | Description |
 |------|-------------|
-| Known providers | Just enter your API key — model and base URL are pre-configured |
-| Custom provider | Enter your own base URL, model name, and API key for any OpenAI-compatible API |
-| Provider info stored | Provider name, model, and base URL are saved alongside your API key for easy reference |
+| Known providers | Provider env vars auto-detected (e.g. `ZAI_API_KEY`) |
+| Custom provider | Enter your own base URL, model name, and API key |
+| API key | Saved to `~/.cora/auth.toml` (secret) |
+| Provider settings | Saved to `~/.cora/config.yaml` |
 
 Check your auth status anytime:
 
@@ -63,7 +67,7 @@ $ cora auth status
    Base URL: https://api.openai.com/v1
 ```
 
-You can also use environment variables instead of `cora auth login`: `CORA_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.
+You can also use provider environment variables: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `ZAI_API_KEY`, etc. `CORA_API_KEY` is reserved for CI use.
 
 ## Understanding the Output
 

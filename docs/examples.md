@@ -67,13 +67,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install cora
-        run: cargo install cora-cli
+        with:
+          fetch-depth: 0
       - name: Run AI code review
         env:
           CORA_API_KEY: ${{ secrets.CORA_API_KEY }}
-          CORA_PROVIDER: openai
-        run: cora review --base main --format sarif
+          CORA_BASE_URL: ${{ secrets.CORA_BASE_URL }}
+          CORA_MODEL: ${{ secrets.CORA_MODEL }}
+        run: |
+          # Install cora — pin version with CORA_VERSION=v0.4.5 for reproducibility
+          curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+          cora review --base main --format sarif
 ```
 
 ## 07 — Pre-commit Hook
