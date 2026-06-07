@@ -116,9 +116,17 @@ async fn review_diff_inner(
     // Parse diff and run rule engine
     let diff_chunks = crate::engine::diff_parser::parse_diff(diff);
     let rule_findings = crate::engine::rules::run_rules(&diff_chunks, &config.rules_config);
+
+    // Run deterministic secrets pre-scan
+    let secrets_findings = crate::engine::secrets_scanner::scan_secrets(
+        &diff_chunks,
+        config.rules_config.max_findings,
+    );
+
     let rule_context = crate::engine::rules::format_rule_context(&rule_findings);
     // Keep a clone for merging after LLM (rule_findings may be consumed in error fallback)
     let rule_findings_clone = rule_findings.clone();
+    let secrets_findings_clone = secrets_findings.clone();
 
     // Combine static analysis + rule engine context for LLM prompt
     let combined_context = match (static_context.as_deref(), rule_context.as_str()) {
@@ -178,17 +186,23 @@ async fn review_diff_inner(
         Ok(resp) => resp,
         Err(e) => {
             // LLM failed — return deterministic findings only (don't silently swallow them)
-            if !rule_findings.is_empty() {
+            if !rule_findings.is_empty() || !secrets_findings.is_empty() {
                 let n_rules = rule_findings.len();
+                let n_secrets = secrets_findings.len();
                 debug!(
                     error = %e,
                     rule_findings = n_rules,
-                    "LLM call failed, returning deterministic rule findings only"
+                    secrets_findings = n_secrets,
+                    "LLM call failed, returning deterministic findings only"
                 );
+                let mut all_deterministic =
+                    crate::engine::rules::merge_rule_findings(vec![], rule_findings);
+                all_deterministic =
+                    crate::engine::rules::merge_rule_findings(all_deterministic, secrets_findings);
                 let mut fallback = ReviewResponse {
-                    issues: crate::engine::rules::merge_rule_findings(vec![], rule_findings),
+                    issues: all_deterministic,
                     summary: format!(
-                        "LLM review failed: {e}. Showing {n_rules} deterministic rule findings only."
+                        "LLM review failed: {e}. Showing {n_rules} rule + {n_secrets} secrets findings."
                     ),
                     tokens_used: None,
                     should_block: false,
@@ -205,10 +219,14 @@ async fn review_diff_inner(
         }
     };
 
-    // Merge rule findings with LLM issues (rule findings appended after LLM issues)
+    // Merge rule findings + secrets findings with LLM issues
     if !rule_findings_clone.is_empty() {
         response.issues =
             crate::engine::rules::merge_rule_findings(response.issues, rule_findings_clone);
+    }
+    if !secrets_findings_clone.is_empty() {
+        response.issues =
+            crate::engine::rules::merge_rule_findings(response.issues, secrets_findings_clone);
     }
 
     // Filter out issues with invalid file paths (hallucination guard)
