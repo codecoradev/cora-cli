@@ -98,7 +98,7 @@ jobs:
           persist-credentials: false
 
       - name: Run Cora AI Code Review
-        uses: codecoradev/cora-cli/.github/actions/cora-review@v0.4.6
+        uses: codecoradev/cora-review-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cora-api-key: ${{ secrets.CORA_API_KEY }}
