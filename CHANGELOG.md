@@ -5,6 +5,26 @@ All notable changes to cora-cli are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.7] - 2026-06-08
+
+### Changed
+
+- **CI action moved to GitHub Marketplace** — published as [`codecoradev/cora-review-action@v1`](https://github.com/marketplace/actions/cora-ai-code-review)
+- **Internal composite action removed** — workflow now uses marketplace action instead of `.github/actions/cora-review/`
+- **`cora-review-simple` removed** — unused duplicate action deleted
+
+### Fixed
+
+- **Download hardening** — 5x retry with exponential backoff, gzip validation, checksum verification for cora-cli binary download in CI (#221)
+- **curl hardening** — `--fail --show-error` + `set -e` guard prevents silent HTML downloads
+- **Checksum enforcement** — hard fail on missing/invalid checksums (was warning-only)
+- **Exact checksum match** — `awk` exact filename lookup replaces `grep` substring match
+
+### Added
+
+- **Improved review prompt** — better consistency, lower false-negative rate, explicit error handling focus area
+- **Comprehensive docs/examples.md** — GitHub Actions section with setup guide, inputs reference, and provider table
+
 ## [0.4.6] - 2026-06-07
 
 ### Changed

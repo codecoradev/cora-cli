@@ -67,9 +67,7 @@ cora-cli/
 │   └── formatter/
 │       └── mod.rs          # Output formatting (pretty, compact, json, sarif)
 ├── .github/
-│   ├── workflows/          # CI, release, deploy workflows
-│   └── actions/
-│       └── cora-review/    # Composite action for GitHub Actions
+│   └── workflows/          # CI, release, deploy workflows
 ├── tests/                   # Integration tests
 ├── Cargo.toml
 └── README.md
