@@ -75,25 +75,65 @@ runs:
           echo "Unsupported architecture: $ARCH"
           exit 1
         fi
-        curl -sL "https://github.com/codecoradev/cora-cli/releases/download/${CORA_VERSION}/${ASSET}-${CORA_VERSION}.tar.gz" \
-          -o /tmp/cora.tar.gz
-        curl -sL "https://github.com/codecoradev/cora-cli/releases/download/${CORA_VERSION}/checksums-sha256.txt" \
-          -o /tmp/cora-checksums.txt || true
+
+        DOWNLOAD_URL="https://github.com/codecoradev/cora-cli/releases/download/${CORA_VERSION}/${ASSET}-${CORA_VERSION}.tar.gz"
+        CHECKSUM_URL="https://github.com/codecoradev/cora-cli/releases/download/${CORA_VERSION}/checksums-sha256.txt"
+
+        # Download tarball with retry + exponential backoff
+        # Handles: CDN propagation delay on fresh releases, transient network errors, rate limits
+        for i in 1 2 3 4 5; do
+          rm -f /tmp/cora.tar.gz
+          HTTP_CODE=$(curl --fail --show-error -sL --connect-timeout 15 --max-time 120 \
+            -w '%{http_code}' -o /tmp/cora.tar.gz "$DOWNLOAD_URL" || echo "000")
+          FILE_SIZE=$(wc -c < /tmp/cora.tar.gz 2>/dev/null || echo 0)
+          echo "Download attempt $i: HTTP $HTTP_CODE, size ${FILE_SIZE} bytes"
+          if [ "$HTTP_CODE" = "200" ] && [ "$FILE_SIZE" -gt 1000 ]; then
+            break
+          fi
+          if [ "$i" -eq 5 ]; then
+            echo "::error::Failed to download ${ASSET}-${CORA_VERSION}.tar.gz after 5 attempts (last HTTP $HTTP_CODE, ${FILE_SIZE} bytes)"
+            exit 1
+          fi
+          BACKOFF=$((i * 10))
+          echo "Attempt $i failed (HTTP $HTTP_CODE), retrying in ${BACKOFF}s..."
+          sleep "$BACKOFF"
+        done
+
+        # Validate downloaded file is actual gzip
+        FILE_TYPE=$(file -b /tmp/cora.tar.gz 2>/dev/null || echo "unknown")
+        if ! echo "$FILE_TYPE" | grep -qi "gzip"; then
+          echo "::error::Downloaded file is not gzip. Got: $FILE_TYPE (HTTP $HTTP_CODE, ${FILE_SIZE} bytes)"
+          exit 1
+        fi
+
+        # Download and verify checksums
+        CHECKSUM_HTTP=$(curl --fail --show-error -sL --connect-timeout 15 --max-time 30 \
+          -w '%{http_code}' -o /tmp/cora-checksums.txt "$CHECKSUM_URL" || echo "000")
         if [ -f /tmp/cora-checksums.txt ] && [ -s /tmp/cora-checksums.txt ]; then
-          EXPECTED=$(grep "${ASSET}-${CORA_VERSION}.tar.gz" /tmp/cora-checksums.txt | awk '{print $1}' || true)
+          EXPECTED=$(awk -v name="${ASSET}-${CORA_VERSION}.tar.gz" '$2 == name {print $1}' /tmp/cora-checksums.txt)
           ACTUAL=$(sha256sum /tmp/cora.tar.gz | awk '{print $1}')
-          if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
+          if [ -z "$EXPECTED" ]; then
+            echo "::error::No checksum entry for ${ASSET}-${CORA_VERSION}.tar.gz — possible release asset mismatch"
+            echo "Checksum file contents:"
+            cat /tmp/cora-checksums.txt
+            rm -f /tmp/cora-checksums.txt
+            exit 1
+          fi
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "::error::Checksum verification failed for ${ASSET}-${CORA_VERSION}.tar.gz"
             echo "Expected: $EXPECTED"
             echo "Actual:   $ACTUAL"
+            rm -f /tmp/cora-checksums.txt
             exit 1
-          elif [ -z "$EXPECTED" ]; then
-            echo "::warning::No checksum found for ${ASSET}-${CORA_VERSION}.tar.gz in checksums file"
           fi
+          echo "Checksum verified OK"
           rm -f /tmp/cora-checksums.txt
         else
-          echo "::warning::No checksums file found, skipping verification"
+          echo "::error::Failed to download checksums file (HTTP $CHECKSUM_HTTP) — cannot verify binary integrity"
+          rm -f /tmp/cora-checksums.txt
+          exit 1
         fi
+
         tar xzf /tmp/cora.tar.gz -C /usr/local/bin cora
         rm -f /tmp/cora.tar.gz
         chmod +x /usr/local/bin/cora

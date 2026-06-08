@@ -50,9 +50,108 @@ Stream results as they come in from the LLM.
 $ cora review --staged --stream
 ```
 
-## 06 — GitHub Actions CI
+## 06 — GitHub Actions CI (Recommended)
 
-Add cora to your CI pipeline.
+The easiest way to add cora to your PR workflow. This reusable action installs cora, runs the review, posts a PR comment with findings, and optionally uploads SARIF to GitHub Code Scanning.
+
+### Setup
+
+1. Add these secrets to your repository (**Settings → Secrets and variables → Actions**):
+
+| Secret | Description | Example |
+|--------|-------------|---------|
+| `CORA_API_KEY` | Your LLM API key | `sk-...` |
+| `CORA_BASE_URL` | LLM API base URL (optional) | `https://api.openai.com/v1` |
+| `CORA_MODEL` | LLM model ID (optional) | `gpt-4o-mini` |
+
+2. Create the workflow file:
+
+```yaml
+# .github/workflows/cora-review.yml
+name: Cora AI Code Review
+
+on:
+  pull_request_target:
+    branches: [main, develop]
+    types: [opened, synchronize, ready_for_review, reopened]
+
+concurrency:
+  group: cora-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  cora-review:
+    name: Cora Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run Cora AI Code Review
+        uses: codecoradev/cora-cli/.github/actions/cora-review@v0.4.6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cora-api-key: ${{ secrets.CORA_API_KEY }}
+          cora-base-url: ${{ secrets.CORA_BASE_URL }}
+          cora-model: ${{ secrets.CORA_MODEL }}
+```
+
+### Options
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `base-branch` | `origin/develop` | Base branch to compare against |
+| `severity` | `major` | Minimum severity to report (`info`, `minor`, `major`, `critical`) |
+| `cora-version` | `latest` | Pin a specific version (e.g., `v0.4.6`) |
+| `upload-sarif` | `true` | Upload findings to GitHub Code Scanning |
+
+### Custom Configuration
+
+Add a `.cora.yaml` to your project root to customize review behavior:
+
+```yaml
+# .cora.yaml
+focus:
+  - security
+  - bugs
+  - performance
+
+rules:
+  - No unwrap() in production code
+  - All public functions must have error handling
+
+ignore:
+  files:
+    - "vendor/**"
+    - "**/*.generated.*"
+  rules:
+    - "style"
+```
+
+### How It Works
+
+The action automatically:
+
+1. **Resolves** the latest cora-cli version from GitHub releases
+2. **Downloads** the binary with retry + checksum verification
+3. **Runs** `cora review` on the PR diff
+4. **Posts** a formatted comment on the PR with findings
+5. **Uploads** SARIF results to GitHub Code Scanning (optional)
+6. **Fails** the job if blocking issues (severity ≥ `major`) are found
+
+### Minimal Setup (No Action)
+
+If you prefer to run cora directly without the reusable action:
 
 ```yaml
 # .github/workflows/cora-review.yml
@@ -69,15 +168,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Run AI code review
+      - name: Install and run cora
         env:
           CORA_API_KEY: ${{ secrets.CORA_API_KEY }}
-          CORA_BASE_URL: ${{ secrets.CORA_BASE_URL }}
-          CORA_MODEL: ${{ secrets.CORA_MODEL }}
         run: |
-          # Install cora — pin version with CORA_VERSION=v0.4.5 for reproducibility
           curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
-          cora review --base main --format sarif
+          cora review --base origin/main --format sarif
 ```
 
 ## 07 — Pre-commit Hook
