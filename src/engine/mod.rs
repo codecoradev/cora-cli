@@ -3,6 +3,7 @@ pub mod cache;
 pub mod context;
 pub mod diff_parser;
 pub mod llm;
+pub mod quality_gate;
 pub mod review;
 pub mod rules;
 pub mod scanner;

@@ -17,6 +17,8 @@ pub struct Config {
     pub ignore: IgnoreConfig,
     /// Hook configuration.
     pub hook: HookConfig,
+    /// Quality gate configuration.
+    pub quality_gate: crate::engine::quality_gate::QualityGateConfig,
     /// Output configuration.
     pub output: OutputConfig,
     /// Response format for LLM API calls ("none" or "`json_object`").
@@ -108,6 +110,7 @@ impl Default for Config {
                 max_diff_size: 5 * 1024 * 1024,
                 on_violation: "warn".to_string(),
             },
+            quality_gate: crate::engine::quality_gate::QualityGateConfig::default(),
             output: OutputConfig {
                 format: "pretty".to_string(),
                 color: true,
@@ -157,6 +160,8 @@ pub struct CoraFile {
     pub ignore: Option<IgnoreSection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hook: Option<HookSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quality_gate: Option<crate::engine::quality_gate::QualityGateConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<OutputSection>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -384,6 +389,9 @@ impl CoraFile {
             if let Some(v) = &h.on_violation {
                 config.hook.on_violation.clone_from(v);
             }
+        }
+        if let Some(qg) = &self.quality_gate {
+            config.quality_gate = qg.clone();
         }
         if let Some(o) = &self.output {
             if let Some(v) = &o.format {
