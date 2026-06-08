@@ -3,13 +3,13 @@
 //! Produces a definitive PASS/FAIL result that CI can use to gate merges.
 //! Inspired by SonarQube Quality Gates.
 
-use crate::engine::Severity;
 use crate::engine::ReviewIssue;
+use crate::engine::Severity;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Quality gate configuration — parsed from `.cora.yaml` under `quality_gate`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct QualityGateConfig {
     /// Enable quality gate evaluation.
     #[serde(default)]
@@ -22,16 +22,6 @@ pub struct QualityGateConfig {
     /// Per-category action overrides.
     #[serde(default)]
     pub categories: HashMap<String, CategoryConfig>,
-}
-
-impl Default for QualityGateConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            thresholds: ThresholdConfig::default(),
-            categories: HashMap::new(),
-        }
-    }
 }
 
 /// Global threshold configuration.
@@ -237,9 +227,10 @@ pub fn evaluate(issues: &[ReviewIssue], config: &QualityGateConfig) -> GateResul
 
     // Determine overall status:
     // FAIL if any "block" category or global threshold is exceeded
-    let status = if checks.iter().any(|c| {
-        !c.passed && c.action.as_deref() != Some("warn")
-    }) {
+    let status = if checks
+        .iter()
+        .any(|c| !c.passed && c.action.as_deref() != Some("warn"))
+    {
         GateStatus::Fail
     } else {
         GateStatus::Pass
@@ -270,10 +261,7 @@ pub fn format_gate_output(result: &GateResult) -> String {
         "\n{}\n",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed()
     ));
-    out.push_str(&format!(
-        "  {}\n",
-        "QUALITY GATE RESULT".cyan().bold()
-    ));
+    out.push_str(&format!("  {}\n", "QUALITY GATE RESULT".cyan().bold()));
     out.push_str(&format!(
         "{}\n",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed()
@@ -288,10 +276,7 @@ pub fn format_gate_output(result: &GateResult) -> String {
     ));
 
     if !result.checks.is_empty() {
-        out.push_str(&format!(
-            "\n  {}\n",
-            "Threshold Checks:".white().bold()
-        ));
+        out.push_str(&format!("\n  {}\n", "Threshold Checks:".white().bold()));
         for check in &result.checks {
             let icon = if check.passed { "✅" } else { "❌" };
             let status_label = if check.passed {
@@ -446,10 +431,7 @@ mod tests {
         // "style" is ignored, but critical still fails (max_critical = 0)
         assert_eq!(result.status, GateStatus::Fail);
         // The category check should not appear in results
-        assert!(!result
-            .checks
-            .iter()
-            .any(|c| c.name == "category:style"));
+        assert!(!result.checks.iter().any(|c| c.name == "category:style"));
     }
 
     #[test]
