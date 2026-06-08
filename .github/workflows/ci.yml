@@ -76,23 +76,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release
 
-  # ── Website ──
-  website-lint:
-    name: Website Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: website/package-lock.json
-      - run: npm ci
-        working-directory: website
-      - run: npx svelte-check --tsconfig ./tsconfig.json --output human
-        working-directory: website
-
-  website-build:
+  # ── Docs (VitePress) ──
+  docs-build:
     name: Website Build
     runs-on: ubuntu-latest
     steps:
@@ -101,14 +86,14 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache-dependency-path: docs/package-lock.json
       - run: npm ci
-        working-directory: website
-      - run: npm run build
-        working-directory: website
+        working-directory: docs
+      - run: npm run docs:build
+        working-directory: docs
       - name: Verify build output
         run: |
-          if [ ! -d "website/build" ] || [ -z "$(ls -A website/build)" ]; then
+          if [ ! -d "docs/.vitepress/dist" ] || [ -z "$(ls -A docs/.vitepress/dist)" ]; then
             echo "::error::Build output is empty or missing."
             exit 1
           fi
@@ -123,9 +108,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache-dependency-path: docs/package-lock.json
       - run: npm audit --audit-level=moderate || true
-        working-directory: website
+        working-directory: docs
 
   cargo-outdated:
     name: Cargo Outdated
