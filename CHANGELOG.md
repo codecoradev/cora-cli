@@ -5,6 +5,31 @@ All notable changes to cora-cli are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-08
+
+### Added
+
+- **Quality Gate** — configurable threshold-based PASS/FAIL for CI enforcement (#205)
+  - Global thresholds: `max_critical`, `max_major`, `max_minor`, `max_security`
+  - Per-category overrides: `block`, `warn`, `ignore` actions
+  - Terminal-formatted gate output with status table
+  - Exit code 2 on gate failure
+  - 12 unit tests covering all gate scenarios
+- **Diff chunker module** — `src/engine/chunker.rs` for splitting large diffs (#188, integration pending #228)
+- **Multi-platform CI docs** — Gitea/Forgejo, GitLab CI, Bitbucket Pipelines workflow examples (#225)
+
+### Changed
+
+- **README links** — all documentation links now point to `codecora.dev` instead of relative file paths
+- **CI workflows** — removed stale SvelteKit `website/` jobs, replaced with VitePress `docs/` build
+- **13 stale issues closed** — migration epics, website tasks, v0.4 leftovers
+- **15 stale branches deleted** — cleanup after merge
+
+### Removed
+
+- **SvelteKit `website/`** — 6,286 lines removed, replaced by VitePress `docs/`
+- **`Website Lint` CI job** — removed from required status checks
+
 ## [0.4.7] - 2026-06-08
 
 ### Changed

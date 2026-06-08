@@ -69,6 +69,17 @@ cora init  # creates .cora.yaml + installs pre-commit hook
 provider: zai
 model: glm-5.1
 focus: [security, bugs]
+
+# Quality gate — enforce code quality in CI
+quality_gate:
+  enabled: true
+  thresholds:
+    max_critical: 0     # 0 critical = gate FAIL
+    max_security: 0     # 0 security findings = gate FAIL
+  categories:
+    performance:
+      action: warn      # warn only, don't fail CI
+      max_findings: 5
 ```
 
 ```bash
@@ -83,7 +94,7 @@ cora config show --project # .cora.yaml
 | `~/.cora/config.yaml` | Global defaults (provider, model, etc.) |
 | `.cora.yaml` | Per-project overrides |
 
-See **[Configuration →](docs/configuration.md)** for full reference.
+See **[Configuration →](https://codecora.dev/configuration.html)** for full reference.
 
 ## CI/CD
 
@@ -108,7 +119,7 @@ Required secrets: `CORA_API_KEY`, `CORA_BASE_URL` (optional), `CORA_MODEL` (opti
 
 See [GitHub Marketplace](https://github.com/marketplace/actions/cora-ai-code-review) for full documentation.
 
-Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](docs/examples.md#07--gitea--forgejo-ci)
+Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](https://codecora.dev/examples.html#_07-gitea-forgejo-ci)
 
 ## Commands
 
@@ -122,7 +133,7 @@ Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](docs/examples.m
 | `cora providers` | List available LLM providers |
 | `cora hook install` | Install pre-commit hook |
 
-See **[CLI Reference →](docs/cli-reference.md)** for all flags and examples.
+See **[CLI Reference →](https://codecora.dev/cli-reference.html)** for all flags and examples.
 
 ## Environment Variables
 
@@ -139,12 +150,13 @@ Provider-specific keys are auto-detected: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
 
 | Page | Description |
 |------|-------------|
-| [Getting Started](docs/getting-started.md) | Install, auth, first review |
-| [Configuration](docs/configuration.md) | Config files, env vars, priority |
-| [CLI Reference](docs/cli-reference.md) | All commands and flags |
-| [Providers](docs/providers.md) | Supported LLM providers |
-| [Examples](docs/examples.md) | Common workflows |
-| [Roadmap](docs/roadmap.md) | Planned features |
+| [Getting Started](https://codecora.dev/getting-started.html) | Install, auth, first review |
+| [Configuration](https://codecora.dev/configuration.html) | Config files, env vars, priority |
+| [CLI Reference](https://codecora.dev/cli-reference.html) | All commands and flags |
+| [Providers](https://codecora.dev/providers.html) | Supported LLM providers |
+| [Examples](https://codecora.dev/examples.html) | Common workflows & CI setup |
+| [Changelog](https://codecora.dev/changelog.html) | Release history |
+| [Roadmap](https://codecora.dev/roadmap.html) | Planned features |
 
 ## Contributing
 
