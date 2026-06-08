@@ -176,7 +176,163 @@ jobs:
           cora review --base origin/main --format sarif
 ```
 
-## 07 — Pre-commit Hook
+## 07 — Gitea / Forgejo CI
+
+cora works on any CI platform that runs Linux. For Gitea and Forgejo, use the binary directly:
+
+```yaml
+# .gitea/workflows/cora-review.yml
+name: Cora AI Code Review
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  cora-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install cora-cli
+        run: |
+          VERSION=$(curl -sf https://api.github.com/repos/codecoradev/cora-cli/releases/latest | jq -r '.tag_name')
+          curl -sfL "https://github.com/codecoradev/cora-cli/releases/download/${VERSION}/cora-cli-x86_64-unknown-linux-gnu.tar.gz" | tar xz
+          sudo mv cora /usr/local/bin/
+
+      - name: Run review
+        env:
+          CORA_API_KEY: ${{ secrets.CORA_API_KEY }}
+          CORA_BASE_URL: ${{ secrets.CORA_BASE_URL }}
+          CORA_MODEL: ${{ secrets.CORA_MODEL }}
+        run: |
+          cora review --base origin/${{ github.base_ref }} --format markdown > review.md
+
+      - name: Post PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('review.md', 'utf8');
+            if (body.trim()) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
+```
+
+### Gitea Secrets
+
+Add these under **Settings → Actions → Secrets**:
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `CORA_API_KEY` | ✅ Yes | Your LLM API key |
+| `CORA_BASE_URL` | No | LLM API base URL |
+| `CORA_MODEL` | No | LLM model ID |
+
+> **Note:** SARIF upload is GitHub-specific and not available on Gitea. Use `--format markdown` instead.
+
+## 08 — GitLab CI
+
+```yaml
+# .gitlab-ci.yml
+cora-review:
+  stage: test
+  image: rust:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - VERSION=$(curl -sf https://api.github.com/repos/codecoradev/cora-cli/releases/latest | jq -r '.tag_name')
+    - curl -sfL "https://github.com/codecoradev/cora-cli/releases/download/${VERSION}/cora-cli-x86_64-unknown-linux-gnu.tar.gz" | tar xz
+    - mv cora /usr/local/bin/
+  script:
+    - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - cora review --base origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME --format markdown > review.md
+  after_script:
+    - |
+      if [ -s review.md ]; then
+        BODY=$(cat review.md)
+        curl -sf -X POST \
+          -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"body\": $(echo "$BODY" | jq -Rs .)}" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
+      fi
+  variables:
+    CORA_API_KEY: $CORA_API_KEY  # Define in CI/CD Variables
+```
+
+### GitLab Variables
+
+Add under **Settings → CI/CD → Variables**:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CORA_API_KEY` | ✅ Yes | Your LLM API key |
+| `CORA_BASE_URL` | No | LLM API base URL |
+| `CORA_MODEL` | No | LLM model ID |
+| `GITLAB_TOKEN` | ✅ Yes | Personal access token with `api` scope (for posting MR comments) |
+
+## 09 — Bitbucket Pipelines
+
+```yaml
+# bitbucket-pipelines.yml
+pipelines:
+  pull-requests:
+    '**':
+      - step:
+          name: Cora AI Code Review
+          image: rust:latest
+          script:
+            - apt-get update && apt-get install -y jq
+            - |
+              VERSION=$(curl -sf https://api.github.com/repos/codecoradev/cora-cli/releases/latest | jq -r '.tag_name')
+              curl -sfL "https://github.com/codecoradev/cora-cli/releases/download/${VERSION}/cora-cli-x86_64-unknown-linux-gnu.tar.gz" | tar xz
+              mv cora /usr/local/bin/
+            - git fetch origin $BITBUCKET_PR_DESTINATION_BRANCH
+            - cora review --base origin/$BITBUCKET_PR_DESTINATION_BRANCH --format markdown > review.md
+            - |
+              if [ -s review.md ]; then
+                BODY=$(cat review.md | jq -Rs .)
+                curl -sf -X POST \
+                  -H "Authorization: Bearer ${BB_AUTH_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"content\": {\"raw\": $BODY}}" \
+                  "https://api.bitbucket.org/2.0/repositories/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO_SLUG}/pullrequests/${BITBUCKET_PR_ID}/comments"
+              fi
+```
+
+### Bitbucket Variables
+
+Add under **Repository settings → Pipelines → Repository variables**:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CORA_API_KEY` | ✅ Yes | Your LLM API key |
+| `CORA_BASE_URL` | No | LLM API base URL |
+| `CORA_MODEL` | No | LLM model ID |
+| `BB_AUTH_TOKEN` | ✅ Yes | App password with `pullrequests:write` scope |
+
+## 10 — Platform Comparison
+
+| Feature | GitHub | Gitea / Forgejo | GitLab | Bitbucket |
+|---------|--------|-----------------|--------|-----------|
+| Marketplace action | ✅ Plug & play | ❌ | ❌ | ❌ |
+| Binary install | ✅ | ✅ | ✅ | ✅ |
+| Auto PR comment | ✅ Built-in | ✅ Via API | ✅ Via API | ✅ Via API |
+| SARIF upload | ✅ Code Scanning | ❌ | ❌ | ❌ |
+| Config file | `.cora.yaml` | `.cora.yaml` | `.cora.yaml` | `.cora.yaml` |
+| Secrets setup | Repo secrets | Repo secrets | CI/CD variables | Repo variables |
+
+> **Tip:** On all platforms, `cora review` works the same. The only difference is how you install the binary and post the comment back to the PR/MR.
+
+## 11 — Pre-commit Hook
 
 Install once, then every commit gets reviewed automatically.
 
@@ -190,7 +346,7 @@ cora pre-commit hook running...
 No issues found — commit allowed
 ```
 
-## 08 — SARIF Upload
+## 12 — SARIF Upload
 
 Generate SARIF output and upload to GitHub Code Scanning.
 

@@ -108,6 +108,8 @@ Required secrets: `CORA_API_KEY`, `CORA_BASE_URL` (optional), `CORA_MODEL` (opti
 
 See [GitHub Marketplace](https://github.com/marketplace/actions/cora-ai-code-review) for full documentation.
 
+Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](docs/examples.md#07--gitea--forgejo-ci)
+
 ## Commands
 
 | Command | Description |
