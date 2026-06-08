@@ -4,6 +4,7 @@ use tracing::debug;
 
 use crate::config::schema::Config;
 use crate::engine::Severity;
+use crate::engine::quality_gate;
 use crate::formatters::{OutputFormat, formatter_for};
 use crate::git;
 use crate::progress::{ProgressReporter, TokenInfo, diff_stats};
@@ -201,10 +202,24 @@ pub async fn execute_review(
 
     // 7. Format output
     let formatter = formatter_for(format);
-    let output = formatter.format_review(&filtered_response)?;
+    let mut output = formatter.format_review(&filtered_response)?;
 
-    // 8. Return exit code
-    let exit_code = if opts.ci {
+    // 8. Quality gate evaluation
+    let gate_result = if config.quality_gate.enabled {
+        let result = quality_gate::evaluate(&filtered_response.issues, &config.quality_gate);
+        output.push_str(&quality_gate::format_gate_output(&result));
+        Some(result)
+    } else {
+        None
+    };
+
+    // 9. Return exit code
+    let exit_code = if gate_result
+        .as_ref()
+        .is_some_and(|g| g.status == quality_gate::GateStatus::Fail)
+    {
+        EXIT_BLOCKED
+    } else if opts.ci {
         // CI mode: hard gate — any finding blocks
         if !filtered_response.issues.is_empty() {
             EXIT_BLOCKED
@@ -217,7 +232,7 @@ pub async fn execute_review(
         EXIT_OK
     };
 
-    // 9. Emit complete event
+    // 10. Emit complete event
     if progress.is_enabled() {
         let tokens = response
             .tokens_used
