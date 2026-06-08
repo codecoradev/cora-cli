@@ -152,6 +152,73 @@ cora uses two mechanisms to prevent the LLM from fabricating findings:
 - **File path injection** — Actual file paths are embedded in the prompt, anchoring the LLM to real files in the diff.
 - **Post-parse filtering** — After parsing, any reported file paths or line numbers that don't exist in the actual diff are discarded.
 
+## Quality Gate
+
+Quality gate evaluates review findings against configurable thresholds to produce a **PASS/FAIL** result. This is useful for CI enforcement — block merges when code quality drops below your standards.
+
+```yaml
+quality_gate:
+  enabled: true
+
+  # Global thresholds — any exceeded = FAIL
+  thresholds:
+    max_critical: 0        # 0 critical issues allowed
+    max_major: 3           # max 3 major issues (disabled by default)
+    max_minor: 10          # max 10 minor issues (disabled by default)
+    max_security: 0        # 0 security findings allowed
+
+  # Per-category overrides
+  categories:
+    security:
+      action: block        # block = any finding → CI fail
+      max_findings: 0
+    performance:
+      action: warn         # warn = comment only, don't fail CI
+      max_findings: 5
+    bug_risk:
+      action: block
+      max_findings: 3
+    style:
+      action: ignore       # skip entirely — don't count toward gate
+```
+
+### How It Works
+
+1. After review, findings are counted by severity and category
+2. Each threshold is checked against actual counts
+3. Category actions determine enforcement:
+   - **block** — exceed threshold = gate FAIL (exit code 2)
+   - **warn** — report but don't fail gate
+   - **ignore** — skip entirely
+4. Overall gate status: **PASSED** or **FAILED**
+
+### CLI Output
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QUALITY GATE RESULT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Status:   ❌ FAILED
+  Findings: 2 critical, 1 major, 4 minor, 0 info
+
+  Threshold Checks:
+  ❌ max_critical          → 2 found   ❌ EXCEEDED
+  ✅ max_major             → 1 found   ✅ OK
+  ✅ max_security          → 0 found   ✅ OK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|----------|
+| 0 | Gate passed, no issues |
+| 2 | Gate failed (threshold exceeded) |
+
+### Default Behavior
+
+When `quality_gate.enabled` is `false` (default), quality gate is skipped. The existing `--ci` flag and `hook.on_violation` settings continue to work as before.
+
 ## Secrets Pre-Scan
 
 cora runs a deterministic secrets scan before the AI review. 12 built-in patterns detect leaked credentials:
