@@ -1,31 +1,54 @@
----
-title: Changelog
----
-
 # Changelog
 
-For the full changelog, see the [repository](https://github.com/codecoradev/cora-cli/blob/develop/CHANGELOG.md).
+All notable changes to cora-cli are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.4.7] - 2026-06-08
+
+### Changed
+
+- **CI action moved to GitHub Marketplace** — published as [`codecoradev/cora-review-action@v1`](https://github.com/marketplace/actions/cora-ai-code-review)
+- **Internal composite action removed** — workflow now uses marketplace action instead of `.github/actions/cora-review/`
+- **`cora-review-simple` removed** — unused duplicate action deleted
+
+### Fixed
+
+- **Download hardening** — 5x retry with exponential backoff, gzip validation, checksum verification for cora-cli binary download in CI (#221)
+- **curl hardening** — `--fail --show-error` + `set -e` guard prevents silent HTML downloads
+- **Checksum enforcement** — hard fail on missing/invalid checksums (was warning-only)
+- **Exact checksum match** — `awk` exact filename lookup replaces `grep` substring match
+
+### Added
+
+- **Improved review prompt** — better consistency, lower false-negative rate, explicit error handling focus area
+- **Comprehensive docs/examples.md** — GitHub Actions section with setup guide, inputs reference, and provider table
 
 ## [0.4.6] - 2026-06-07
 
 ### Changed
 
-- **README redesigned** — 568 → 148 lines, professional layout with star badge and docs index (#162)
-- **All docs updated** — changelog, getting-started, usage, roadmap, examples, installation
+- **README redesigned** — 568 → 148 lines, professional layout with star badge, docs index table, links to docs/ for details (#162)
+- **All docs updated for v0.4.5+** — changelog, getting-started, usage, roadmap, examples, installation
 
 ### Added
 
-- **Deterministic secrets pre-scan** — 12 built-in patterns (AWS, GitHub, OpenAI, Anthropic, Groq, xAI, Slack, Stripe, Google, JWT, Private Key) (#204)
-  - Masked output, auto-skip test files, injected into LLM context
-  - Fallback blocks on critical findings when LLM fails
-- **Diff parser hardening** — hunk line count validation, broader binary detection, truncated diff handling (#195 Phase 1)
-- **`.agent.md` release checklist** — prevents docs drift between versions
+- **Deterministic secrets pre-scan** — 12 built-in patterns (AWS, GitHub, OpenAI, Anthropic, Groq, xAI, Slack, Stripe, Google, JWT, Private Key) run before AI review (#204)
+  - Masked output: `AKIA****CDEF` (first 4 + last 4 chars shown)
+  - Auto-skip test/spec/fixture/mock/example files
+  - Secrets findings injected into LLM context for consistent summary
+  - Fallback path blocks on critical findings even when LLM fails
+- **Diff parser hardening** — hunk line count validation, broader binary detection (GIT binary patch, singular form), graceful truncated diff handling (#195 Phase 1)
+- **`.agent.md` release checklist** — pre-release checklist to prevent docs drift between versions
 
 ### Fixed
 
-- `cora config show` flags documented in cli-reference.md
-- `cora auth login` path corrected in cli-reference.md
-- CI example includes all required secrets
+- `cora config show --global` / `--project` documented in cli-reference.md (was missing)
+- `cora auth login` path corrected from `config.toml` to `auth.toml` in cli-reference.md
+- CI example in docs now includes CORA_BASE_URL and CORA_MODEL secrets
+
+## [Unreleased]
 
 ## [0.4.5] - 2026-06-07
 
@@ -37,23 +60,25 @@ For the full changelog, see the [repository](https://github.com/codecoradev/cora
   - `.cora.yaml` (project) overrides global config per-project
   - `CORA_API_KEY` env var reserved for CI use only
 - **Provider info auto-migration** — if `auth.toml` still contains provider/model/base_url, automatically moved to `config.yaml` on first run
-- **Deterministic rules** — `rules/` added to default exclude paths (#185)
+- **Deterministic rules** — `rules/` added to default exclude paths, preventing rules from matching their own source definitions (#185)
 
 ### Fixed
 
-- **`cora config show`** — displays effective resolved config with source annotations (#189)
-- **`cora config show --global`** — new flag to show only `~/.cora/config.yaml`
-- **`cora config show --project`** — new flag to show only `.cora.yaml`
-- **`cora review` sends to wrong provider** — provider info now correctly read from merged config (#209)
-- **`save_provider_info` data loss** — parse failure on `config.yaml` no longer silently replaces file
-- **`cora auth login` interactive flow** — auto-detects provider env vars, suggests model/base URL defaults (#203)
-- **Env var override visibility** — `cora config show` annotates values from env vars (#182)
-- **Truncated JSON repair tests** — 12 new tests for `repair_truncated_json()` (#186)
+- **`cora config show`** — now displays the **effective resolved config** with source annotations like `[from: env CORA_PROVIDER]` instead of raw file values (#189)
+- **`cora config show --global`** — new flag to show only `~/.cora/config.yaml` contents
+- **`cora config show --project`** — new flag to show only `.cora.yaml` contents (mutually exclusive with `--global`)
+- **`cora review` sends to wrong provider** — provider info from `auth.toml`/`config.yaml` was ignored at runtime, always defaulting to OpenAI. Now correctly reads from merged config (#209)
+- **`save_provider_info` data loss** — parse failure on `config.yaml` no longer silently replaces the entire file with defaults (now returns error)
+- **`cora auth login` interactive flow** — now auto-detects provider env vars (e.g. pick ZAI → detects `ZAI_API_KEY`), suggests model and base URL defaults from presets (enter to accept) (#203)
+- **`cora auth login --provider zai`** — now auto-detects `ZAI_API_KEY` from environment, no need for `--api-key` flag (#184)
+- **Env var override visibility** — `cora config show` now annotates which values come from env vars vs config files (#182)
+- **Truncated JSON repair tests** — 12 new tests confirming `repair_truncated_json()` works correctly for all edge cases (#186)
 
 ### Added
 
-- **`--global` / `--project` flags** on `cora config show` for scoped inspection
-- **Interactive model/base URL prompts** — during `cora auth login`, shows preset defaults
+- **`--global` / `--project` flags** on `cora config show` for scoped config inspection
+- **Clap `conflicts_with`** on `--global`/`--project` — `cora config show --global --project` now rejected at CLI level
+- **Interactive model/base URL prompts** — during `cora auth login`, shows preset defaults and allows override with enter-to-accept
 
 ## [0.4.4] - 2026-06-06
 
@@ -192,7 +217,7 @@ For the full changelog, see the [repository](https://github.com/codecoradev/cora
 
 ### Changed
 
-- **Official CodeCora branding assets** — logo, favicon, and OG image updated from cora SaaS repo (#110)
+- **Official CodeCora branding assets** — logo, favicon, and OG image updated from ajianaz/cora SaaS repo (#110)
 - **Standalone `cora-review.yml` workflow** — CI action extracted from inline `ci.yml` job to dedicated workflow with concurrency control (#107)
 - **Action v2 hardened** — all third-party actions pinned to commit SHA, checksum verification for binary downloads, env var indirection for inputs, `grep` pipefail fix, empty file guard, Node 24 strict mode compatibility (#107)
 
@@ -293,8 +318,8 @@ For the full changelog, see the [repository](https://github.com/codecoradev/cora
 ### Added
 
 - `cora init` — create `.cora.yaml` config file with provider/model selection
-- `cora hook install\|uninstall` — pre-commit hook management
-- `cora config show\|set` — configuration management
+- `cora hook install|uninstall` — pre-commit hook management
+- `cora config show|set` — configuration management
 - CI composite action (`cora-review-simple`) for easy GitHub Actions integration
 - Shell completions for bash, zsh, fish, and powershell
 - `cora scan --incremental` with SHA256 content hash cache for fast incremental scanning
@@ -347,3 +372,23 @@ For the full changelog, see the [repository](https://github.com/codecoradev/cora
 - **Ignore Rules** — file patterns and rule-level exclusions
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
+
+[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.4.6...develop
+[0.4.6]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
+[0.4.5]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...v0.4.5
+[0.4.4]: https://github.com/codecoradev/cora-cli/compare/v0.4.3...v0.4.4
+[0.4.3]: https://github.com/codecoradev/cora-cli/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/codecoradev/cora-cli/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/codecoradev/cora-cli/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/codecoradev/cora-cli/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/codecoradev/cora-cli/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/codecoradev/cora-cli/compare/v0.1.8...v0.2.0
+[0.1.8]: https://github.com/codecoradev/cora-cli/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/codecoradev/cora-cli/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/codecoradev/cora-cli/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/codecoradev/cora-cli/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/codecoradev/cora-cli/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/codecoradev/cora-cli/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/codecoradev/cora-cli/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/codecoradev/cora-cli/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/codecoradev/cora-cli/releases/tag/v0.1.0

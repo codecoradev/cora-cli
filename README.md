@@ -87,6 +87,8 @@ See **[Configuration →](docs/configuration.md)** for full reference.
 
 ## CI/CD
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Cora%20AI%20Code%20Review-blue?logo=github)](https://github.com/marketplace/actions/cora-ai-code-review)
+
 ```yaml
 # .github/workflows/cora-review.yml
 on: pull_request
@@ -96,12 +98,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: ./.github/actions/cora-review
+      - uses: codecoradev/cora-review-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          cora-api-key: ${{ secrets.CORA_API_KEY }}
 ```
 
-Required secrets: `CORA_API_KEY`, `CORA_BASE_URL`, `CORA_MODEL`
+Required secrets: `CORA_API_KEY`, `CORA_BASE_URL` (optional), `CORA_MODEL` (optional)
+
+See [GitHub Marketplace](https://github.com/marketplace/actions/cora-ai-code-review) for full documentation.
 
 ## Commands
 
