@@ -1,0 +1,57 @@
+name: rust-strict
+description: "Rust-specific: unsafe, unwrap, panic, lifetime, error handling, idiomatic patterns"
+version: "1.0"
+
+focus_areas:
+  - id: unsafe_usage
+    weight: 10
+    action: block
+    rules:
+      - "No unsafe blocks without a safety comment explaining why it's sound"
+      - "Check for undefined behavior: dangling pointers, aliasing violations, data races"
+      - "Validate all unsafe operations — raw pointer derefs, transmute, from_raw_parts"
+
+  - id: error_handling
+    weight: 9
+    action: warn
+    rules:
+      - "No unwrap() or expect() in production code paths — use ? operator or match"
+      - "No panic! in library code — return Result"
+      - "Use thiserror or anyhow for error types — don't use Box<dyn Error>"
+      - "Propagate errors with context using .with_context()? or .map_err()?"
+
+  - id: idiomatic_rust
+    weight: 7
+    action: warn
+    rules:
+      - "Use iterators and functional combinators instead of manual loops where appropriate"
+      - "Prefer &str over String for function parameters when ownership not needed"
+      - "Use Cow<str> for functions that sometimes need owned strings"
+      - "Implement From/Into for type conversions"
+      - "Use lifetimes explicitly when needed — don't overuse 'static"
+
+  - id: ownership
+    weight: 8
+    action: warn
+    rules:
+      - "Avoid unnecessary .clone() — use references or Arc where possible"
+      - "Check for reference cycles with Rc/Arc (use Weak for cyclic structures)"
+      - "Don't return references to local variables"
+
+  - id: concurrency
+    weight: 7
+    action: warn
+    rules:
+      - "Use Send + Sync bounds correctly"
+      - "Prefer message passing (channels) over shared state (Mutex)"
+      - "Check for potential deadlocks with Mutex ordering"
+
+ignore_areas:
+  - documentation
+  - formatting
+
+review_style:
+  tone: strict
+  detail_level: high
+  suggest_fixes: true
+  max_findings: null

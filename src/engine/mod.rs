@@ -4,6 +4,7 @@ pub mod chunker;
 pub mod context;
 pub mod diff_parser;
 pub mod llm;
+pub mod profiles;
 pub mod quality_gate;
 pub mod review;
 pub mod rules;

@@ -1,0 +1,51 @@
+name: typescript-strict
+description: "TypeScript-specific: any types, null safety, proper typing, async patterns"
+version: "1.0"
+
+focus_areas:
+  - id: type_safety
+    weight: 10
+    action: block
+    rules:
+      - "No any types — use unknown, generics, or proper interfaces"
+      - "No non-null assertions (!) without clear justification"
+      - "Avoid type: ignore or @ts-ignore — fix the type error instead"
+      - "Use discriminated unions instead of optional properties for state"
+
+  - id: null_safety
+    weight: 9
+    action: warn
+    rules:
+      - "Always check for null/undefined before accessing properties"
+      - "Use optional chaining (?.) and nullish coalescing (??) appropriately"
+      - "Don't use truthy/falsy checks for null — use === null or == null explicitly"
+
+  - id: async_patterns
+    weight: 8
+    action: warn
+    rules:
+      - "Always await Promises — no floating promises"
+      - "Handle promise rejections with try/catch or .catch()"
+      - "Use Promise.all for concurrent operations, not sequential awaits"
+      - "Avoid async constructors — use factory pattern instead"
+      - "Watch for race conditions in concurrent state mutations"
+
+  - id: best_practices
+    weight: 7
+    action: warn
+    rules:
+      - "Use const by default, let only when reassignment needed — never var"
+      - "Prefer interfaces over type aliases for object shapes"
+      - "Use enum or const objects for fixed value sets"
+      - "Export types and interfaces from barrel files"
+      - "Use satisfies operator for type checking without widening"
+
+ignore_areas:
+  - documentation
+  - formatting
+
+review_style:
+  tone: standard
+  detail_level: high
+  suggest_fixes: true
+  max_findings: null

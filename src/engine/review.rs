@@ -167,6 +167,19 @@ async fn review_diff_inner(
         combined_context
     };
 
+    // Inject profile instructions into the context
+    let final_context = match (&config.profile, final_context) {
+        (Some(profile), Some(ctx)) => {
+            let profile_prompt = crate::engine::profiles::build_profile_prompt(profile);
+            Some(format!("## Quality Profile\n{profile_prompt}\n\n{ctx}"))
+        }
+        (Some(profile), None) => {
+            let profile_prompt = crate::engine::profiles::build_profile_prompt(profile);
+            Some(format!("## Quality Profile\n{profile_prompt}"))
+        }
+        (None, ctx) => ctx,
+    };
+
     // Call LLM — but preserve deterministic rule findings even on LLM failure
     let llm_result: Result<ReviewResponse, CoraError> = if stream {
         llm::review_diff_stream(

@@ -1,0 +1,51 @@
+name: clean-code
+description: "Broad quality — readability, naming, complexity — best for team projects"
+version: "1.0"
+
+focus_areas:
+  - id: readability
+    weight: 8
+    action: warn
+    rules:
+      - "Functions should do one thing — flag long functions (>50 lines)"
+      - "Use descriptive names — avoid single-letter vars (except loop counters)"
+      - "Avoid magic numbers — extract to named constants"
+      - "Keep nesting depth reasonable (max 3-4 levels)"
+
+  - id: complexity
+    weight: 7
+    action: warn
+    rules:
+      - "Flag high cyclomatic complexity — too many branches in one function"
+      - "Avoid deeply nested conditionals — use early returns or guard clauses"
+      - "Break large modules into focused submodules"
+
+  - id: error_handling
+    weight: 8
+    action: warn
+    rules:
+      - "Handle errors explicitly — no silent swallowing or empty catch blocks"
+      - "Use appropriate error types — don't return generic errors everywhere"
+      - "Propagate errors with context (wrap with 'failed to X')"
+
+  - id: dry
+    weight: 6
+    action: warn
+    rules:
+      - "Flag duplicated code — suggest extraction into shared functions"
+      - "Avoid copy-paste with minor variations — parameterize instead"
+
+  - id: testing
+    weight: 5
+    action: info
+    rules:
+      - "Suggest tests for complex logic (edge cases, error paths)"
+      - "Flag untested public APIs"
+
+ignore_areas: []
+
+review_style:
+  tone: standard
+  detail_level: standard
+  suggest_fixes: true
+  max_findings: 30

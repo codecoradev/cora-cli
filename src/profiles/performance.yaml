@@ -1,0 +1,50 @@
+name: performance
+description: "Focus on speed, memory, and allocation patterns — best for hot-path code"
+version: "1.0"
+
+focus_areas:
+  - id: performance
+    weight: 10
+    action: warn
+    rules:
+      - "Avoid unnecessary allocations in hot paths — reuse buffers, pre-allocate"
+      - "Watch for O(n²) or worse complexity in loops"
+      - "Use appropriate data structures for the access pattern"
+      - "Avoid cloning large types when references suffice"
+      - "Profile before optimizing — but flag obvious bottlenecks"
+
+  - id: memory
+    weight: 9
+    action: warn
+    rules:
+      - "No memory leaks — ensure resources are freed (RAII, Drop, defer close)"
+      - "Avoid holding large data structures longer than needed"
+      - "Use streaming/chunking for large data instead of loading all into memory"
+      - "Check for unintended copies of large buffers"
+
+  - id: io_efficiency
+    weight: 8
+    action: warn
+    rules:
+      - "Avoid N+1 queries — batch database/API calls"
+      - "Use async I/O for concurrent operations, not blocking calls"
+      - "Minimize unnecessary network round-trips"
+      - "Cache expensive computations when results don't change often"
+
+  - id: concurrency
+    weight: 7
+    action: warn
+    rules:
+      - "Avoid data races in concurrent code (proper locking, atomic operations)"
+      - "Watch for deadlocks (lock ordering, timeout on lock acquisition)"
+      - "Prefer message passing over shared mutable state"
+
+ignore_areas:
+  - documentation
+  - formatting
+
+review_style:
+  tone: standard
+  detail_level: high
+  suggest_fixes: true
+  max_findings: null

@@ -47,6 +47,8 @@ pub struct Config {
     pub context_chain: crate::engine::context::types::ContextConfig,
     /// File bundling configuration for scan/review grouping.
     pub bundling: BundlingConfig,
+    /// Active quality profile (resolved from .cora.yaml).
+    pub profile: Option<crate::engine::profiles::Profile>,
 }
 
 /// Provider configuration.
@@ -128,6 +130,7 @@ impl Default for Config {
             rules_config: RulesConfig::default(),
             context_chain: crate::engine::context::types::ContextConfig::default(),
             bundling: BundlingConfig::default(),
+            profile: None,
         }
     }
 }
@@ -174,6 +177,8 @@ pub struct CoraFile {
     pub rules_engine: Option<RulesSection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bundling: Option<BundlingSection>,
+    #[serde(default)]
+    pub profile: Option<crate::engine::profiles::ProfileRef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -459,6 +464,17 @@ impl CoraFile {
             }
             if let Some(v) = b.coalesce_by_language {
                 config.bundling.coalesce_by_language = v;
+            }
+        }
+        // Resolve profile — load built-in or custom, merge into config
+        if let Some(profile_ref) = &self.profile {
+            match crate::engine::profiles::resolve_profile(profile_ref) {
+                Ok(profile) => {
+                    config.profile = Some(profile);
+                }
+                Err(e) => {
+                    tracing::warn!("failed to resolve profile: {e}");
+                }
             }
         }
     }

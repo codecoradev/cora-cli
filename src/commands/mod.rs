@@ -3,6 +3,7 @@ pub mod completion;
 pub mod config_cmd;
 pub mod hook_cmd;
 pub mod init;
+pub mod profile;
 pub mod providers;
 pub mod review;
 pub mod scan;
