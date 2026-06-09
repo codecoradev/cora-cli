@@ -4,7 +4,9 @@ use tracing::debug;
 
 use crate::config::schema::Config;
 use crate::engine::Severity;
+use crate::engine::chunker;
 use crate::engine::quality_gate;
+use crate::engine::types::ReviewResponse;
 use crate::formatters::{OutputFormat, formatter_for};
 use crate::git;
 use crate::progress::{ProgressReporter, TokenInfo, diff_stats};
@@ -40,6 +42,8 @@ pub struct ReviewOptions {
     pub no_cache: bool,
     /// CI mode: skip diff size limit, hard gate on any findings.
     pub ci: bool,
+    /// Auto-chunk large diffs into review-sized pieces.
+    pub auto_chunk: bool,
 }
 
 /// Result of a review command execution.
@@ -88,6 +92,13 @@ pub async fn execute_review(
     // 3. Validate size (skip in CI mode)
     let max_size = opts.max_diff_size.unwrap_or(config.hook.max_diff_size);
     if !opts.ci && diff.len() > max_size {
+        if opts.auto_chunk {
+            // Auto-chunk mode: split diff and review each chunk
+            return execute_chunked_review(
+                config, llm_config, opts, format, progress, &diff, max_size,
+            )
+            .await;
+        }
         if config.hook.on_violation == "disallow" {
             // Return blocked result instead of error
             return Ok(ReviewResult {
@@ -96,7 +107,7 @@ pub async fn execute_review(
                     "{}\n",
                     format!(
                         "❌ Diff too large ({} chars, max {}). Commit blocked. \
-                         Use --base to review a specific branch, increase \
+                         Use --auto-chunk to review in pieces, --base to review a specific branch, increase \
                          hook.max_diff_size, or run: git commit --no-verify",
                         diff.len(),
                         max_size
@@ -107,7 +118,7 @@ pub async fn execute_review(
             });
         }
         anyhow::bail!(
-            "Diff too large ({} chars, max {}). Use --base to review a specific branch, or increase hook.max_diff_size.",
+            "Diff too large ({} chars, max {}). Use --auto-chunk to review in pieces, --base to review a specific branch, or increase hook.max_diff_size.",
             diff.len(),
             max_size
         );
@@ -279,4 +290,238 @@ fn get_diff(opts: &ReviewOptions, _config: &Config) -> Result<String> {
             },
         }
     }
+}
+
+/// Execute a chunked review for large diffs.
+///
+/// Splits the diff into chunks, reviews each independently, then
+/// merges and deduplicates findings.
+#[allow(clippy::cast_possible_truncation)]
+async fn execute_chunked_review(
+    config: &Config,
+    llm_config: &crate::engine::LLMConfig,
+    opts: &ReviewOptions,
+    format: OutputFormat,
+    progress: &ProgressReporter,
+    diff: &str,
+    max_size: usize,
+) -> Result<ReviewResult> {
+    let chunks = chunker::chunk_diff(diff, max_size);
+
+    if chunks.is_empty() {
+        let output = format!("{}\n", "No changes to review.".yellow());
+        return Ok(ReviewResult {
+            exit_code: EXIT_OK,
+            output,
+        });
+    }
+
+    let total_chunks = chunks.len();
+    if !opts.quiet {
+        eprintln!(
+            "{}",
+            format!(
+                "📦 Diff too large ({} chars), splitting into {} chunks…",
+                diff.len(),
+                total_chunks
+            )
+            .cyan()
+        );
+    }
+
+    debug!(
+        total_chunks,
+        diff_len = diff.len(),
+        "auto-chunking large diff"
+    );
+
+    let mut all_issues: Vec<crate::engine::types::ReviewIssue> = Vec::new();
+    let mut summaries: Vec<String> = Vec::new();
+    let mut total_tokens = crate::engine::types::TokenUsage::default();
+    let mut any_error = false;
+
+    for chunk in &chunks {
+        if !opts.quiet {
+            eprintln!(
+                "{}",
+                format!(
+                    "  → Reviewing chunk {}/{} ({}, {} files)…",
+                    chunk.index + 1,
+                    chunk.total,
+                    chunk.label,
+                    chunk.file_count
+                )
+                .dimmed()
+            );
+        }
+
+        if progress.is_enabled() {
+            progress.calling_llm(&llm_config.provider, &llm_config.model);
+        }
+
+        let chunk_start = std::time::Instant::now();
+
+        match crate::engine::review::review_diff_with_cache(
+            config,
+            llm_config,
+            &chunk.diff,
+            opts.stream,
+            !opts.no_cache,
+            opts.quiet,
+        )
+        .await
+        {
+            Ok(resp) => {
+                if progress.is_enabled() {
+                    let duration_ms = chunk_start.elapsed().as_millis() as u64;
+                    let tokens = resp
+                        .tokens_used
+                        .as_ref()
+                        .map_or_else(TokenInfo::zero, TokenInfo::from_usage);
+                    progress.llm_response(&tokens, duration_ms);
+                }
+
+                // Accumulate tokens
+                if let Some(usage) = &resp.tokens_used {
+                    total_tokens.input_tokens += usage.input_tokens;
+                    total_tokens.output_tokens += usage.output_tokens;
+                    total_tokens.estimated_cost_usd += usage.estimated_cost_usd;
+                }
+
+                if !resp.summary.is_empty() {
+                    summaries.push(format!(
+                        "[Chunk {}/{} — {}] {}",
+                        chunk.index + 1,
+                        chunk.total,
+                        chunk.label,
+                        resp.summary
+                    ));
+                }
+
+                all_issues.extend(resp.issues);
+            }
+            Err(e) => {
+                if progress.is_enabled() {
+                    progress.error(&e.to_string(), "chunked_review");
+                }
+                any_error = true;
+                if !opts.quiet {
+                    eprintln!(
+                        "  {}",
+                        format!(
+                            "⚠️  Chunk {}/{} failed: {}",
+                            chunk.index + 1,
+                            chunk.total,
+                            e
+                        )
+                        .yellow()
+                    );
+                }
+            }
+        }
+    }
+
+    // Deduplicate findings by (file, line, title)
+    let before_dedup = all_issues.len();
+    all_issues.sort_by(|a, b| {
+        a.file
+            .cmp(&b.file)
+            .then_with(|| a.line.cmp(&b.line))
+            .then_with(|| a.title.cmp(&b.title))
+    });
+    all_issues.dedup_by(|a, b| a.file == b.file && a.line == b.line && a.title == b.title);
+    let deduped = before_dedup - all_issues.len();
+
+    if deduped > 0 && !opts.quiet {
+        eprintln!(
+            "{}",
+            format!("  ℹ️  Deduplicated {deduped} overlapping findings").dimmed()
+        );
+    }
+
+    // Build merged response
+    let merged_summary = if summaries.is_empty() {
+        if any_error {
+            "Review completed with partial results (some chunks failed).".to_string()
+        } else {
+            "No issues found across all chunks.".to_string()
+        }
+    } else {
+        summaries.join("\n\n")
+    };
+
+    let merged_response = ReviewResponse {
+        issues: all_issues,
+        summary: merged_summary,
+        tokens_used: Some(total_tokens),
+        should_block: false,
+    };
+
+    // 6. Filter by severity if specified
+    let min_severity = if let Some(ref sev) = opts.severity {
+        Severity::from_str_lossy(sev)
+    } else {
+        config.hook.min_severity_level()
+    };
+
+    let mut filtered_response = merged_response.clone();
+    filtered_response
+        .issues
+        .retain(|i| i.severity <= min_severity);
+
+    // 7. Format output
+    let formatter = formatter_for(format);
+    let mut output = formatter.format_review(&filtered_response)?;
+
+    // Add chunking summary header if not quiet and format is pretty
+    if !opts.quiet && format == OutputFormat::Pretty {
+        let header = format!(
+            "📦 Reviewed in {} chunks ({} files total)\n",
+            total_chunks,
+            chunks.iter().map(|c| c.file_count).sum::<usize>()
+        );
+        output = format!("{header}{output}");
+    }
+
+    // 8. Quality gate evaluation
+    let gate_result = if config.quality_gate.enabled {
+        let result = quality_gate::evaluate(&filtered_response.issues, &config.quality_gate);
+        output.push_str(&quality_gate::format_gate_output(&result));
+        Some(result)
+    } else {
+        None
+    };
+
+    // 9. Return exit code
+    let exit_code = if gate_result
+        .as_ref()
+        .is_some_and(|g| g.status == quality_gate::GateStatus::Fail)
+    {
+        EXIT_BLOCKED
+    } else if opts.ci {
+        if !filtered_response.issues.is_empty() {
+            EXIT_BLOCKED
+        } else {
+            EXIT_OK
+        }
+    } else if merged_response.should_block && config.hook.mode == "block" {
+        EXIT_BLOCKED
+    } else {
+        EXIT_OK
+    };
+
+    // 10. Emit complete event
+    if progress.is_enabled() {
+        let tokens = filtered_response
+            .tokens_used
+            .as_ref()
+            .map_or_else(TokenInfo::zero, TokenInfo::from_usage);
+        progress.complete(
+            filtered_response.issues.len(),
+            exit_code == EXIT_BLOCKED,
+            &tokens,
+        );
+    }
+
+    Ok(ReviewResult { exit_code, output })
 }

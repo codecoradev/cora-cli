@@ -315,28 +315,28 @@ diff --git a/docs/README.md b/docs/README.md
 
     #[test]
     fn derive_label_single_file() {
-        let files = vec![&FileDiff {
+        let fd = FileDiff {
             dir_prefix: "src".to_string(),
             diff: String::new(),
             size: 0,
-        }];
+        };
+        let files = vec![&fd];
         assert_eq!(derive_label(&files), "src/*");
     }
 
     #[test]
     fn derive_label_multiple_dirs() {
-        let files = vec![
-            &FileDiff {
-                dir_prefix: "src".to_string(),
-                diff: String::new(),
-                size: 0,
-            },
-            &FileDiff {
-                dir_prefix: "docs".to_string(),
-                diff: String::new(),
-                size: 0,
-            },
-        ];
+        let fd1 = FileDiff {
+            dir_prefix: "src".to_string(),
+            diff: String::new(),
+            size: 0,
+        };
+        let fd2 = FileDiff {
+            dir_prefix: "docs".to_string(),
+            diff: String::new(),
+            size: 0,
+        };
+        let files = vec![&fd1, &fd2];
         assert_eq!(derive_label(&files), "docs, src");
     }
 }
