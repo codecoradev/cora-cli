@@ -109,6 +109,10 @@ enum Command {
         #[clap(long)]
         stream: bool,
 
+        /// Disable auto-chunking for large diffs (auto-chunk is enabled by default)
+        #[clap(long)]
+        no_auto_chunk: bool,
+
         /// Output structured NDJSON progress events to stderr
         #[clap(long)]
         progress: bool,
@@ -333,6 +337,7 @@ async fn main() -> Result<()> {
             unstaged,
             max_diff_size,
             stream,
+            no_auto_chunk,
             progress,
             quiet,
             output_file,
@@ -355,6 +360,7 @@ async fn main() -> Result<()> {
                     unstaged,
                     max_diff_size,
                     stream,
+                    no_auto_chunk,
                     progress,
                     quiet,
                     output_file,
@@ -479,6 +485,7 @@ struct ReviewOpts {
     unstaged: bool,
     max_diff_size: Option<usize>,
     stream: bool,
+    no_auto_chunk: bool,
     progress: bool,
     quiet: bool,
     output_file: Option<String>,
@@ -542,6 +549,7 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         severity: opts.severity.clone(),
         no_cache: opts.no_cache,
         ci: opts.ci,
+        auto_chunk: !opts.no_auto_chunk,
     };
 
     // When streaming and not quiet/progress, show a simpler message

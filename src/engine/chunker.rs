@@ -149,8 +149,7 @@ fn find_file_start(lines: &[&str], start_from: usize, path: &str) -> Option<usiz
 fn find_file_end(lines: &[&str], start_from: usize) -> usize {
     for i in start_from..lines.len() {
         // A new file starts with "--- " followed by "+++ "
-        if lines[i].starts_with("--- ") && i + 1 < lines.len() && lines[i + 1].starts_with("+++ ")
-        {
+        if lines[i].starts_with("--- ") && i + 1 < lines.len() && lines[i + 1].starts_with("+++ ") {
             // Check it's not a hunk line that starts with "---"
             // File headers have "--- a/" pattern, hunks have "---1,5" pattern
             if lines[i].starts_with("--- a/") || lines[i].starts_with("--- /dev/null") {
@@ -315,28 +314,28 @@ diff --git a/docs/README.md b/docs/README.md
 
     #[test]
     fn derive_label_single_file() {
-        let files = vec![&FileDiff {
+        let fd = FileDiff {
             dir_prefix: "src".to_string(),
             diff: String::new(),
             size: 0,
-        }];
+        };
+        let files = vec![&fd];
         assert_eq!(derive_label(&files), "src/*");
     }
 
     #[test]
     fn derive_label_multiple_dirs() {
-        let files = vec![
-            &FileDiff {
-                dir_prefix: "src".to_string(),
-                diff: String::new(),
-                size: 0,
-            },
-            &FileDiff {
-                dir_prefix: "docs".to_string(),
-                diff: String::new(),
-                size: 0,
-            },
-        ];
+        let fd1 = FileDiff {
+            dir_prefix: "src".to_string(),
+            diff: String::new(),
+            size: 0,
+        };
+        let fd2 = FileDiff {
+            dir_prefix: "docs".to_string(),
+            diff: String::new(),
+            size: 0,
+        };
+        let files = vec![&fd1, &fd2];
         assert_eq!(derive_label(&files), "docs, src");
     }
 }

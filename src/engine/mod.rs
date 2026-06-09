@@ -1,5 +1,6 @@
 pub mod bundling;
 pub mod cache;
+pub mod chunker;
 pub mod context;
 pub mod diff_parser;
 pub mod llm;
