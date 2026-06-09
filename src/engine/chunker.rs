@@ -149,8 +149,7 @@ fn find_file_start(lines: &[&str], start_from: usize, path: &str) -> Option<usiz
 fn find_file_end(lines: &[&str], start_from: usize) -> usize {
     for i in start_from..lines.len() {
         // A new file starts with "--- " followed by "+++ "
-        if lines[i].starts_with("--- ") && i + 1 < lines.len() && lines[i + 1].starts_with("+++ ")
-        {
+        if lines[i].starts_with("--- ") && i + 1 < lines.len() && lines[i + 1].starts_with("+++ ") {
             // Check it's not a hunk line that starts with "---"
             // File headers have "--- a/" pattern, hunks have "---1,5" pattern
             if lines[i].starts_with("--- a/") || lines[i].starts_with("--- /dev/null") {
