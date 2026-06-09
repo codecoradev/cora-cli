@@ -339,6 +339,8 @@ async fn execute_chunked_review(
     let mut summaries: Vec<String> = Vec::new();
     let mut total_tokens = crate::engine::types::TokenUsage::default();
     let mut any_error = false;
+    let mut any_success = false;
+    let mut should_block = false;
 
     for chunk in &chunks {
         if !opts.quiet {
@@ -399,6 +401,10 @@ async fn execute_chunked_review(
                 }
 
                 all_issues.extend(resp.issues);
+                if resp.should_block {
+                    should_block = true;
+                }
+                any_success = true;
             }
             Err(e) => {
                 if progress.is_enabled() {
@@ -439,6 +445,22 @@ async fn execute_chunked_review(
         );
     }
 
+    // If all chunks failed, return an error instead of silently passing
+    if !any_success {
+        if progress.is_enabled() {
+            progress.error("All chunks failed during chunked review", "chunked_review");
+        }
+        return Ok(ReviewResult {
+            exit_code: EXIT_BLOCKED,
+            output: format!(
+                "{}\n",
+                "❌ All review chunks failed. Check your API key and try again."
+                    .red()
+                    .bold()
+            ),
+        });
+    }
+
     // Build merged response
     let merged_summary = if summaries.is_empty() {
         if any_error {
@@ -454,7 +476,7 @@ async fn execute_chunked_review(
         issues: all_issues,
         summary: merged_summary,
         tokens_used: Some(total_tokens),
-        should_block: false,
+        should_block,
     };
 
     // 6. Filter by severity if specified
