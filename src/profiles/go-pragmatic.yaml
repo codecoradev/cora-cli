@@ -1,0 +1,52 @@
+name: go-pragmatic
+description: "Go-specific: error handling, goroutine safety, interface design, idiomatic Go"
+version: "1.0"
+
+focus_areas:
+  - id: error_handling
+    weight: 10
+    action: block
+    rules:
+      - "Check all error returns — never discard errors with _"
+      - "Wrap errors with context using fmt.Errorf('...: %w', err)"
+      - "Handle errors before deferring cleanup — don't lose the original error"
+      - "Don't use panic for flow control — return errors"
+
+  - id: concurrency
+    weight: 9
+    action: warn
+    rules:
+      - "Watch for goroutine leaks — ensure all goroutines can exit"
+      - "Close channels properly — sender closes, receiver checks"
+      - "Use sync.WaitGroup or errgroup for goroutine coordination"
+      - "No data races — protect shared state with mutex or channels"
+      - "Avoid defer in loops when cleanup is time-sensitive"
+
+  - id: interfaces
+    weight: 7
+    action: warn
+    rules:
+      - "Accept interfaces, return concrete types"
+      - "Keep interfaces small — one method is ideal"
+      - "Define interfaces where they're used, not where they're implemented"
+      - "Use type assertion with comma-ok pattern to avoid panics"
+
+  - id: idiomatic_go
+    weight: 6
+    action: info
+    rules:
+      - "Use meaningful names — avoid single-letter names outside short loops"
+      - "Group related constants in iota blocks"
+      - "Use table-driven tests for functions with multiple cases"
+      - "Prefer struct literals over constructors for simple types"
+      - "Use context.Context as first parameter in functions that do I/O"
+
+ignore_areas:
+  - documentation
+  - formatting
+
+review_style:
+  tone: standard
+  detail_level: standard
+  suggest_fixes: true
+  max_findings: null

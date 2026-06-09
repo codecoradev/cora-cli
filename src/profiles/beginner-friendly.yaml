@@ -1,0 +1,46 @@
+name: beginner-friendly
+description: "Gentle review — focus on common mistakes and learning opportunities"
+version: "1.0"
+
+focus_areas:
+  - id: common_mistakes
+    weight: 8
+    action: warn
+    rules:
+      - "Off-by-one errors in loops and array indexing"
+      - "Missing null/None/undefined checks before access"
+      - "Incorrect comparison operators (== vs ===, assignment in condition)"
+      - "Missing return statements or unreachable code"
+
+  - id: learning
+    weight: 9
+    action: info
+    rules:
+      - "Explain WHY something is an issue, not just WHAT"
+      - "Suggest idiomatic alternatives with brief explanation"
+      - "Link concepts to common patterns (e.g., 'this is a classic iterator pattern')"
+      - "Be encouraging — acknowledge good patterns too"
+
+  - id: best_practices
+    weight: 7
+    action: info
+    rules:
+      - "Prefer standard library functions over manual implementations"
+      - "Use consistent naming conventions"
+      - "Avoid global mutable state"
+
+  - id: security_basics
+    weight: 6
+    action: warn
+    rules:
+      - "Never trust user input — always validate and sanitize"
+      - "Don't hardcode passwords or API keys"
+      - "Use HTTPS, not HTTP"
+
+ignore_areas: []
+
+review_style:
+  tone: gentle
+  detail_level: exhaustive
+  suggest_fixes: true
+  max_findings: 20

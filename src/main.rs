@@ -13,7 +13,9 @@ mod git;
 mod hook;
 mod progress;
 
-use commands::{auth, completion, config_cmd, hook_cmd, init, providers, review, scan, upload};
+use commands::{
+    auth, completion, config_cmd, hook_cmd, init, profile, providers, review, scan, upload,
+};
 use config::loader;
 use formatters::OutputFormat;
 
@@ -182,6 +184,12 @@ enum Command {
         focus: Vec<String>,
     },
 
+    /// Manage quality profiles (preset rule sets)
+    Profile {
+        #[command(subcommand)]
+        action: ProfileAction,
+    },
+
     /// Upload a SARIF file to GitHub Code Scanning
     UploadSarif {
         /// Path to SARIF file to upload (default: reads from stdin)
@@ -298,6 +306,22 @@ enum ConfigAction {
     Validate,
 }
 
+#[derive(Subcommand, Debug)]
+enum ProfileAction {
+    /// List available quality profiles
+    List,
+    /// Show details of a specific profile
+    Show {
+        /// Profile name (e.g. security-first, rust-strict)
+        name: String,
+    },
+    /// Validate a custom profile YAML file
+    Validate {
+        /// Path to the profile YAML file
+        path: String,
+    },
+}
+
 #[allow(clippy::too_many_lines)]
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -395,6 +419,14 @@ async fn main() -> Result<()> {
                 },
             )
             .await?
+        }
+        Command::Profile { action } => {
+            match action {
+                ProfileAction::List => profile::execute_profile_list()?,
+                ProfileAction::Show { name } => profile::execute_profile_show(&name)?,
+                ProfileAction::Validate { path } => profile::execute_profile_validate(&path)?,
+            }
+            0
         }
         Command::UploadSarif {
             file,

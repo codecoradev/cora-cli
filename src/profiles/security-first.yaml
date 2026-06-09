@@ -1,0 +1,53 @@
+name: security-first
+description: "Strict security focus — zero tolerance for vulnerabilities"
+version: "1.0"
+
+focus_areas:
+  - id: security
+    weight: 10
+    action: block
+    rules:
+      - "No hardcoded secrets, credentials, or API keys in source code"
+      - "Validate and sanitize all external inputs (HTTP params, file uploads, CLI args)"
+      - "Use parameterized queries or ORM — never string interpolation for SQL"
+      - "Check authorization on every endpoint and sensitive operation"
+      - "Sanitize user-generated content before rendering (XSS prevention)"
+      - "Use constant-time comparison for secrets and tokens"
+      - "Never roll custom crypto — use established libraries"
+
+  - id: injection
+    weight: 10
+    action: block
+    rules:
+      - "No SQL/NoSQL/XSS/SSRF/LDAP/Path traversal injection vectors"
+      - "Escape all output in templates and HTML contexts"
+      - "Validate file paths — reject path traversal patterns (../, ..\\)"
+      - "Restrict SSRF — validate URLs before HTTP calls"
+
+  - id: error_handling
+    weight: 7
+    action: warn
+    rules:
+      - "Never expose stack traces, internal paths, or system info to users"
+      - "Log security events (auth failures, access denied) properly"
+      - "Handle all error paths explicitly — no silent failures"
+
+  - id: secrets_management
+    weight: 8
+    action: block
+    rules:
+      - "Load secrets from env vars or secret managers, not config files"
+      - "No private keys, JWT secrets, or database passwords in code"
+      - "Use HTTPS for all external communication"
+
+ignore_areas:
+  - style
+  - naming
+  - documentation
+  - formatting
+
+review_style:
+  tone: strict
+  detail_level: high
+  suggest_fixes: true
+  max_findings: null

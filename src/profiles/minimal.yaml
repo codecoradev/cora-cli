@@ -1,0 +1,35 @@
+name: minimal
+description: "Only critical + security — best for quick PRs and hotfixes"
+version: "1.0"
+
+focus_areas:
+  - id: critical_bugs
+    weight: 10
+    action: block
+    rules:
+      - "Crashes, panics, and unhandled exceptions"
+      - "Data loss or corruption risks"
+      - "Breaking changes to public APIs"
+
+  - id: security
+    weight: 10
+    action: block
+    rules:
+      - "Hardcoded secrets and credentials"
+      - "SQL injection, XSS, and other injection vectors"
+      - "Authentication or authorization bypasses"
+
+ignore_areas:
+  - style
+  - naming
+  - documentation
+  - formatting
+  - performance
+  - best_practice
+  - complexity
+
+review_style:
+  tone: strict
+  detail_level: minimal
+  suggest_fixes: true
+  max_findings: 10
