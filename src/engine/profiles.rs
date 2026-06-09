@@ -417,8 +417,10 @@ mod tests {
 
     #[test]
     fn build_profile_prompt_minimal() {
-        let mut p = Profile::default();
-        p.name = "custom".to_string();
+        let p = Profile {
+            name: "custom".to_string(),
+            ..Default::default()
+        };
         let prompt = build_profile_prompt(&p);
         assert!(prompt.contains("custom"));
     }
