@@ -473,7 +473,8 @@ impl CoraFile {
                     config.profile = Some(profile);
                 }
                 Err(e) => {
-                    tracing::warn!("failed to resolve profile: {e}");
+                    // Warn but don't fail — profile is optional enhancement
+                    tracing::warn!("invalid profile in config, ignoring: {e}");
                 }
             }
         }

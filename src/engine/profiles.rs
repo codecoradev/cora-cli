@@ -169,12 +169,20 @@ pub fn resolve_profile(profile_ref: &ProfileRef) -> Result<Profile, String> {
                 debug!(profile = name, "loaded built-in profile");
                 return Ok(p);
             }
-            // Try loading from file
+            // Try loading from file (resolve relative to CWD)
             let path = std::path::Path::new(name);
             if path.is_file() {
                 let content = std::fs::read_to_string(path)
                     .map_err(|e| format!("cannot read profile file '{}': {e}", name))?;
-                let profile = parse_profile_yaml(&content)?;
+                let mut profile = parse_profile_yaml(&content)?;
+                // If profile has no name, derive from filename
+                if profile.name.is_empty() {
+                    profile.name = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("custom")
+                        .to_string();
+                }
                 debug!(profile = name, "loaded profile from file");
                 return Ok(profile);
             }
