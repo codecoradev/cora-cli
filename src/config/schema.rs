@@ -47,6 +47,8 @@ pub struct Config {
     pub context_chain: crate::engine::context::types::ContextConfig,
     /// File bundling configuration for scan/review grouping.
     pub bundling: BundlingConfig,
+    /// Debt tracking configuration.
+    pub debt: crate::engine::debt_tracker::DebtConfig,
     /// Active quality profile (resolved from .cora.yaml).
     pub profile: Option<crate::engine::profiles::Profile>,
 }
@@ -130,6 +132,7 @@ impl Default for Config {
             rules_config: RulesConfig::default(),
             context_chain: crate::engine::context::types::ContextConfig::default(),
             bundling: BundlingConfig::default(),
+            debt: crate::engine::debt_tracker::DebtConfig::default(),
             profile: None,
         }
     }
@@ -177,6 +180,8 @@ pub struct CoraFile {
     pub rules_engine: Option<RulesSection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bundling: Option<BundlingSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debt: Option<crate::engine::debt_tracker::DebtConfig>,
     #[serde(default)]
     pub profile: Option<crate::engine::profiles::ProfileRef>,
 }
@@ -465,6 +470,10 @@ impl CoraFile {
             if let Some(v) = b.coalesce_by_language {
                 config.bundling.coalesce_by_language = v;
             }
+        }
+        // Merge debt tracking config
+        if let Some(debt) = &self.debt {
+            config.debt = debt.clone();
         }
         // Resolve profile — load built-in or custom, merge into config
         if let Some(profile_ref) = &self.profile {

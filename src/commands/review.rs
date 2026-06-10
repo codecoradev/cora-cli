@@ -224,6 +224,21 @@ pub async fn execute_review(
         None
     };
 
+    // 8b. Save debt tracking snapshot (best-effort, never fails review)
+    if config.debt.enabled {
+        let (commit, branch) = get_git_context();
+        let snapshot = crate::engine::debt_tracker::DebtSnapshot::from_review(
+            &filtered_response.issues,
+            gate_result.as_ref(),
+            commit,
+            branch,
+            0, // files_reviewed not tracked per-review yet
+            None,
+            None, // duration not passed through yet
+        );
+        crate::engine::debt_tracker::save_snapshot(&snapshot, config.debt.history_dir.as_deref());
+    }
+
     // 9. Return exit code
     let exit_code = if gate_result
         .as_ref()
@@ -257,6 +272,28 @@ pub async fn execute_review(
     }
 
     Ok(ReviewResult { exit_code, output })
+}
+
+/// Helper to get git commit and branch context for debt tracking.
+/// Returns (Some(commit), Some(branch)) if in a git repo, (None, None) otherwise.
+fn get_git_context() -> (Option<String>, Option<String>) {
+    let commit = std::process::Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                String::from_utf8(o.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+            } else {
+                None
+            }
+        });
+
+    let branch = crate::git::get_current_branch().ok();
+
+    (commit, branch)
 }
 
 /// Get the diff based on the provided options.
@@ -513,6 +550,21 @@ async fn execute_chunked_review(
     } else {
         None
     };
+
+    // 8b. Save debt tracking snapshot (best-effort, never fails review)
+    if config.debt.enabled {
+        let (commit, branch) = get_git_context();
+        let snapshot = crate::engine::debt_tracker::DebtSnapshot::from_review(
+            &filtered_response.issues,
+            gate_result.as_ref(),
+            commit,
+            branch,
+            chunks.iter().map(|c| c.file_count).sum(),
+            None,
+            None,
+        );
+        crate::engine::debt_tracker::save_snapshot(&snapshot, config.debt.history_dir.as_deref());
+    }
 
     // 9. Return exit code
     let exit_code = if gate_result
