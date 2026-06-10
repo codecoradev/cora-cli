@@ -5,6 +5,8 @@ All notable changes to cora-cli are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [0.5.0] - 2026-06-10
 
 ### Added
@@ -36,9 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--no-auto-chunk` flag to disable
   - `src/engine/chunker.rs` module (~310 lines)
 - **Multi-platform CI docs** — Gitea/Forgejo, GitLab CI, Bitbucket Pipelines workflow examples (#225)
+- **GitHub Marketplace action** — published as [`codecoradev/cora-review-action@v1`](https://github.com/marketplace/actions/cora-ai-code-review)
+- **Improved review prompt** — better consistency, lower false-negative rate, explicit error handling focus area
+- **Comprehensive docs/examples.md** — GitHub Actions section with setup guide, inputs reference, and provider table
 
 ### Changed
 
+- **CI action moved to GitHub Marketplace** — workflow uses marketplace action instead of `.github/actions/cora-review/`
 - **README links** — all documentation links now point to `codecora.dev` instead of relative file paths
 - **CI workflows** — removed stale SvelteKit `website/` jobs, replaced with VitePress `docs/` build
 - **`merge_into()` returns `Result`** — fail-fast on invalid profile config instead of silently continuing
@@ -50,31 +56,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Profiles bugs** — path resolution with project root, fail-fast on invalid config, dedup merge by `id` (#238)
 - **Code Scanning alert #79** — eliminated redundant `parse_diff()` call in language context injection
-
-### Removed
-
-- **SvelteKit `website/`** — 6,286 lines removed, replaced by VitePress `docs/`
-- **`Website Lint` CI job** — removed from required status checks
-
-## [0.4.7] - 2026-06-08
-
-### Changed
-
-- **CI action moved to GitHub Marketplace** — published as [`codecoradev/cora-review-action@v1`](https://github.com/marketplace/actions/cora-ai-code-review)
-- **Internal composite action removed** — workflow now uses marketplace action instead of `.github/actions/cora-review/`
-- **`cora-review-simple` removed** — unused duplicate action deleted
-
-### Fixed
-
 - **Download hardening** — 5x retry with exponential backoff, gzip validation, checksum verification for cora-cli binary download in CI (#221)
 - **curl hardening** — `--fail --show-error` + `set -e` guard prevents silent HTML downloads
 - **Checksum enforcement** — hard fail on missing/invalid checksums (was warning-only)
 - **Exact checksum match** — `awk` exact filename lookup replaces `grep` substring match
 
-### Added
+### Removed
 
-- **Improved review prompt** — better consistency, lower false-negative rate, explicit error handling focus area
-- **Comprehensive docs/examples.md** — GitHub Actions section with setup guide, inputs reference, and provider table
+- **SvelteKit `website/`** — 6,286 lines removed, replaced by VitePress `docs/`
+- **`Website Lint` CI job** — removed from required status checks
+- **Internal composite action** — `.github/actions/cora-review/` deleted, replaced by marketplace action
+- **`cora-review-simple`** — unused duplicate action deleted
 
 ## [0.4.6] - 2026-06-07
 
@@ -98,8 +90,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cora config show --global` / `--project` documented in cli-reference.md (was missing)
 - `cora auth login` path corrected from `config.toml` to `auth.toml` in cli-reference.md
 - CI example in docs now includes CORA_BASE_URL and CORA_MODEL secrets
-
-## [Unreleased]
 
 ## [0.4.5] - 2026-06-07
 
@@ -425,8 +415,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MIT License** — fully open source
 
 [Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.5.0...develop
-[0.5.0]: https://github.com/codecoradev/cora-cli/compare/v0.4.7...v0.5.0
-[0.4.7]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
+[0.5.0]: https://github.com/codecoradev/cora-cli/compare/v0.4.6...v0.5.0
+[0.4.6]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/codecoradev/cora-cli/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/codecoradev/cora-cli/compare/v0.4.2...v0.4.3
