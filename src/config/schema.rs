@@ -335,7 +335,7 @@ impl CoraFile {
 
     /// Merge this file config into a `Config`, overwriting only fields that are present.
     #[allow(clippy::assigning_clones)]
-    pub fn merge_into(&self, config: &mut Config) {
+    pub fn merge_into(&self, config: &mut Config) -> Result<(), CoraError> {
         if let Some(v) = &self.model {
             config.provider.model.clone_from(v);
         }
@@ -473,11 +473,15 @@ impl CoraFile {
                     config.profile = Some(profile);
                 }
                 Err(e) => {
-                    // Warn but don't fail — profile is optional enhancement
-                    tracing::warn!("invalid profile in config, ignoring: {e}");
+                    // Fail fast — invalid profile means review policy is broken.
+                    // Better to error than silently run without the intended policy.
+                    return Err(CoraError::ConfigParse(format!(
+                        "invalid profile in config: {e}"
+                    )));
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -542,7 +546,7 @@ mod tests {
     fn merge_empty_cora_file_leaves_defaults() {
         let mut cfg = Config::default();
         let cora = CoraFile::default();
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.provider.provider, "openai");
         assert_eq!(cfg.provider.model, "gpt-4o-mini");
         assert_eq!(cfg.output.format, "pretty");
@@ -559,7 +563,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.provider.provider, "anthropic");
         assert_eq!(cfg.provider.model, "claude-3-haiku");
         assert_eq!(cfg.provider.base_url, "https://api.anthropic.com/v1");
@@ -577,7 +581,7 @@ base_url: https://api.z.ai/api/coding/paas/v4
         )
         .unwrap();
 
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
 
         assert_eq!(cfg.provider.provider, "openai");
         assert_eq!(cfg.provider.model, "glm-5.1");
@@ -595,7 +599,7 @@ base_url: https://api.z.ai/api/coding/paas/v4
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.provider.provider, "ollama");
         assert_eq!(cfg.provider.model, "llama3.1"); // resolved from ollama preset
         assert_eq!(cfg.provider.base_url, "http://localhost:11434/v1"); // resolved from ollama preset
@@ -611,7 +615,7 @@ provider: zai
         )
         .unwrap();
 
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.provider.provider, "zai");
         assert_eq!(cfg.provider.model, "glm-5.1"); // resolved from zai preset
         assert_eq!(cfg.provider.base_url, "https://api.z.ai/api/coding/paas/v4"); // resolved from zai preset
@@ -624,7 +628,7 @@ provider: zai
             focus: Some(vec!["security".to_string(), "bugs".to_string()]),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.focus, vec!["security", "bugs"]);
     }
 
@@ -635,7 +639,7 @@ provider: zai
             rules: Some(vec!["no unwrap".to_string()]),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.rules, vec!["no unwrap"]);
     }
 
@@ -649,7 +653,7 @@ provider: zai
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.ignore.files, vec!["vendor/**"]);
         assert_eq!(cfg.ignore.rules, vec!["skip-rule-1"]);
     }
@@ -666,7 +670,7 @@ provider: zai
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.hook.mode, "block");
         assert_eq!(cfg.hook.min_severity, "critical");
         assert_eq!(cfg.hook.max_diff_size, 1024);
@@ -683,7 +687,7 @@ provider: zai
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.output.format, "json");
         assert!(!cfg.output.color);
     }
@@ -854,7 +858,7 @@ review:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.response_format, "json_object");
     }
 
@@ -871,7 +875,7 @@ review:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(
             cfg.review_system_prompt_override.as_deref(),
             Some("Custom prompt here.")
@@ -891,7 +895,7 @@ review:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(
             cfg.review_system_prompt_file.as_deref(),
             Some("prompts/review.md")
@@ -924,7 +928,7 @@ scan:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(
             cfg.scan_system_prompt_override.as_deref(),
             Some("Performance only.")
@@ -1023,7 +1027,7 @@ llm:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.temperature, 0.7);
         // Other LLM fields should remain at defaults
         assert_eq!(cfg.max_tokens, 4096);
@@ -1043,7 +1047,7 @@ llm:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.max_tokens, 2048);
     }
 
@@ -1059,7 +1063,7 @@ llm:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.timeout, 300);
     }
 
@@ -1075,7 +1079,7 @@ llm:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.temperature, 1.0);
         assert_eq!(cfg.max_tokens, 16384);
         assert_eq!(cfg.timeout, 240);
@@ -1194,7 +1198,7 @@ bundling:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.bundling.max_chars_per_group, 30_000);
         assert_eq!(cfg.bundling.max_files_per_group, 10);
         assert_eq!(
@@ -1218,7 +1222,7 @@ bundling:
             }),
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.bundling.max_chars_per_group, 40_000);
         assert_eq!(cfg.bundling.max_files_per_group, 20); // default unchanged
         assert_eq!(
@@ -1235,7 +1239,7 @@ bundling:
         let cora = CoraFile {
             ..Default::default()
         };
-        cora.merge_into(&mut cfg);
+        cora.merge_into(&mut cfg).unwrap();
         assert_eq!(cfg.bundling.max_chars_per_group, 60_000);
         assert_eq!(cfg.bundling.max_files_per_group, 20);
     }

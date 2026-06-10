@@ -157,11 +157,19 @@ pub fn load_all_builtins() -> Vec<Profile> {
 /// Resolve a `ProfileRef` from `.cora.yaml` into a final `Profile`.
 ///
 /// Resolution order:
-/// 1. If `Name("builtin")` → load built-in
-/// 2. If `Name("./path.yaml")` → load from file
-/// 3. If `Inline { extends, ... }` → merge with base
-/// 4. If `Inline` without extends → use as-is
+/// - If `Name("builtin")` → load built-in
+/// - If `Name("./path.yaml")` → load from file (resolve relative to project root)
+/// - If `Inline { extends, ... }` → merge with base
+/// - If `Inline` without extends → use as-is
 pub fn resolve_profile(profile_ref: &ProfileRef) -> Result<Profile, String> {
+    resolve_profile_with_root(profile_ref, None)
+}
+
+/// Resolve profile with optional project root for relative file path resolution.
+pub fn resolve_profile_with_root(
+    profile_ref: &ProfileRef,
+    project_root: Option<&std::path::Path>,
+) -> Result<Profile, String> {
     match profile_ref {
         ProfileRef::Name(name) => {
             // Try built-in first
@@ -169,11 +177,15 @@ pub fn resolve_profile(profile_ref: &ProfileRef) -> Result<Profile, String> {
                 debug!(profile = name, "loaded built-in profile");
                 return Ok(p);
             }
-            // Try loading from file (resolve relative to CWD)
-            let path = std::path::Path::new(name);
+            // Resolve relative to project root (not CWD) for deterministic behavior
+            let path = if let Some(root) = project_root {
+                root.join(name)
+            } else {
+                std::path::PathBuf::from(name)
+            };
             if path.is_file() {
-                let content = std::fs::read_to_string(path)
-                    .map_err(|e| format!("cannot read profile file '{}': {e}", name))?;
+                let content = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("cannot read profile file '{}': {e}", path.display()))?;
                 let mut profile = parse_profile_yaml(&content)?;
                 // If profile has no name, derive from filename
                 if profile.name.is_empty() {
@@ -183,11 +195,11 @@ pub fn resolve_profile(profile_ref: &ProfileRef) -> Result<Profile, String> {
                         .unwrap_or("custom")
                         .to_string();
                 }
-                debug!(profile = name, "loaded profile from file");
+                debug!(profile = %path.display(), "loaded profile from file");
                 return Ok(profile);
             }
             Err(format!(
-                "unknown profile '{name}'. Available: {}",
+                "unknown profile '{name}'. Available built-ins: {}",
                 BUILTIN_PROFILES.join(", ")
             ))
         }
@@ -206,9 +218,18 @@ pub fn resolve_profile(profile_ref: &ProfileRef) -> Result<Profile, String> {
                 profile.name = "custom".to_string();
             }
 
-            // Merge focus areas (append, don't replace)
+            // Merge focus areas by id — replace existing, append new
             if !inline.focus_areas.is_empty() {
-                profile.focus_areas.extend(inline.focus_areas.clone());
+                for area in &inline.focus_areas {
+                    if let Some(existing) = profile.focus_areas.iter_mut().find(|a| a.id == area.id)
+                    {
+                        // Replace existing focus area with override
+                        *existing = area.clone();
+                    } else {
+                        // Append new focus area
+                        profile.focus_areas.push(area.clone());
+                    }
+                }
             }
 
             // Override ignore areas

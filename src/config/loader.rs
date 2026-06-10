@@ -242,7 +242,7 @@ pub fn load_config(
 
     // 1. Load global config (~/.cora/config.yaml)
     if let Some(cora) = load_global_config()? {
-        cora.merge_into(&mut config);
+        cora.merge_into(&mut config)?;
     }
 
     // 2. Load project config (.cora.yaml)
@@ -257,10 +257,10 @@ pub fn load_config(
                 path.display()
             ))
         })?;
-        cora.merge_into(&mut config);
+        cora.merge_into(&mut config)?;
         debug!(path = %path.display(), "loaded explicit config");
     } else if let Some((path, cora)) = find_cora_file(&std::env::current_dir()?)? {
-        cora.merge_into(&mut config);
+        cora.merge_into(&mut config)?;
         debug!(path = %path.display(), "loaded discovered config");
     } else {
         debug!("no .cora.yaml found, using defaults");
