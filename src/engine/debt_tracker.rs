@@ -200,15 +200,27 @@ fn trend_from_change(change: i64) -> &'static str {
 
 // ─── File I/O ───
 
-/// Generate a filename for a snapshot: `YYYY-MM-DD_HHMMSS_{short_hash}.json`
+/// Generate a filename for a snapshot using a content-based hash for uniqueness.
+/// Format: `YYYY-MM-DD_{short_hash}_{content_hash}.json`
 fn snapshot_filename(snapshot: &DebtSnapshot) -> String {
-    let date = snapshot.timestamp.format("%Y-%m-%d_%H%M%S");
+    let date = snapshot.timestamp.format("%Y-%m-%d");
     let hash = snapshot.commit.as_deref().unwrap_or("unknown");
     // Take first 7 chars of commit hash
     let short_hash = if hash.len() > 7 { &hash[..7] } else { hash };
-    // Add sub-second nanos to prevent same-second collision
-    let nanos = snapshot.timestamp.timestamp_subsec_nanos();
-    format!("{date}_{short_hash}_{:09}.json", nanos)
+    // Content-based uniqueness: hash the findings + categories + timestamp
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    snapshot.timestamp.hash(&mut hasher);
+    for (k, v) in &snapshot.findings {
+        k.hash(&mut hasher);
+        v.hash(&mut hasher);
+    }
+    for (k, v) in &snapshot.categories {
+        k.hash(&mut hasher);
+        v.hash(&mut hasher);
+    }
+    let content_hash = format!("{:08x}", hasher.finish());
+    format!("{date}_{short_hash}_{content_hash}.json")
 }
 
 /// Resolve the history directory path.

@@ -473,15 +473,11 @@ impl CoraFile {
         }
         // Merge debt tracking config
         if let Some(debt) = &self.debt {
-            if !debt.enabled {
-                config.debt.enabled = false;
+            config.debt.enabled = debt.enabled;
+            if debt.history_dir.is_some() {
+                config.debt.history_dir.clone_from(&debt.history_dir);
             }
-            if let Some(ref dir) = debt.history_dir {
-                config.debt.history_dir = Some(dir.clone());
-            }
-            if debt.retention_days != 90 {
-                config.debt.retention_days = debt.retention_days;
-            }
+            config.debt.retention_days = debt.retention_days;
         }
         // Resolve profile — load built-in or custom, merge into config
         if let Some(profile_ref) = &self.profile {
