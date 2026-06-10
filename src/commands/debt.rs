@@ -89,8 +89,18 @@ fn filter_since(
     snapshots: &[debt_tracker::DebtSnapshot],
     since: &str,
 ) -> Vec<debt_tracker::DebtSnapshot> {
-    // Try parsing as date first (YYYY-MM-DD)
-    if let Ok(date) = DateTime::parse_from_rfc3339(&format!("{since}T00:00:00Z")) {
+    // Try parsing as date first (YYYY-MM-DD or full ISO 8601)
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(since, "%Y-%m-%d") {
+        let cutoff = date.and_hms_opt(0, 0, 0).unwrap().and_utc();
+        return snapshots
+            .iter()
+            .filter(|s| s.timestamp >= cutoff)
+            .cloned()
+            .collect();
+    }
+
+    // Try full ISO 8601 / RFC 3339
+    if let Ok(date) = DateTime::parse_from_rfc3339(since) {
         let cutoff = date.with_timezone(&chrono::Utc);
         return snapshots
             .iter()
@@ -292,7 +302,7 @@ fn print_trend_graph(snapshots: &[debt_tracker::DebtSnapshot]) {
                 min_score + (max_score - min_score) * ((row + 1) as f64 / (height - 1) as f64);
 
             if (*score >= bar_threshold_low && *score < bar_threshold_high)
-                || (row == 0 && (*score - max_score).abs() < f64::EPSILON)
+                || (row == height - 1 && (*score - max_score).abs() < 0.01)
             {
                 line.push_str(&"●".green().to_string());
             } else if i > 0 {
