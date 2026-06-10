@@ -301,9 +301,12 @@ fn print_trend_graph(snapshots: &[debt_tracker::DebtSnapshot]) {
             let bar_threshold_high =
                 min_score + (max_score - min_score) * ((row + 1) as f64 / (height - 1) as f64);
 
-            if (*score >= bar_threshold_low && *score < bar_threshold_high)
-                || (row == height - 1 && (*score - max_score).abs() < 0.01)
-            {
+            // Score falls within this row's range
+            // Special case: top row (row == height-1) should also catch max_score
+            let in_range =
+                *score >= bar_threshold_low && (*score < bar_threshold_high || row == height - 1);
+
+            if in_range {
                 line.push_str(&"●".green().to_string());
             } else if i > 0 {
                 let prev = sampled[i - 1];
