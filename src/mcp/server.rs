@@ -3,7 +3,7 @@
 //! Reads JSON-RPC requests from stdin, dispatches to tool handlers,
 //! writes responses to stdout.
 
-use std::io::{self, BufRead, Write};
+use std::io::{self, Read, Write};
 
 use tracing::{debug, error, info};
 
@@ -22,47 +22,88 @@ const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn run_server() -> anyhow::Result<()> {
     info!("Starting cora MCP server on stdio");
 
-    let stdin = io::stdin();
     let stdout = io::stdout();
     let mut stdout_lock = stdout.lock();
+    let mut buffer = String::new();
 
-    for line in stdin.lock().lines() {
-        let line = line?;
-        let trimmed = line.trim();
+    // Read stdin byte-by-byte to handle multi-line JSON-RPC messages.
+    // Line-based parsing breaks on pretty-printed JSON.
+    // MCP spec: each message is a complete JSON object, optionally followed by newline.
+    let mut brace_depth: i32 = 0;
+    let mut in_string = false;
+    let mut escape_next = false;
 
-        if trimmed.is_empty() {
+    for b in io::BufReader::new(io::stdin()).bytes() {
+        let byte = b?;
+        let ch = byte as char;
+
+        if escape_next {
+            escape_next = false;
+            buffer.push(ch);
             continue;
         }
 
-        debug!(input = trimmed, "received request");
+        if ch == '\\' && in_string {
+            escape_next = true;
+            buffer.push(ch);
+            continue;
+        }
 
-        let request: JsonRpcRequest = match serde_json::from_str(trimmed) {
-            Ok(req) => req,
-            Err(e) => {
-                error!(error = %e, "failed to parse request");
-                let err_resp = JsonRpcResponse {
-                    jsonrpc: "2.0".to_string(),
-                    id: None,
-                    result: None,
-                    error: Some(JsonRpcError {
-                        code: -32700,
-                        message: format!("Parse error: {e}"),
-                        data: None,
-                    }),
-                };
-                write_response(&mut stdout_lock, &err_resp)?;
+        if ch == '"' {
+            in_string = !in_string;
+            buffer.push(ch);
+            continue;
+        }
+
+        if !in_string {
+            if ch == '{' {
+                brace_depth += 1;
+            } else if ch == '}' {
+                brace_depth -= 1;
+            }
+        }
+
+        buffer.push(ch);
+
+        // Complete JSON object found when braces are balanced and buffer is non-empty
+        if brace_depth == 0 && !buffer.trim().is_empty() {
+            let trimmed = buffer.trim().to_string();
+            buffer.clear();
+
+            if trimmed.is_empty() {
                 continue;
             }
-        };
 
-        let response = handle_request(&request);
-        write_response(&mut stdout_lock, &response)?;
-        stdout_lock.flush()?;
+            debug!(input = %trimmed, "received request");
 
-        // Exit on shutdown notification
-        if request.method == "notifications/cancelled" || request.method == "shutdown" {
-            info!("Shutting down MCP server");
-            break;
+            let request: JsonRpcRequest = match serde_json::from_str(&trimmed) {
+                Ok(req) => req,
+                Err(e) => {
+                    error!(error = %e, "failed to parse request");
+                    let err_resp = JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id: None,
+                        result: None,
+                        error: Some(JsonRpcError {
+                            code: -32700,
+                            message: format!("Parse error: {e}"),
+                            data: None,
+                        }),
+                    };
+                    write_response(&mut stdout_lock, &err_resp)?;
+                    continue;
+                }
+            };
+
+            let response = handle_request(&request);
+            write_response(&mut stdout_lock, &response)?;
+            stdout_lock.flush()?;
+
+            // Exit on shutdown notification
+            if request.method == "notifications/cancelled" || request.method == "shutdown" {
+                info!("Shutting down MCP server");
+                break;
+            }
         }
     }
 
