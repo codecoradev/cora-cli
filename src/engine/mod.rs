@@ -3,6 +3,7 @@ pub mod cache;
 pub mod chunker;
 pub mod context;
 pub mod diff_parser;
+pub mod language_analyzer;
 pub mod llm;
 pub mod profiles;
 pub mod quality_gate;

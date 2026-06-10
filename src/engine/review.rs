@@ -192,6 +192,17 @@ async fn review_diff_inner(
         combined_context
     };
 
+    // Inject language-specific context
+    let lang_context = crate::engine::language_analyzer::build_language_context(diff);
+    let final_context = if !lang_context.is_empty() {
+        match final_context {
+            Some(ctx) => Some(format!("{lang_context}\n\n{ctx}")),
+            None => Some(lang_context),
+        }
+    } else {
+        final_context
+    };
+
     // Inject profile instructions into the context
     let final_context = match (&config.profile, final_context) {
         (Some(profile), Some(ctx)) => {
