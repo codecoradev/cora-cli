@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// MCP server configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct McpConfig {
     /// Enable MCP server.
     #[serde(default)]
