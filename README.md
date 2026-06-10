@@ -158,6 +158,16 @@ Provider-specific keys are auto-detected: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
 | [Changelog](https://codecora.dev/changelog.html) | Release history |
 | [Roadmap](https://codecora.dev/roadmap.html) | Planned features |
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=codecoradev%2Fcora-cli&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=codecoradev/cora-cli&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=codecoradev/cora-cli&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=codecoradev/cora-cli&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## Contributing
 
 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for guidelines. PRs welcome!

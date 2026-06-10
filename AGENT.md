@@ -9,16 +9,20 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 - **Edition:** Rust 2024 (MSRV 1.85)
 - **Repo:** `codecoradev/cora-cli`
 - **Default branch:** `develop`
+- **Marketplace:** https://github.com/marketplace/actions/cora-ai-code-review
+- **Website:** https://codecora.dev
 
 ## Build & Development Commands
 
 ```bash
 cargo build              # Build (debug)
 cargo build --release    # Build (release)
-cargo test               # Run all 224 tests
-cargo clippy             # Lint
-cargo fmt                # Format check (use -- --check for CI)
+cargo test               # Run all 453 tests
+cargo clippy --all-targets -- -D warnings  # Lint (strict)
+cargo fmt --all -- --check  # Format check
 ```
+
+Always run `cargo fmt --all` before committing. CI runs all three checks.
 
 ## Code Structure (`src/`)
 
@@ -46,7 +50,24 @@ src/
 │   ├── review.rs        # Review orchestration logic
 │   ├── scanner.rs       # File scanning engine
 │   ├── llm.rs           # LLM API interaction
-│   └── types.rs         # Severity, finding, and result types
+│   ├── types.rs         # Severity, finding, and result types
+│   ├── diff_parser.rs   # Diff → FileChunk parsing
+│   ├── chunker.rs       # Auto-chunking large diffs
+│   ├── profiles.rs      # Quality profiles (strict/balanced/lax)
+│   ├── quality_gate.rs  # Quality gate thresholds + pass/fail
+│   ├── security_scanner.rs  # Static security pattern matching
+│   ├── language_analyzer.rs # Language-specific review guidance
+│   ├── secrets_scanner.rs   # Secret/credential detection
+│   └── rules/           # Custom rule engine
+│       ├── mod.rs
+│       ├── builtin.rs   # Built-in rules
+│       ├── matching.rs  # Rule matching logic
+│       └── types.rs     # Rule & finding types
+├── mcp/                 # MCP server (Model Context Protocol)
+│   ├── mod.rs
+│   ├── protocol.rs      # JSON-RPC 2.0 types
+│   ├── server.rs        # Stdio transport + request dispatch
+│   └── tools.rs         # 5 tool handlers
 ├── formatters/          # Output format implementations
 │   ├── mod.rs
 │   ├── pretty.rs        # Human-readable terminal output
@@ -75,10 +96,10 @@ src/
 ## Testing
 
 ```bash
-cargo test               # 205 tests total
-                         #   183 unit tests
-                         #   16 CLI integration tests
-                         #    6 config tests
+cargo test               # 453 tests total
+                         #   431 unit tests
+                         #    16 CLI integration tests
+                         #     6 config tests
 cargo test --no-verify   # Skip pre-commit hooks (avoids timeout in hooks)
 ```
 
@@ -145,3 +166,56 @@ API keys live in a separate `auth.toml` file (`~/.cora/auth.toml`), not in
 - **Documentation update before release**: README config/features/flags, website
   configuration docs page, and homepage feature bullets MUST be updated to reflect
   new features BEFORE version bump and tagging.
+
+## Lessons Learned (Agent Operating Principles)
+
+These are hard-won lessons from actual development sessions. Follow them.
+
+### Workflow Discipline
+
+- **One issue = one branch = one PR = wait CI green = merge = next.** Never stack
+  multiple features on one branch. Serial workflow prevents merge conflicts and
+  makes bisecting bugs trivial.
+- **Local green ≠ CI green.** CI may use a different Rust version that is stricter
+  (e.g. treats dead_code as error, not warning). Always wait for CI to pass.
+- **Delete stale branches immediately after merge.** `git push origin --delete <branch>`.
+  A clean `git branch -a` improves developer experience.
+
+### Rust-Specific
+
+- **`pub` visibility = API contract.** Every `pub` added must have justification.
+  When exposing internals (e.g. `SecurityPattern` fields for MCP), consider adding
+  getter methods instead of making fields public.
+- **`Result<(), CoraError>` is infectious.** Changing a return type from `()` to
+  `Result` will propagate to every callsite. Plan the blast radius before changing
+  signatures.
+- **Use `edit` (exact text replacement), not `sed` for refactoring.** `sed` applies
+  globally and can mangle struct literal instances when you only meant to change the
+  struct definition.
+- **`#[allow(dead_code)]` for structs used only in `#[cfg(test)]`.** Clippy in CI
+  with `-D warnings` treats dead_code as error. Functions called only from tests
+  need this annotation.
+
+### CI & Code Scanning
+
+- **Code Scanning alerts: evaluate before dismissing.** Some are false positives
+  (test fixtures like `AKIAIOSFODNN7EXAMPLE`), but others catch real bugs (e.g.
+  redundant `parse_diff()` calls, broken line-based stdio parsing).
+- **Dismiss with reason.** Always provide `dismissed_reason` ("won't fix" or
+  "false positive") so future reviewers understand the decision.
+
+### MCP Server Design
+
+- **MCP is simpler than you think.** JSON-RPC 2.0 over stdio. No HTTP server needed.
+  The client (Claude Code, Cursor, etc.) manages the lifecycle.
+- **Don't use line-based stdin parsing for JSON-RPC.** Pretty-printed JSON spans
+  multiple lines. Use brace-depth tracking instead.
+- **Reuse parsed data.** If `parse_diff()` already ran, pass the `Vec<FileChunk>` to
+  downstream functions. Never parse the same diff twice.
+
+### Security Scanner
+
+- **Every regex pattern needs exemption logic.** Skip test files, example keys,
+  fixtures. Without exemptions, noise drowns out real findings.
+- **Balance sensitivity.** Too strict = wall of false positives. Too loose = miss
+  real vulnerabilities. Start conservative, tune based on real findings.
