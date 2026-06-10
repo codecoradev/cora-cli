@@ -2,6 +2,7 @@ pub mod bundling;
 pub mod cache;
 pub mod chunker;
 pub mod context;
+pub mod debt_tracker;
 pub mod diff_parser;
 pub mod language_analyzer;
 pub mod llm;
