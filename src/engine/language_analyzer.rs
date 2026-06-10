@@ -5,10 +5,30 @@
 
 use crate::engine::diff_parser;
 
-/// Build language-specific context string from detected languages in the diff.
+/// Build language-specific context from already-parsed diff chunks.
 ///
-/// Detects which languages are present and injects relevant rules/patterns
-/// into the LLM prompt.
+/// Uses pre-parsed chunks to avoid redundant parsing.
+pub fn build_language_context_from_chunks(chunks: &[diff_parser::FileChunk]) -> String {
+    let languages = detect_languages(chunks);
+
+    if languages.is_empty() {
+        return String::new();
+    }
+
+    let mut parts = Vec::new();
+    parts.push("LANGUAGE-SPECIFIC REVIEW GUIDANCE:".to_string());
+
+    for lang in &languages {
+        if let Some(rules) = get_language_rules(lang) {
+            parts.push(rules.to_string());
+        }
+    }
+
+    parts.join("\n\n")
+}
+
+/// Build language-specific context string from raw diff text.
+#[allow(dead_code)]
 pub fn build_language_context(diff_text: &str) -> String {
     let chunks = diff_parser::parse_diff(diff_text);
     let languages = detect_languages(&chunks);

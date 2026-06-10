@@ -14,14 +14,14 @@ use crate::engine::rules::types::RuleFinding;
 
 // ─── Security patterns ───
 
-struct SecurityPattern {
-    id: &'static str,
-    name: &'static str,
-    regex: &'static str,
-    severity: Severity,
+pub struct SecurityPattern {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub regex: &'static str,
+    pub severity: Severity,
 }
 
-static PATTERNS: &[SecurityPattern] = &[
+pub static PATTERNS: &[SecurityPattern] = &[
     // ── Weak crypto ──
     SecurityPattern {
         id: "crypto/md5-password",

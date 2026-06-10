@@ -11,6 +11,7 @@ mod error;
 mod formatters;
 mod git;
 mod hook;
+mod mcp;
 mod progress;
 
 use commands::{
@@ -245,6 +246,9 @@ enum Command {
         /// Shell name: bash, zsh, fish, or powershell
         shell: String,
     },
+
+    /// Start MCP server (Model Context Protocol for AI agents)
+    Mcp,
 }
 
 #[derive(Subcommand, Debug)]
@@ -499,6 +503,10 @@ async fn main() -> Result<()> {
         }
         Command::Completion { shell } => {
             completion::execute_completion(&shell)?;
+            0
+        }
+        Command::Mcp => {
+            mcp::server::run_server()?;
             0
         }
     };
