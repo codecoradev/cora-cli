@@ -192,8 +192,9 @@ async fn review_diff_inner(
         combined_context
     };
 
-    // Inject language-specific context
-    let lang_context = crate::engine::language_analyzer::build_language_context(diff);
+    // Inject language-specific context (reuses parsed diff_chunks)
+    let lang_context =
+        crate::engine::language_analyzer::build_language_context_from_chunks(&diff_chunks);
     let final_context = if !lang_context.is_empty() {
         match final_context {
             Some(ctx) => Some(format!("{lang_context}\n\n{ctx}")),
