@@ -130,8 +130,19 @@ cora uses standard exit codes for scripting and CI integration:
 |------|---------|-------------|
 | `0` | No issues found | Pass |
 | `1` | Issues found | Fail (warning/error) |
-| `2` | Review blocked | Fail (auth/config error) |
+| `2` | Quality gate failed or review blocked | Fail (threshold exceeded) |
 | `3` | Authentication error | Fail (missing API key) |
+
+## MCP Server
+
+cora includes a built-in MCP server for AI coding agent integration.
+
+```bash
+# Start MCP server (JSON-RPC 2.0 over stdio)
+cora mcp
+```
+
+See [Configuration → MCP Server](./configuration#mcp-server) for setup guides for Claude Code, Cursor, and other agents.
 
 ## Tips
 

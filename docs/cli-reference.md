@@ -46,6 +46,7 @@ Complete command reference for the cora CLI.
 | `cora providers` | List detected AI providers |
 | `cora upload-sarif` `<file>` | Upload SARIF to GitHub Code Scanning |
 | `cora completion` `<shell>` | Generate shell completions (bash/zsh/fish) |
+| `cora mcp` | Start MCP server for AI coding agents (Claude Code, Cursor, Windsurf) |
 
 ## Quick Examples
 
