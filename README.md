@@ -14,7 +14,7 @@
 
 ---
 
-**Cora** is a fast, native CLI that uses any LLM to review your code — in your terminal, CI/CD, or git hooks. Bring your own key, pick any model, review in seconds.
+**Cora** is a fast, native CLI that uses any LLM to review your code — in your terminal, CI/CD, git hooks, or directly inside AI coding agents. Bring your own key, pick any model, review in seconds.
 
 ## Why Cora?
 
@@ -22,7 +22,13 @@
 - ⚡ **Native Rust** — fast binary, no runtime dependencies, cross-platform
 - 🪝 **Pre-commit hooks** — catch issues before they reach CI
 - 📋 **SARIF output** — upload to GitHub Code Scanning
-- 🛡️ **Deterministic rules + secrets scanner** — regex-based pre-scan that always catches known patterns and leaked credentials
+- 🛡️ **Deterministic scanners** — 11 security patterns + 12 secret detection patterns that run without LLM
+- 🧠 **Language-specific analysis** — tailored review guidance for Dart/Flutter, Svelte, TypeScript, Go, Rust, Python
+- 🚧 **Quality gate** — configurable pass/fail thresholds for CI enforcement
+- 📐 **Quality profiles** — strict, balanced, or lax presets for different project needs
+- 📏 **Custom rule engine** — write your own regex rules in `.cora.yaml`
+- ✂️ **Auto-chunking** — splits large PRs into reviewable chunks automatically
+- 🔌 **MCP server** — expose rules and config to AI agents (Claude Code, Cursor, Copilot, Windsurf)
 - 💾 **Diff-hash caching** — skip repeat reviews automatically
 - 🔧 **Configurable** — per-project `.cora.yaml`, global `~/.cora/config.yaml`, or env vars
 
@@ -131,6 +137,7 @@ Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](https://codecor
 | `cora auth login` | Save API key |
 | `cora config show` | Show resolved config |
 | `cora providers` | List available LLM providers |
+| `cora mcp` | Start MCP server for AI coding agents |
 | `cora hook install` | Install pre-commit hook |
 
 See **[CLI Reference →](https://codecora.dev/cli-reference.html)** for all flags and examples.

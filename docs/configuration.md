@@ -234,3 +234,127 @@ cora runs a deterministic secrets scan before the AI review. 12 built-in pattern
 | And more (Groq, xAI, Slack, Stripe, Google) | Varies |
 
 Secrets are automatically **masked** in output (e.g. `AKIA****CDEF`). Test/spec/fixture files are auto-skipped.
+
+## Static Security Scanner
+
+cora runs a static security scan on added lines before the AI review. 11 built-in patterns detect common vulnerabilities:
+
+| Pattern | Category | Severity |
+|---------|----------|----------|
+| MD5 used for password hashing | Weak crypto | Major |
+| SHA-1 used for password hashing | Weak crypto | Major |
+| Weak hash algorithm (MD5/SHA1) | Weak crypto | Minor |
+| Hardcoded password or secret | Hardcoded secret | Critical |
+| SQL injection via string concatenation | Injection | Critical |
+| eval() with dynamic input | Injection | Critical |
+| Command injection via exec/system | Injection | Critical |
+| Hardcoded role or permission check | Auth | Major |
+| Debug mode enabled | Config | Major |
+| CORS wildcard allows all origins | Config | Major |
+| SSL certificate verification disabled | Crypto | Critical |
+
+Test files are automatically skipped. Findings are injected into the LLM prompt as additional context.
+
+## Language-Specific Analyzers
+
+cora detects the languages in your diff and injects tailored review guidance:
+
+| Language | Guidance |
+|----------|----------|
+| **Dart / Flutter** | Widget lifecycle, state management, async patterns, null safety |
+| **Svelte / TypeScript** | Reactivity, store patterns, SSR considerations, type safety |
+| **Go** | Error handling, concurrency, goroutine leaks, interface design |
+| **Rust** | Ownership, lifetimes, error handling, unsafe usage, idioms |
+| **Python** | Type hints, async patterns, security (pickle/eval), common pitfalls |
+
+No configuration needed — language context is auto-detected from file extensions in the diff.
+
+## Quality Profiles
+
+cora includes built-in quality profiles for different review strictness:
+
+| Profile | Description |
+|---------|------------|
+| `strict` | All categories enabled, low tolerance for issues |
+| `balanced` | *(default)* Security + bugs + performance, moderate thresholds |
+| `lax` | Only critical issues, high tolerance |
+
+Set in `.cora.yaml`:
+
+```yaml
+profile: strict
+```
+
+## Custom Rule Engine
+
+Write your own regex-based rules in `.cora.yaml`:
+
+```yaml
+rules:
+  - id: no-unwrap
+    pattern: "\\.unwrap\\(\\)"
+    severity: warning
+    message: "Avoid unwrap() in production code — use proper error handling"
+    languages: ["rust"]
+    exclude: ["tests/**"]
+
+  - id: no-console-log
+    pattern: "console\\.log\\("
+    severity: minor
+    message: "Remove console.log before merging"
+    languages: ["typescript", "javascript"]
+```
+
+Rules run during the deterministic pre-scan phase (no LLM needed).
+
+## MCP Server
+
+cora includes a built-in MCP (Model Context Protocol) server that exposes rules and config to AI coding agents like Claude Code, Cursor, Copilot, and Windsurf.
+
+### Start the server
+
+```bash
+cora mcp
+```
+
+### Available tools
+
+| Tool | Description |
+|------|-------------|
+| `cora.list_rules` | List all rules, security patterns, and secret patterns |
+| `cora.check_snippet` | Check a code snippet against deterministic scanners (no LLM) |
+| `cora.get_quality_gate` | Get quality gate config and thresholds |
+| `cora.get_config` | Get effective project config (no secrets exposed) |
+| `cora.list_profiles` | List all quality profiles |
+
+### Configure in Claude Code
+
+Add to your project's `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "cora": {
+      "command": "cora",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### Configure in Cursor
+
+Add to `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "cora": {
+      "command": "cora",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+The MCP server communicates via JSON-RPC 2.0 over stdio — no HTTP server needed.
