@@ -219,6 +219,47 @@ quality_gate:
 
 When `quality_gate.enabled` is `false` (default), quality gate is skipped. The existing `--ci` flag and `hook.on_violation` settings continue to work as before.
 
+## Debt Tracking
+
+cora tracks review findings over time and reports quality trends. After each review, a lightweight JSON snapshot is saved to `.cora/history/`. Use `cora debt` to view the aggregated report.
+
+```yaml
+debt:
+  enabled: true              # enable auto-save of review snapshots
+  history_dir: .cora/history # directory for snapshot files
+  retention_days: 90         # auto-cleanup old snapshots
+```
+
+### CLI Usage
+
+```bash
+cora debt                    # show debt report table
+cora debt --json             # machine-readable JSON
+cora debt --trend            # quality score trend graph
+cora debt --badge            # shields.io badge JSON
+cora debt --estimate         # show estimated fix time
+cora debt --since v0.4.5     # filter by git tag or date
+```
+
+### Quality Score
+
+Ranges from 0–10 (10 = no issues). Penalties per finding:
+
+| Severity | Penalty |
+|----------|--------|
+| Critical | -2.0 |
+| Major | -1.0 |
+| Minor | -0.3 |
+| Info | -0.1 |
+
+### Badge Integration
+
+Use `cora debt --badge` output as a shields.io endpoint:
+
+```markdown
+[![Quality](https://img.shields.io/endpoint?url=https://example.com/cora-badge.json)]()
+```
+
 ## Secrets Pre-Scan
 
 cora runs a deterministic secrets scan before the AI review. 12 built-in patterns detect leaked credentials:

@@ -17,7 +17,7 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 ```bash
 cargo build              # Build (debug)
 cargo build --release    # Build (release)
-cargo test               # Run all 453 tests
+cargo test               # Run all 495 tests
 cargo clippy --all-targets -- -D warnings  # Lint (strict)
 cargo fmt --all -- --check  # Format check
 ```
@@ -33,6 +33,7 @@ src/
 │   ├── mod.rs
 │   ├── review.rs        # cora review (diff-based review)
 │   ├── scan.rs          # cora scan (full-file scan)
+│   ├── debt.rs          # cora debt (tech debt report)
 │   ├── config_cmd.rs    # cora config (show/set/validate)
 │   ├── auth.rs          # cora auth (API key management)
 │   ├── hook_cmd.rs      # cora hook (pre-commit hook install/uninstall)
@@ -55,6 +56,7 @@ src/
 │   ├── chunker.rs       # Auto-chunking large diffs
 │   ├── profiles.rs      # Quality profiles (strict/balanced/lax)
 │   ├── quality_gate.rs  # Quality gate thresholds + pass/fail
+│   ├── debt_tracker.rs  # Tech debt metrics + trend tracking
 │   ├── security_scanner.rs  # Static security pattern matching
 │   ├── language_analyzer.rs # Language-specific review guidance
 │   ├── secrets_scanner.rs   # Secret/credential detection
@@ -96,7 +98,7 @@ src/
 ## Testing
 
 ```bash
-cargo test               # 453 tests total
+cargo test               # 495 tests total
                          #   431 unit tests
                          #    16 CLI integration tests
                          #     6 config tests
@@ -228,7 +230,7 @@ Missing any = release blocker.
 ### 1. Code
 
 - [ ] All target issues merged to `develop`
-- [ ] `cargo test` — all 453+ tests pass
+- [ ] `cargo test` — all 495+ tests pass
 - [ ] `cargo clippy --all-targets -- -D warnings` — clean
 - [ ] `cargo fmt --all -- --check` — clean
 - [ ] `cargo build --release` — no errors
@@ -298,7 +300,7 @@ When submitting cora to directories, aggregators, or showcases (Trendshift, etc.
 
 ### Key Metrics to Mention
 
-- Test count (453+)
+- Test count (495+)
 - Lines of Rust code (16,800+)
 - CI checks (10)
 - GitHub Marketplace action published

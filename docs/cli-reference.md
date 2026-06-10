@@ -45,6 +45,13 @@ Complete command reference for the cora CLI.
 | `cora auth remove` | Remove stored API key |
 | `cora providers` | List detected AI providers |
 | `cora upload-sarif` `<file>` | Upload SARIF to GitHub Code Scanning |
+| `cora debt` | Show tech debt report from review history |
+| `cora debt --json` | Debt report as JSON (for CI/dashboards) |
+| `cora debt --trend` | Quality score trend graph |
+| `cora debt --badge` | Shields.io badge JSON endpoint |
+| `cora debt --estimate` | Show estimated fix time |
+| `cora debt --since v0.4.5` | Filter by git tag or date |
+| `cora debt --branch main` | Filter by branch |
 | `cora completion` `<shell>` | Generate shell completions (bash/zsh/fish) |
 | `cora mcp` | Start MCP server for AI coding agents (Claude Code, Cursor, Windsurf) |
 

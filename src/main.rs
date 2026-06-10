@@ -267,6 +267,14 @@ enum Command {
         /// Filter by branch name
         #[clap(long)]
         branch: Option<String>,
+
+        /// Output shields.io badge JSON
+        #[clap(long)]
+        badge: bool,
+
+        /// Show estimated debt fix time
+        #[clap(long)]
+        estimate: bool,
     },
 }
 
@@ -533,12 +541,16 @@ async fn main() -> Result<()> {
             trend,
             since,
             branch,
+            badge,
+            estimate,
         } => {
             let opts = debt::DebtOptions {
                 json,
                 trend,
                 since,
                 branch,
+                badge,
+                estimate,
             };
             debt::execute_debt(&opts)?
         }

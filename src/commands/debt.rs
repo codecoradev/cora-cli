@@ -21,6 +21,10 @@ pub struct DebtOptions {
     pub since: Option<String>,
     /// Filter: only snapshots for this branch.
     pub branch: Option<String>,
+    /// Generate shields.io badge JSON.
+    pub badge: bool,
+    /// Show estimated debt fix time.
+    pub estimate: bool,
 }
 
 /// Execute the `cora debt` subcommand.
@@ -68,8 +72,25 @@ pub fn execute_debt(opts: &DebtOptions) -> Result<i32> {
 
     let report = debt_tracker::aggregate(&snapshots);
 
+    if opts.badge {
+        let badge = debt_tracker::generate_badge(&report);
+        let json = serde_json::to_string(&badge)?;
+        println!("{json}");
+        return Ok(EXIT_OK);
+    }
+
     if opts.json {
-        let json = serde_json::to_string_pretty(&report)?;
+        // Add debt estimation to report output
+        let hours = debt_tracker::estimate_debt_hours(&report.findings);
+        let mut json_report = serde_json::to_value(&report)?;
+        if let Some(obj) = json_report.as_object_mut() {
+            obj.insert("estimated_debt_hours".to_string(), serde_json::json!(hours));
+            obj.insert(
+                "estimated_debt_human".to_string(),
+                serde_json::json!(debt_tracker::format_debt_hours(hours)),
+            );
+        }
+        let json = serde_json::to_string_pretty(&json_report)?;
         println!("{json}");
         return Ok(EXIT_OK);
     }
@@ -79,7 +100,7 @@ pub fn execute_debt(opts: &DebtOptions) -> Result<i32> {
         println!();
     }
 
-    print_debt_table(&report);
+    print_debt_table(&report, opts.estimate);
 
     Ok(EXIT_OK)
 }
@@ -148,7 +169,7 @@ fn resolve_tag_date(tag: &str) -> Option<chrono::DateTime<chrono::Utc>> {
 }
 
 /// Print the debt report as a terminal table.
-fn print_debt_table(report: &debt_tracker::DebtReport) {
+fn print_debt_table(report: &debt_tracker::DebtReport, show_estimate: bool) {
     let mut out = Vec::new();
 
     // Header
@@ -198,6 +219,13 @@ fn print_debt_table(report: &debt_tracker::DebtReport) {
         change_str
     )
     .unwrap();
+
+    // Debt estimation
+    if show_estimate {
+        let hours = debt_tracker::estimate_debt_hours(&report.findings);
+        let human = debt_tracker::format_debt_hours(hours);
+        writeln!(out, "  Est. Debt: {}", human.yellow()).unwrap();
+    }
 
     // Severity breakdown
     writeln!(out).unwrap();
