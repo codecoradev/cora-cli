@@ -219,3 +219,96 @@ These are hard-won lessons from actual development sessions. Follow them.
   fixtures. Without exemptions, noise drowns out real findings.
 - **Balance sensitivity.** Too strict = wall of false positives. Too loose = miss
   real vulnerabilities. Start conservative, tune based on real findings.
+
+## Pre-Release Checklist
+
+Before any release (version bump + tag), verify ALL of these are done.
+Missing any = release blocker.
+
+### 1. Code
+
+- [ ] All target issues merged to `develop`
+- [ ] `cargo test` — all 453+ tests pass
+- [ ] `cargo clippy --all-targets -- -D warnings` — clean
+- [ ] `cargo fmt --all -- --check` — clean
+- [ ] `cargo build --release` — no errors
+- [ ] `./target/release/cora --version` — prints correct version
+- [ ] `./target/release/cora mcp --help` — new subcommands work
+- [ ] `./target/release/cora review --staged` — no crash on clean tree
+
+### 2. Documentation (Every File)
+
+Documentation drift is the #1 source of user confusion. Each file must reflect
+reality BEFORE version bump.
+
+| File | What to check |
+|------|---------------|
+| `README.md` | "Why Cora" bullets match all features. Commands table includes all subcommands. Config example shows latest features. All links point to `codecora.dev` |
+| `CHANGELOG.md` | New version entry with ALL changes (Added, Changed, Fixed, Removed). Link references at bottom include new version |
+| `docs/changelog.md` | Mirrors `CHANGELOG.md` exactly — same content, same links |
+| `docs/roadmap.md` | Completed items marked ✓ Done (not ◎ Planned). Future items accurate |
+| `docs/getting-started.md` | Quick start still works. Next steps links valid. New major features mentioned |
+| `docs/configuration.md` | All config keys documented with examples. New sections (quality gate, security scanner, MCP, profiles, custom rules, language analyzers) present |
+| `docs/cli-reference.md` | All commands listed. New subcommands (e.g. `cora mcp`) included. Flags accurate |
+| `docs/usage.md` | Review modes, output formats, exit codes up to date. New sections present |
+| `docs/examples.md` | CI examples work. Marketplace action reference correct. Multi-platform examples present |
+| `docs/providers.md` | Provider list, default models, env vars accurate |
+| `docs/installation.md` | Version pin example uses latest. Platforms list accurate |
+| `AGENT.md` | Code structure tree current. Test count current. Key files table current |
+| `.agent.md` | Pre-release checklist current. CI checks count current. Module dependencies current |
+
+### 3. Cross-Check
+
+- [ ] **Feature coverage**: Every new feature appears in README + CHANGELOG + docs/configuration.md + docs/roadmap.md
+- [ ] **Consistent terminology**: Same name for features across all files (e.g. "Quality Gate" not "quality gate" or "gate check")
+- [ ] **No broken links**: All `codecora.dev` links resolve. All internal doc links work
+- [ ] **Version numbers**: README install example, docs/installation.md pin example, AGENT.md test count — all match current version
+- [ ] **Star History chart**: Repository list includes all relevant repos (e.g. `cora-cli,uteke`)
+
+### 4. CI & Scanning
+
+- [ ] CI: 10/10 checks green on develop branch
+- [ ] Code Scanning: 0 open alerts (fix or dismiss each with reason)
+- [ ] No open PRs blocking the release
+
+### 5. Post-Merge Verification
+
+After merging to `main`:
+
+- [ ] `release.yml` triggers on `v*` tag
+- [ ] 4 platform binaries published to GitHub Releases
+- [ ] `crates.io` publish succeeds
+- [ ] Website (`codecora.dev`) reflects new docs
+- [ ] Marketplace action still works (test on a PR)
+
+## External Submissions
+
+When submitting cora to directories, aggregators, or showcases (Trendshift, etc.):
+
+### Description Template
+
+> Cora CLI — Open-source AI code review tool written in Rust. BYOK (Bring Your Own Key) —
+> works with any OpenAI-compatible LLM. Runs locally via CLI, CI/CD, pre-commit hooks, or
+> as an MCP server for AI coding agents (Claude Code, Cursor, Copilot).
+>
+> Features: diff-based review, static security scanning (11 regex patterns), quality gate
+> with configurable thresholds, language-specific analyzers (Dart/Flutter, Svelte,
+> TypeScript, Go, Rust, Python), secret detection, custom rule engine, quality profiles,
+> auto-chunking for large PRs, and SARIF output for CI integration.
+
+### Key Metrics to Mention
+
+- Test count (453+)
+- Lines of Rust code (16,800+)
+- CI checks (10)
+- GitHub Marketplace action published
+- MCP server with 5 tools
+- MIT license
+- Active development cadence
+
+### Pre-Submission Checks
+
+- [ ] README accurately describes ALL current features (not outdated)
+- [ ] All docs synced (changelog, roadmap, configuration, CLI reference)
+- [ ] No stale "Planned" items on roadmap that are actually done
+- [ ] Star History chart includes all relevant repos
