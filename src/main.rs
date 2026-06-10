@@ -15,7 +15,7 @@ mod mcp;
 mod progress;
 
 use commands::{
-    auth, completion, config_cmd, hook_cmd, init, profile, providers, review, scan, upload,
+    auth, completion, config_cmd, debt, hook_cmd, init, profile, providers, review, scan, upload,
 };
 use config::loader;
 use formatters::OutputFormat;
@@ -249,6 +249,25 @@ enum Command {
 
     /// Start MCP server (Model Context Protocol for AI agents)
     Mcp,
+
+    /// Show tech debt report from review history
+    Debt {
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+
+        /// Show quality score trend graph
+        #[clap(long)]
+        trend: bool,
+
+        /// Only show data since a date (YYYY-MM-DD) or git tag
+        #[clap(long)]
+        since: Option<String>,
+
+        /// Filter by branch name
+        #[clap(long)]
+        branch: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -508,6 +527,20 @@ async fn main() -> Result<()> {
         Command::Mcp => {
             mcp::server::run_server()?;
             0
+        }
+        Command::Debt {
+            json,
+            trend,
+            since,
+            branch,
+        } => {
+            let opts = debt::DebtOptions {
+                json,
+                trend,
+                since,
+                branch,
+            };
+            debt::execute_debt(&opts)?
         }
     };
 
