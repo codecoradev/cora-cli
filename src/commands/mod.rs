@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod completion;
 pub mod config_cmd;
+pub mod debt;
 pub mod hook_cmd;
 pub mod init;
 pub mod profile;
