@@ -252,6 +252,7 @@ pub fn detect_language(path: &str) -> &'static str {
             "html" | "htm" => "html",
             "css" | "scss" | "sass" | "less" => "css",
             "dart" => "dart",
+            "svelte" => "svelte",
             "lua" => "lua",
             "zig" => "zig",
             "ex" | "exs" => "ex",
