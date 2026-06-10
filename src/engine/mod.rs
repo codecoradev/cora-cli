@@ -10,6 +10,7 @@ pub mod review;
 pub mod rules;
 pub mod scanner;
 pub mod secrets_scanner;
+pub mod security_scanner;
 pub mod static_analysis;
 pub mod types;
 

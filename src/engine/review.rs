@@ -123,27 +123,52 @@ async fn review_diff_inner(
         config.rules_config.max_findings,
     );
 
+    // Run deterministic security pattern scan (weak crypto, injection, etc.)
+    let security_findings = crate::engine::security_scanner::scan_security(
+        &diff_chunks,
+        config.rules_config.max_findings,
+    );
+
     let rule_context = crate::engine::rules::format_rule_context(&rule_findings);
     let secrets_context = crate::engine::rules::format_rule_context(&secrets_findings);
+    let security_context = crate::engine::rules::format_rule_context(&security_findings);
     // Keep a clone for merging after LLM (rule_findings may be consumed in error fallback)
     let rule_findings_clone = rule_findings.clone();
     let secrets_findings_clone = secrets_findings.clone();
+    let security_findings_clone = security_findings.clone();
 
-    // Combine static analysis + rule engine + secrets findings for LLM prompt
+    // Combine static analysis + rule engine + secrets + security findings for LLM prompt
     let combined_context = match (
         static_context.as_deref(),
         rule_context.as_str(),
         secrets_context.as_str(),
+        security_context.as_str(),
     ) {
-        (Some(sa), rc, sc) if !rc.is_empty() && !sc.is_empty() => {
+        (Some(sa), rc, sc, sec) if !rc.is_empty() && !sc.is_empty() && !sec.is_empty() => {
+            Some(format!("{sa}\n\n{rc}\n\n{sc}\n\n{sec}"))
+        }
+        (Some(sa), rc, sc, _) if !rc.is_empty() && !sc.is_empty() => {
             Some(format!("{sa}\n\n{rc}\n\n{sc}"))
         }
-        (Some(sa), rc, _) if !rc.is_empty() => Some(format!("{sa}\n\n{rc}")),
-        (Some(sa), _, sc) if !sc.is_empty() => Some(format!("{sa}\n\n{sc}")),
-        (Some(sa), _, _) => Some(sa.to_string()),
-        (_, rc, sc) if !rc.is_empty() && !sc.is_empty() => Some(format!("{rc}\n\n{sc}")),
-        (_, rc, _) if !rc.is_empty() => Some(rc.to_string()),
-        (_, _, sc) if !sc.is_empty() => Some(sc.to_string()),
+        (Some(sa), rc, _, sec) if !rc.is_empty() && !sec.is_empty() => {
+            Some(format!("{sa}\n\n{rc}\n\n{sec}"))
+        }
+        (Some(sa), _, sc, sec) if !sc.is_empty() && !sec.is_empty() => {
+            Some(format!("{sa}\n\n{sc}\n\n{sec}"))
+        }
+        (Some(sa), rc, _, _) if !rc.is_empty() => Some(format!("{sa}\n\n{rc}")),
+        (Some(sa), _, sc, _) if !sc.is_empty() => Some(format!("{sa}\n\n{sc}")),
+        (Some(sa), _, _, sec) if !sec.is_empty() => Some(format!("{sa}\n\n{sec}")),
+        (Some(sa), _, _, _) => Some(sa.to_string()),
+        (_, rc, sc, sec) if !rc.is_empty() && !sc.is_empty() && !sec.is_empty() => {
+            Some(format!("{rc}\n\n{sc}\n\n{sec}"))
+        }
+        (_, rc, sc, _) if !rc.is_empty() && !sc.is_empty() => Some(format!("{rc}\n\n{sc}")),
+        (_, rc, _, sec) if !rc.is_empty() && !sec.is_empty() => Some(format!("{rc}\n\n{sec}")),
+        (_, _, sc, sec) if !sc.is_empty() && !sec.is_empty() => Some(format!("{sc}\n\n{sec}")),
+        (_, rc, _, _) if !rc.is_empty() => Some(rc.to_string()),
+        (_, _, sc, _) if !sc.is_empty() => Some(sc.to_string()),
+        (_, _, _, sec) if !sec.is_empty() => Some(sec.to_string()),
         _ => None,
     };
 
@@ -223,6 +248,8 @@ async fn review_diff_inner(
                     crate::engine::rules::merge_rule_findings(vec![], rule_findings);
                 all_deterministic =
                     crate::engine::rules::merge_rule_findings(all_deterministic, secrets_findings);
+                all_deterministic =
+                    crate::engine::rules::merge_rule_findings(all_deterministic, security_findings);
                 let mut fallback = ReviewResponse {
                     issues: all_deterministic,
                     summary: format!(
@@ -243,7 +270,7 @@ async fn review_diff_inner(
         }
     };
 
-    // Merge rule findings + secrets findings with LLM issues
+    // Merge rule findings + secrets findings + security findings with LLM issues
     if !rule_findings_clone.is_empty() {
         response.issues =
             crate::engine::rules::merge_rule_findings(response.issues, rule_findings_clone);
@@ -251,6 +278,10 @@ async fn review_diff_inner(
     if !secrets_findings_clone.is_empty() {
         response.issues =
             crate::engine::rules::merge_rule_findings(response.issues, secrets_findings_clone);
+    }
+    if !security_findings_clone.is_empty() {
+        response.issues =
+            crate::engine::rules::merge_rule_findings(response.issues, security_findings_clone);
     }
 
     // Filter out issues with invalid file paths (hallucination guard)
