@@ -567,8 +567,8 @@ pub struct BadgeData {
 pub fn generate_badge(report: &DebtReport) -> BadgeData {
     let score = report.quality_score_avg;
     let trend_arrow = match report.trend.as_str() {
-        "improving" => " ▼",
-        "worsening" => " ▲",
+        "improving" => " ▼", // fewer findings = improving
+        "worsening" => " ▲", // more findings = worsening
         _ => "",
     };
     let color = if score >= 8.0 {
@@ -583,6 +583,33 @@ pub fn generate_badge(report: &DebtReport) -> BadgeData {
         schema_version: 1,
         label: "code quality".to_string(),
         message: format!("{:.1}/10{trend_arrow}", score),
+        color: color.to_string(),
+    }
+}
+
+/// Generate a badge that includes debt estimation.
+#[allow(dead_code)]
+pub fn generate_badge_with_debt(report: &DebtReport) -> BadgeData {
+    let score = report.quality_score_avg;
+    let hours = estimate_debt_hours(&report.findings);
+    let human = format_debt_hours(hours);
+    let trend_arrow = match report.trend.as_str() {
+        "improving" => " ▼", // fewer findings = improving
+        "worsening" => " ▲", // more findings = worsening
+        _ => "",
+    };
+    let color = if score >= 8.0 {
+        "green"
+    } else if score >= 5.0 {
+        "yellow"
+    } else {
+        "red"
+    };
+
+    BadgeData {
+        schema_version: 1,
+        label: "code quality".to_string(),
+        message: format!("{:.1}/10 · debt {human}{trend_arrow}", score),
         color: color.to_string(),
     }
 }

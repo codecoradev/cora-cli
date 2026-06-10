@@ -73,7 +73,11 @@ pub fn execute_debt(opts: &DebtOptions) -> Result<i32> {
     let report = debt_tracker::aggregate(&snapshots);
 
     if opts.badge {
-        let badge = debt_tracker::generate_badge(&report);
+        let badge = if opts.estimate {
+            debt_tracker::generate_badge_with_debt(&report)
+        } else {
+            debt_tracker::generate_badge(&report)
+        };
         let json = serde_json::to_string(&badge)?;
         println!("{json}");
         return Ok(EXIT_OK);

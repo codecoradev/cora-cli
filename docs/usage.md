@@ -187,7 +187,7 @@ Quality score ranges from 0 (worst) to 10 (best). Each finding reduces the score
 - Minor: -0.3
 - Info: -0.1
 
-Trend indicators: ▼ improving, ► stable, ▲ worsening.
+Trend indicators: ▼ improving (fewer findings), ► stable, ▲ worsening (more findings).
 
 ## Tips
 
