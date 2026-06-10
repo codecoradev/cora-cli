@@ -5,7 +5,7 @@ All notable changes to cora-cli are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2026-06-08
+## [0.5.0] - 2026-06-10
 
 ### Added
 
@@ -15,15 +15,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Terminal-formatted gate output with status table
   - Exit code 2 on gate failure
   - 12 unit tests covering all gate scenarios
-- **Diff chunker module** — `src/engine/chunker.rs` for splitting large diffs (#188, integration pending #228)
+- **Static Security Scanner** — 11 regex patterns for common vulnerabilities (#234)
+  - Weak crypto (MD5/SHA1 for passwords), hardcoded secrets, SQL injection, eval(), command injection
+  - Hardcoded roles, debug mode, CORS wildcard, SSL verify disabled
+  - Auto-skips test files; only scans added lines
+  - Findings injected into LLM prompt as additional context
+- **Language-Specific Analyzers** — tailored review guidance for 6 languages (#233)
+  - Dart/Flutter: widget lifecycle, state management, null safety
+  - Svelte/TypeScript: reactivity, stores, SSR, type safety
+  - Go: error handling, concurrency, goroutine leaks
+  - Rust: ownership, lifetimes, unsafe, idioms
+  - Python: type hints, async, security patterns
+- **MCP Server** — expose rules and config to AI coding agents (#207)
+  - JSON-RPC 2.0 over stdio transport
+  - 5 tools: `list_rules`, `check_snippet`, `get_quality_gate`, `get_config`, `list_profiles`
+  - `cora mcp` subcommand
+  - Brace-depth stdin parsing (handles pretty-printed JSON)
+  - 17 unit tests
+- **Auto-chunking** — large diffs split into reviewable chunks automatically (#188)
+  - `--no-auto-chunk` flag to disable
+  - `src/engine/chunker.rs` module (~310 lines)
 - **Multi-platform CI docs** — Gitea/Forgejo, GitLab CI, Bitbucket Pipelines workflow examples (#225)
 
 ### Changed
 
 - **README links** — all documentation links now point to `codecora.dev` instead of relative file paths
 - **CI workflows** — removed stale SvelteKit `website/` jobs, replaced with VitePress `docs/` build
+- **`merge_into()` returns `Result`** — fail-fast on invalid profile config instead of silently continuing
+- **Language context reuses parsed diff** — `build_language_context_from_chunks()` eliminates redundant `parse_diff()` call
 - **13 stale issues closed** — migration epics, website tasks, v0.4 leftovers
 - **15 stale branches deleted** — cleanup after merge
+
+### Fixed
+
+- **Profiles bugs** — path resolution with project root, fail-fast on invalid config, dedup merge by `id` (#238)
+- **Code Scanning alert #79** — eliminated redundant `parse_diff()` call in language context injection
 
 ### Removed
 
@@ -398,8 +424,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.4.6...develop
-[0.4.6]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
+[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.5.0...develop
+[0.5.0]: https://github.com/codecoradev/cora-cli/compare/v0.4.7...v0.5.0
+[0.4.7]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/codecoradev/cora-cli/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/codecoradev/cora-cli/compare/v0.4.2...v0.4.3

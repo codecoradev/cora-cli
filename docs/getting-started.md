@@ -130,6 +130,31 @@ Now that you have cora running, explore these topics to get the most out of it:
 
 - [Installation](./installation) — install options and shell completions
 - [Usage](./usage) — review modes, output formats, and configuration
-- [Configuration](./configuration) — full .cora.yaml reference
+- [Configuration](./configuration) — full .cora.yaml reference, quality gate, security scanner, MCP server
 - [Providers](./providers) — setting up OpenAI, Anthropic, Groq, Ollama, and Z.AI
 - [CLI Reference](./cli-reference) — full command documentation
+- [Examples](./examples) — CI/CD setup for GitHub, GitLab, Gitea, Bitbucket
+
+## AI Agent Integration
+
+cora includes a built-in MCP server for AI coding agents. After installation:
+
+```bash
+# Start MCP server
+$ cora mcp
+```
+
+Configure in Claude Code (`.claude/settings.json`) or Cursor (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "cora": {
+      "command": "cora",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+See [Configuration → MCP Server](./configuration#mcp-server) for full setup guides.

@@ -65,17 +65,19 @@ Demand-gated — we build what people actually need. Track progress on [GitHub I
 
 ## v0.5 — Agent & Quality
 
-- [#205](https://github.com/codecoradev/cora-cli/issues/205) Quality gate — CI pass/fail thresholds — ◎ Planned
-- [#207](https://github.com/codecoradev/cora-cli/issues/207) MCP server — expose rules to AI agents — ◎ Planned
-- [#208](https://github.com/codecoradev/cora-cli/issues/208) Quality profiles — preset rule sets — ◎ Planned
+- [#205](https://github.com/codecoradev/cora-cli/issues/205) Quality gate — CI pass/fail thresholds — ✓ Done
+- [#234](https://github.com/codecoradev/cora-cli/issues/234) Static security scanner — 11 patterns — ✓ Done
+- [#233](https://github.com/codecoradev/cora-cli/issues/233) Language-specific analyzers (Dart, Svelte, TS, Go, Rust, Python) — ✓ Done
+- [#207](https://github.com/codecoradev/cora-cli/issues/207) MCP server — expose rules to AI agents — ✓ Done
+- [#238](https://github.com/codecoradev/cora-cli/issues/238) Quality profiles bug fix — path resolution, fail-fast, dedup — ✓ Done
+- [#188](https://github.com/codecoradev/cora-cli/issues/188) Auto-chunking for large diffs — ✓ Done
 - [#206](https://github.com/codecoradev/cora-cli/issues/206) Tech debt metrics — review history — ◎ Planned
-- [#188](https://github.com/codecoradev/cora-cli/issues/188) Auto-chunking for large diffs — ◎ Planned
 
 ## v0.6 — Growth & Marketplace
 
-- [#47](https://github.com/codecoradev/cora-cli/issues/47) GitHub Marketplace action — ◎ Planned
+- [#47](https://github.com/codecoradev/cora-cli/issues/47) GitHub Marketplace action — ✓ Done
+- [#196](https://github.com/codecoradev/cora-cli/issues/196) VitePress docs site — ✓ Done
 - [#161](https://github.com/codecoradev/cora-cli/issues/161) `cora gain` — local stats + viral sharing — ◎ Planned
-- [#196](https://github.com/codecoradev/cora-cli/issues/196) VitePress docs site — ◎ Planned
 - [#160](https://github.com/codecoradev/cora-cli/issues/160) Landing page redesign — ◎ Planned
 
 ## Future — What's Next
