@@ -276,24 +276,31 @@ pub async fn execute_review(
 
 /// Helper to get git commit and branch context for debt tracking.
 /// Returns (Some(commit), Some(branch)) if in a git repo, (None, None) otherwise.
+/// Results are cached per process to avoid spawning git on every review.
 fn get_git_context() -> (Option<String>, Option<String>) {
-    let commit = std::process::Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()
-        .and_then(|o| {
-            if o.status.success() {
-                String::from_utf8(o.stdout)
-                    .ok()
-                    .map(|s| s.trim().to_string())
-            } else {
-                None
-            }
-        });
+    use std::sync::LazyLock;
 
-    let branch = crate::git::get_current_branch().ok();
+    static CONTEXT: LazyLock<(Option<String>, Option<String>)> = LazyLock::new(|| {
+        let commit = std::process::Command::new("git")
+            .args(["rev-parse", "--short", "HEAD"])
+            .output()
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    String::from_utf8(o.stdout)
+                        .ok()
+                        .map(|s| s.trim().to_string())
+                } else {
+                    None
+                }
+            });
 
-    (commit, branch)
+        let branch = crate::git::get_current_branch().ok();
+
+        (commit, branch)
+    });
+
+    (CONTEXT.0.clone(), CONTEXT.1.clone())
 }
 
 /// Get the diff based on the provided options.

@@ -206,7 +206,9 @@ fn snapshot_filename(snapshot: &DebtSnapshot) -> String {
     let hash = snapshot.commit.as_deref().unwrap_or("unknown");
     // Take first 7 chars of commit hash
     let short_hash = if hash.len() > 7 { &hash[..7] } else { hash };
-    format!("{date}_{short_hash}.json")
+    // Add sub-second nanos to prevent same-second collision
+    let nanos = snapshot.timestamp.timestamp_subsec_nanos();
+    format!("{date}_{short_hash}_{:09}.json", nanos)
 }
 
 /// Resolve the history directory path.
@@ -749,10 +751,17 @@ mod tests {
             None,
         );
         let name = snapshot_filename(&snap);
-        // Should be like: 2026-06-10_123456_abcdef1.json
+        // Should be like: 2026-06-10_123456_abcdef1_000000000.json
         assert!(name.starts_with("2026"));
         assert!(name.contains("_abcdef1"));
         assert!(name.ends_with(".json"));
+        // Should have 3 underscore-separated segments before .json
+        let stem = name.trim_end_matches(".json");
+        let parts: Vec<&str> = stem.split('_').collect();
+        assert!(
+            parts.len() >= 3,
+            "expected at least 3 parts, got: {parts:?}"
+        );
     }
 
     #[test]
