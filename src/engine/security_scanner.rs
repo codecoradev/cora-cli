@@ -158,7 +158,7 @@ pub fn scan_security(chunks: &[FileChunk], max_findings: usize) -> Vec<RuleFindi
                         });
 
                         if findings.len() >= max_findings {
-                            findings.sort_by(|a, b| b.severity.cmp(&a.severity));
+                            findings.sort_by_key(|f| std::cmp::Reverse(f.severity));
                             return findings;
                         }
                     }
@@ -167,7 +167,7 @@ pub fn scan_security(chunks: &[FileChunk], max_findings: usize) -> Vec<RuleFindi
         }
     }
 
-    findings.sort_by(|a, b| b.severity.cmp(&a.severity));
+    findings.sort_by_key(|f| std::cmp::Reverse(f.severity));
     findings
 }
 
