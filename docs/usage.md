@@ -144,6 +144,51 @@ cora mcp
 
 See [Configuration → MCP Server](./configuration#mcp-server) for setup guides for Claude Code, Cursor, and other agents.
 
+## Tech Debt Tracking
+
+cora automatically tracks review findings over time, letting you answer "is our codebase getting better or worse?"
+
+```bash
+# Show debt report
+$ cora debt
+
+# Show trend graph over review history
+$ cora debt --trend
+
+# Machine-readable output for CI dashboards
+$ cora debt --json
+
+# Shields.io badge JSON (embed in README)
+$ cora debt --badge
+
+# Estimated fix time
+$ cora debt --estimate
+
+# Filter by date or git tag
+$ cora debt --since 2026-06-01
+$ cora debt --since v0.4.5
+
+# Filter by branch
+$ cora debt --branch develop
+```
+
+Snapshots are saved to `.cora/history/` after each review. Configure in `.cora.yaml`:
+
+```yaml
+debt:
+  enabled: true           # default
+  history_dir: .cora/history
+  retention_days: 90
+```
+
+Quality score ranges from 0 (worst) to 10 (best). Each finding reduces the score:
+- Critical: -2.0
+- Major: -1.0
+- Minor: -0.3
+- Info: -0.1
+
+Trend indicators: ▼ improving (fewer findings), ► stable, ▲ worsening (more findings).
+
 ## Tips
 
 - Use `cora review` with no flags for the fastest pre-commit feedback

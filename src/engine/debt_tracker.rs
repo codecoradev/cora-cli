@@ -510,6 +510,110 @@ impl DebtConfig {
     }
 }
 
+// ─── Debt estimation ───
+
+/// Estimated fix time in hours per severity level.
+const DEBT_HOURS_CRITICAL: f64 = 2.0;
+const DEBT_HOURS_MAJOR: f64 = 1.0;
+const DEBT_HOURS_MINOR: f64 = 0.25;
+const DEBT_HOURS_INFO: f64 = 0.1;
+
+/// Estimate total fix time from severity counts.
+#[allow(dead_code)]
+pub fn estimate_debt_hours(findings: &HashMap<String, usize>) -> f64 {
+    let critical = findings.get("critical").copied().unwrap_or(0) as f64;
+    let major = findings.get("major").copied().unwrap_or(0) as f64;
+    let minor = findings.get("minor").copied().unwrap_or(0) as f64;
+    let info = findings.get("info").copied().unwrap_or(0) as f64;
+
+    critical * DEBT_HOURS_CRITICAL
+        + major * DEBT_HOURS_MAJOR
+        + minor * DEBT_HOURS_MINOR
+        + info * DEBT_HOURS_INFO
+}
+
+/// Format debt hours as human-readable string.
+#[allow(dead_code)]
+pub fn format_debt_hours(hours: f64) -> String {
+    if hours < 1.0 {
+        format!("~{:.0}min", hours * 60.0)
+    } else if hours < 8.0 {
+        format!("~{:.1}h", hours)
+    } else {
+        format!("~{:.1}d", hours / 8.0)
+    }
+}
+
+// ─── Badge generation ───
+
+/// Generate a shields.io-compatible JSON badge endpoint for quality score.
+///
+/// Output can be hosted as a static JSON file and used with:
+/// `![quality](https://img.shields.io/endpoint?url=...badge.json)`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BadgeData {
+    /// Schema version (always 1).
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: u32,
+    /// Badge label.
+    pub label: String,
+    /// Badge message (score + trend).
+    pub message: String,
+    /// Badge color: green/yellow/red.
+    pub color: String,
+}
+
+#[allow(dead_code)]
+pub fn generate_badge(report: &DebtReport) -> BadgeData {
+    let score = report.quality_score_avg;
+    let trend_arrow = match report.trend.as_str() {
+        "improving" => " ▼", // fewer findings = improving
+        "worsening" => " ▲", // more findings = worsening
+        _ => "",
+    };
+    let color = if score >= 8.0 {
+        "green"
+    } else if score >= 5.0 {
+        "yellow"
+    } else {
+        "red"
+    };
+
+    BadgeData {
+        schema_version: 1,
+        label: "code quality".to_string(),
+        message: format!("{:.1}/10{trend_arrow}", score),
+        color: color.to_string(),
+    }
+}
+
+/// Generate a badge that includes debt estimation.
+#[allow(dead_code)]
+pub fn generate_badge_with_debt(report: &DebtReport) -> BadgeData {
+    let score = report.quality_score_avg;
+    let hours = estimate_debt_hours(&report.findings);
+    let human = format_debt_hours(hours);
+    let trend_arrow = match report.trend.as_str() {
+        "improving" => " ▼", // fewer findings = improving
+        "worsening" => " ▲", // more findings = worsening
+        _ => "",
+    };
+    let color = if score >= 8.0 {
+        "green"
+    } else if score >= 5.0 {
+        "yellow"
+    } else {
+        "red"
+    };
+
+    BadgeData {
+        schema_version: 1,
+        label: "code quality".to_string(),
+        message: format!("{:.1}/10 · debt {human}{trend_arrow}", score),
+        color: color.to_string(),
+    }
+}
+
 // ─── Tests ───
 
 #[cfg(test)]
@@ -993,5 +1097,119 @@ mod tests {
         let remaining = load_snapshots(Some(&dir_str));
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].commit.as_deref(), Some("new2222"));
+    }
+
+    // ─── estimate_debt_hours ───
+
+    #[test]
+    fn estimate_debt_empty() {
+        let hours = estimate_debt_hours(&HashMap::new());
+        assert!((hours - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn estimate_debt_critical_only() {
+        let mut findings = HashMap::new();
+        findings.insert("critical".to_string(), 3);
+        let hours = estimate_debt_hours(&findings);
+        assert!((hours - 6.0).abs() < f64::EPSILON); // 3 * 2.0
+    }
+
+    #[test]
+    fn estimate_debt_mixed() {
+        let mut findings = HashMap::new();
+        findings.insert("critical".to_string(), 1);
+        findings.insert("major".to_string(), 2);
+        findings.insert("minor".to_string(), 4);
+        findings.insert("info".to_string(), 3);
+        let hours = estimate_debt_hours(&findings);
+        // 1*2.0 + 2*1.0 + 4*0.25 + 3*0.1 = 2.0 + 2.0 + 1.0 + 0.3 = 5.3
+        assert!((hours - 5.3).abs() < 0.001);
+    }
+
+    // ─── format_debt_hours ───
+
+    #[test]
+    fn format_debt_minutes() {
+        assert_eq!(format_debt_hours(0.5), "~30min");
+    }
+
+    #[test]
+    fn format_debt_hours_display() {
+        assert_eq!(format_debt_hours(3.5), "~3.5h");
+    }
+
+    #[test]
+    fn format_debt_days() {
+        assert_eq!(format_debt_hours(16.0), "~2.0d");
+    }
+
+    // ─── generate_badge ───
+
+    #[test]
+    fn badge_high_score() {
+        let report = aggregate(&[DebtSnapshot::from_review(
+            &[],
+            None,
+            None,
+            None,
+            1,
+            None,
+            None,
+        )]);
+        let badge = generate_badge(&report);
+        assert_eq!(badge.schema_version, 1);
+        assert_eq!(badge.label, "code quality");
+        assert!(badge.message.contains("10.0/10"));
+        assert_eq!(badge.color, "green");
+    }
+
+    #[test]
+    fn badge_medium_score() {
+        let report = aggregate(&[DebtSnapshot::from_review(
+            &[
+                make_issue(Severity::Major, "bug"),
+                make_issue(Severity::Major, "bug"),
+                make_issue(Severity::Major, "bug"),
+            ],
+            None,
+            None,
+            None,
+            1,
+            None,
+            None,
+        )]);
+        let badge = generate_badge(&report);
+        // 10.0 - 3.0 = 7.0, which is >= 5.0 and < 8.0 = yellow
+        assert_eq!(badge.color, "yellow");
+    }
+
+    #[test]
+    fn badge_low_score() {
+        let issues: Vec<ReviewIssue> = (0..6)
+            .map(|_| make_issue(Severity::Critical, "security"))
+            .collect();
+        let report = aggregate(&[DebtSnapshot::from_review(
+            &issues, None, None, None, 1, None, None,
+        )]);
+        let badge = generate_badge(&report);
+        assert_eq!(badge.color, "red");
+    }
+
+    #[test]
+    fn badge_serializes_with_rename() {
+        let report = aggregate(&[DebtSnapshot::from_review(
+            &[],
+            None,
+            None,
+            None,
+            1,
+            None,
+            None,
+        )]);
+        let badge = generate_badge(&report);
+        let json = serde_json::to_string(&badge).unwrap();
+        // Should use camelCase for shields.io compatibility
+        assert!(json.contains("\"schemaVersion\":"));
     }
 }
