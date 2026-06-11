@@ -40,6 +40,7 @@ ignore = "0.4"
 
 # Error handling
 anyhow = "1"
+which = "7"
 thiserror = "2"
 
 # Config
