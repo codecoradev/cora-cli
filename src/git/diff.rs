@@ -58,6 +58,16 @@ fn git_cmd(args: &[&str]) -> std::result::Result<String, CoraError> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        let stderr_str = stderr.trim();
+
+        // Detect common git errors and provide friendly messages
+        if stderr_str.contains("not a git repository")
+            || stderr_str.contains("unknown option `cached'")
+            || stderr_str.contains("Not a git repository")
+        {
+            return Err(CoraError::NotInGitRepo);
+        }
+
         return Err(CoraError::GitCommand {
             command: args.join(" "),
             stderr: stderr.to_string(),
