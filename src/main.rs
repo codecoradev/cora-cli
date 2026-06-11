@@ -694,9 +694,6 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         String::new()
     };
 
-    // TODO: inject memory_context into review prompt (Phase 2 integration)
-    let _ = &memory_context;
-
     // Execute the review (returns formatted output)
     let result = review::execute_review(
         &config,
@@ -704,8 +701,18 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         &review_opts,
         effective_format,
         &progress_reporter,
+        if !memory_context.is_empty() {
+            Some(memory_context.as_str())
+        } else {
+            None
+        },
     )
     .await?;
+
+    // Show memory status if context was used
+    if !memory_context.is_empty() && !opts.quiet {
+        eprintln!("{}", "ℹ Review enriched with Uteke memory context.".cyan());
+    }
 
     // Print the formatted output (to file if --output-file, else stdout)
     if let Some(ref path) = opts.output_file {
@@ -729,10 +736,16 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         let project = repo_name_from_git().unwrap_or_else(|| "unknown".to_string());
         memory_backend.save_findings(
             &project,
-            0, // TODO: extract from result
-            "",
-            &[],
+            result.total_issues,
+            &result.severity_summary,
+            &result.categories,
         );
+        if !opts.quiet {
+            eprintln!(
+                "{}",
+                format!("💾 Saved {} findings to Uteke memory.", result.total_issues).dimmed()
+            );
+        }
     }
 
     Ok(result.exit_code)

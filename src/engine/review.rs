@@ -60,10 +60,21 @@ pub async fn review_diff_with_cache(
     stream: bool,
     use_cache: bool,
     quiet: bool,
+    memory_context: Option<&str>,
 ) -> std::result::Result<ReviewResponse, CoraError> {
-    review_diff_inner(config, llm_config, diff, stream, use_cache, quiet).await
+    review_diff_inner(
+        config,
+        llm_config,
+        diff,
+        stream,
+        use_cache,
+        quiet,
+        memory_context,
+    )
+    .await
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn review_diff_inner(
     config: &Config,
     llm_config: &LLMConfig,
@@ -71,6 +82,7 @@ async fn review_diff_inner(
     stream: bool,
     use_cache: bool,
     quiet: bool,
+    memory_context: Option<&str>,
 ) -> std::result::Result<ReviewResponse, CoraError> {
     debug!(
         diff_len = diff.len(),
@@ -217,7 +229,12 @@ async fn review_diff_inner(
         (None, ctx) => ctx,
     };
 
-    // Call LLM — but preserve deterministic rule findings even on LLM failure
+    // Inject memory context from Uteke (if --memory flag was used)
+    let final_context = match (memory_context, final_context) {
+        (Some(mem), Some(ctx)) => Some(format!("{mem}\n\n{ctx}")),
+        (Some(mem), None) => Some(mem.to_string()),
+        (None, ctx) => ctx,
+    }; // but preserve deterministic rule findings even on LLM failure
     let llm_result: Result<ReviewResponse, CoraError> = if stream {
         llm::review_diff_stream(
             llm_config,
