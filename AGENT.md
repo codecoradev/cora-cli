@@ -17,7 +17,7 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 ```bash
 cargo build              # Build (debug)
 cargo build --release    # Build (release)
-cargo test               # Run all 495 tests
+cargo test               # Run all 506 tests
 cargo clippy --all-targets -- -D warnings  # Lint (strict)
 cargo fmt --all -- --check  # Format check
 ```
@@ -62,6 +62,7 @@ src/
 │   ├── language_analyzer.rs # Language-specific review guidance
 │   ├── secrets_scanner.rs   # Secret/credential detection
 │   ├── debt_tracker.rs  # Tech debt metrics + history snapshots
+│   ├── memory.rs        # Uteke memory integration (recall + learn)
 │   └── rules/           # Custom rule engine
 │       ├── mod.rs
 │       ├── builtin.rs   # Built-in rules
@@ -100,8 +101,8 @@ src/
 ## Testing
 
 ```bash
-cargo test               # 495 tests total
-                         #   473 unit tests
+cargo test               # 506 tests total
+                         #   484 unit tests
                          #    16 CLI integration tests
                          #     6 config tests
 cargo test --no-verify   # Skip pre-commit hooks (avoids timeout in hooks)
@@ -232,7 +233,7 @@ Missing any = release blocker.
 ### 1. Code
 
 - [ ] All target issues merged to `develop`
-- [ ] `cargo test` — all 495+ tests pass
+- [ ] `cargo test` — all 506+ tests pass
 - [ ] `cargo clippy --all-targets -- -D warnings` — clean
 - [ ] `cargo fmt --all -- --check` — clean
 - [ ] `cargo build --release` — no errors
