@@ -24,7 +24,7 @@ export default defineConfig({
       { text: 'Changelog', link: '/changelog' },
       { text: 'Roadmap', link: '/roadmap' },
       {
-        text: 'v0.4.6',
+        text: 'v0.5.0',
         items: [
           { text: 'GitHub', link: 'https://github.com/codecoradev/cora-cli' },
           { text: 'Releases', link: 'https://github.com/codecoradev/cora-cli/releases' },
