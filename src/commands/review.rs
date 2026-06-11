@@ -48,39 +48,94 @@ pub struct ReviewOptions {
 
 /// Result of a review command execution.
 pub struct ReviewResult {
-    /// Exit code (0 = ok, 2 = blocked).
+    /// Exit code (0 = ok, 1 = issues, 2 = blocked).
     pub exit_code: i32,
     /// The formatted output string.
     pub output: String,
+    /// Total issues found (for memory integration).
+    pub total_issues: usize,
+    /// Severity summary (e.g. "1 critical, 2 major, 0 minor").
+    pub severity_summary: String,
+    /// Issue categories (e.g. ["security", "performance"]).
+    pub categories: Vec<String>,
+}
+
+impl ReviewResult {
+    /// Create a result from formatted output, extracting issue stats from the response.
+    fn with_issues(
+        exit_code: i32,
+        output: String,
+        response: &crate::engine::types::ReviewResponse,
+    ) -> Self {
+        let total_issues = response.issues.len();
+        let mut sev_counts: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let mut cat_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        for issue in &response.issues {
+            let sev = format!("{:?}", issue.severity).to_lowercase();
+            *sev_counts.entry(sev).or_insert(0) += 1;
+            if let Some(ref t) = issue.issue_type {
+                if !t.is_empty() {
+                    cat_set.insert(t.clone());
+                }
+            }
+        }
+
+        let severity_summary = if sev_counts.is_empty() {
+            String::new()
+        } else {
+            let mut parts: Vec<String> = sev_counts
+                .into_iter()
+                .map(|(k, v)| format!("{v} {k}"))
+                .collect();
+            parts.sort();
+            parts.join(", ")
+        };
+
+        Self {
+            exit_code,
+            output,
+            total_issues,
+            severity_summary,
+            categories: cat_set.into_iter().collect(),
+        }
+    }
+
+    /// Create a result with no issues (empty diff, errors, etc).
+    fn empty(exit_code: i32, output: String) -> Self {
+        Self {
+            exit_code,
+            output,
+            total_issues: 0,
+            severity_summary: String::new(),
+            categories: Vec::new(),
+        }
+    }
 }
 
 /// Execute the review command.
 ///
 /// Gets the diff, validates its size, calls the LLM engine, formats output,
 /// and returns the appropriate exit code along with the formatted output.
-#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 pub async fn execute_review(
     config: &Config,
     llm_config: &crate::engine::LLMConfig,
     opts: &ReviewOptions,
     format: OutputFormat,
     progress: &ProgressReporter,
+    memory_context: Option<&str>,
 ) -> Result<ReviewResult> {
     // 1. Get the diff
     let diff = get_diff(opts, config)?;
 
     if diff.trim().is_empty() {
         if opts.quiet {
-            return Ok(ReviewResult {
-                exit_code: EXIT_OK,
-                output: String::new(),
-            });
+            return Ok(ReviewResult::empty(EXIT_OK, String::new()));
         }
         let output = format!("{}\n", "No changes to review.".yellow());
-        return Ok(ReviewResult {
-            exit_code: EXIT_OK,
-            output,
-        });
+        return Ok(ReviewResult::empty(EXIT_OK, output));
     }
 
     // 2. Emit parsing_diff event if progress enabled
@@ -95,15 +150,20 @@ pub async fn execute_review(
         if opts.auto_chunk {
             // Auto-chunk mode: split diff and review each chunk
             return execute_chunked_review(
-                config, llm_config, opts, format, progress, &diff, max_size,
+                config,
+                llm_config,
+                opts,
+                format,
+                progress,
+                &diff,
+                max_size,
+                memory_context,
             )
             .await;
         }
         if config.hook.on_violation == "disallow" {
             // Return blocked result instead of error
-            return Ok(ReviewResult {
-                exit_code: EXIT_BLOCKED,
-                output: format!(
+            return Ok(ReviewResult::empty(EXIT_BLOCKED, format!(
                     "{}\n",
                     format!(
                         "❌ Diff too large ({} chars, max {}). Commit blocked. \
@@ -114,8 +174,7 @@ pub async fn execute_review(
                     )
                     .red()
                     .bold(),
-                ),
-            });
+                )));
         }
         anyhow::bail!(
             "Diff too large ({} chars, max {}). Use --auto-chunk to review in pieces, --base to review a specific branch, or increase hook.max_diff_size.",
@@ -145,6 +204,7 @@ pub async fn execute_review(
         opts.stream,
         !opts.no_cache,
         opts.quiet,
+        memory_context,
     )
     .await
     {
@@ -187,10 +247,7 @@ pub async fn execute_review(
                         }]
                     }]
                 });
-                return Ok(ReviewResult {
-                    exit_code: EXIT_OK,
-                    output: format!("{warning_output}\n"),
-                });
+                return Ok(ReviewResult::empty(EXIT_OK, format!("{warning_output}\n")));
             }
             return Err(e.into());
         }
@@ -271,10 +328,12 @@ pub async fn execute_review(
         );
     }
 
-    Ok(ReviewResult { exit_code, output })
+    Ok(ReviewResult::with_issues(
+        exit_code,
+        output,
+        &filtered_response,
+    ))
 }
-
-/// Helper to get git commit and branch context for debt tracking.
 /// Returns (Some(commit), Some(branch)) if in a git repo, (None, None) otherwise.
 /// Results are cached per process to avoid spawning git on every review.
 fn get_git_context() -> (Option<String>, Option<String>) {
@@ -340,7 +399,7 @@ fn get_diff(opts: &ReviewOptions, _config: &Config) -> Result<String> {
 ///
 /// Splits the diff into chunks, reviews each independently, then
 /// merges and deduplicates findings.
-#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_truncation, clippy::too_many_arguments)]
 async fn execute_chunked_review(
     config: &Config,
     llm_config: &crate::engine::LLMConfig,
@@ -349,15 +408,13 @@ async fn execute_chunked_review(
     progress: &ProgressReporter,
     diff: &str,
     max_size: usize,
+    memory_context: Option<&str>,
 ) -> Result<ReviewResult> {
     let chunks = chunker::chunk_diff(diff, max_size);
 
     if chunks.is_empty() {
         let output = format!("{}\n", "No changes to review.".yellow());
-        return Ok(ReviewResult {
-            exit_code: EXIT_OK,
-            output,
-        });
+        return Ok(ReviewResult::empty(EXIT_OK, output));
     }
 
     let total_chunks = chunks.len();
@@ -414,6 +471,7 @@ async fn execute_chunked_review(
             opts.stream,
             !opts.no_cache,
             opts.quiet,
+            memory_context,
         )
         .await
         {
@@ -494,15 +552,15 @@ async fn execute_chunked_review(
         if progress.is_enabled() {
             progress.error("All chunks failed during chunked review", "chunked_review");
         }
-        return Ok(ReviewResult {
-            exit_code: EXIT_BLOCKED,
-            output: format!(
+        return Ok(ReviewResult::empty(
+            EXIT_BLOCKED,
+            format!(
                 "{}\n",
                 "❌ All review chunks failed. Check your API key and try again."
                     .red()
                     .bold()
             ),
-        });
+        ));
     }
 
     // Build merged response
@@ -604,5 +662,9 @@ async fn execute_chunked_review(
         );
     }
 
-    Ok(ReviewResult { exit_code, output })
+    Ok(ReviewResult::with_issues(
+        exit_code,
+        output,
+        &filtered_response,
+    ))
 }
