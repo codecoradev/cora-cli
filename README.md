@@ -138,6 +138,8 @@ Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](https://codecor
 | `cora config show` | Show resolved config |
 | `cora providers` | List available LLM providers |
 | `cora debt` | Show tech debt report from review history |
+| `cora review --memory` | Recall project patterns from Uteke before review |
+| `cora review --learn` | Recall + save findings to Uteke |
 | `cora mcp` | Start MCP server for AI coding agents |
 | `cora hook install` | Install pre-commit hook |
 

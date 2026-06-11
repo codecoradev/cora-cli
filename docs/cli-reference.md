@@ -26,6 +26,8 @@ Complete command reference for the cora CLI.
 | `cora init` | Create `.cora.yaml` config file |
 | `cora review` | Review code changes (default: staged files) |
 | `cora review --staged` | Review staged git changes explicitly |
+| `cora review --memory` | Recall project patterns from Uteke before review |
+| `cora review --learn` | Recall + save findings to Uteke (implies --memory) |
 | `cora review --unstaged` | Review unstaged working changes |
 | `cora review --unpushed` | Review unpushed commits |
 | `cora review --base` `<branch>` | Compare current branch against target |

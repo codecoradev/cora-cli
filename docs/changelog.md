@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Auto-save after every review (best-effort, never fails review)
   - `debt:` config section in `.cora.yaml` (history_dir, retention_days)
   - 32 unit tests
+- **Uteke memory integration** — recall project patterns and learn from reviews (#232)
+  - `--memory` flag — recall context from Uteke before review
+  - `--learn` flag — recall + save findings after review
+  - `MemoryBackend` with auto-detect, graceful degradation when Uteke not installed
+  - 11 unit tests
 - **Multi-platform CI docs** — Gitea/Forgejo, GitLab CI, Bitbucket Pipelines workflow examples (#225)
 - **GitHub Marketplace action** — published as [`codecoradev/cora-review-action@v1`](https://github.com/marketplace/actions/cora-ai-code-review)
 - **Improved review prompt** — better consistency, lower false-negative rate, explicit error handling focus area
