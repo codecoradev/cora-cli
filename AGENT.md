@@ -286,6 +286,129 @@ After merging to `main`:
 - [ ] Website (`codecora.dev`) reflects new docs
 - [ ] Marketplace action still works (test on a PR)
 
+## Release Workflow
+
+Release authority belongs to the project owner only. The agent NEVER triggers a release
+without explicit approval. This workflow was established during v0.5.0 development.
+
+### Phase 1: Pre-Release Preparation (agent does this)
+
+Complete ALL items in the Pre-Release Checklist above. Every single checkbox must be green.
+
+### Phase 2: Validation Report (agent generates, owner reviews)
+
+Generate a comprehensive pre-release report covering:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║           LAPORAN PRE-RELEASE vX.Y.Z — FINAL               ║
+╚══════════════════════════════════════════════════════════════╝
+
+📦 REPOSITORY: codecoradev/cora-cli
+🌿 BRANCH:     develop (N commits ahead of main)
+🏷️  TAG:       Next → vX.Y.Z
+📋 CARGO:      version = "0.X.Y" (needs bump)
+
+✅ TESTS:        N pass (unit + CLI + config)
+✅ CLIPPY:       Clean
+✅ FORMAT:       Clean
+✅ CI:           10/10 green
+✅ CODE SCANNING: 0 open
+✅ OPEN PRs:      0
+✅ OPEN ISSUES:   N (all post-release scope)
+
+📋 vX.Y.Z FEATURES:
+   1. ...
+   2. ...
+
+📄 DOCS VERIFICATION:
+   ✅ README.md         — ...
+   ✅ CHANGELOG.md       — ...
+   ✅ docs/*             — ...
+   ✅ AGENT.md           — ...
+
+⚠️ REMAINING (post-release):
+   • ...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👍 SIAP RILIS — menunggu approval.
+```
+
+### Phase 3: Acceptance (owner decides)
+
+The owner reviews the report and either:
+- **APPROVES** → "oke kerjakan" / "go ahead" / "rilis"
+- **REQUESTS CHANGES** → specifies what to fix first
+- **POSTPONES** → "belum, tunggu dulu"
+
+**The agent must NEVER proceed without explicit approval.**
+
+### Phase 4: Release Execution (only after approval)
+
+```bash
+# 1. Bump version
+sed -i '' 's/version = "0.X.Y"/version = "0.X.Z"/' Cargo.toml
+
+# 2. Update version references in docs
+#    - docs/installation.md: CORA_VERSION pin example
+#    - AGENT.md: test count if changed
+#    - docs/.vitepress/config.ts: nav bar version
+
+# 3. Commit and tag
+git add -A && git commit -m "chore: bump version to X.Y.Z"
+git tag vX.Y.Z
+git push origin develop --tags
+
+# 4. release.yml auto-triggers:
+#    → sync develop → main (force push)
+#    → build 4 platforms (Linux x86_64, Linux ARM64, macOS ARM64, Windows)
+#    → publish to crates.io
+#    → create GitHub Release with changelog excerpt
+
+# 5. deploy-website.yml auto-triggers (on push to main):
+#    → build VitePress docs
+#    → deploy to codecora.dev
+```
+
+### Phase 5: Post-Release Verification (agent does this)
+
+After release completes, verify:
+
+- [ ] GitHub Release page shows vX.Y.Z with correct changelog
+- [ ] 4 platform binaries attached to release
+- [ ] SHA256 checksums file included
+- [ ] `crates.io` shows new version: `cargo search cora-cli`
+- [ ] `codecora.dev` reflects new docs
+- [ ] Marketplace action still works (test on a test PR)
+- [ ] Close the released milestone/issues
+- [ ] Update roadmap: mark released items
+
+### Rollback Procedure
+
+If release fails or has critical bugs:
+
+1. Delete the tag: `git push origin --delete vX.Y.Z`
+2. Delete the GitHub Release
+3. Yank from crates.io: `cargo yank cora-cli@X.Y.Z`
+4. Fix on develop, re-tag when ready
+
+### Version Numbering Convention
+
+- **Patch** (0.4.6 → 0.4.7): Bug fixes, docs updates, no new features
+- **Minor** (0.4.x → 0.5.0): New features, backwards compatible
+- **Major** (0.x → 1.0.0): Breaking changes
+- **Pre-release**: Tag with suffix (v0.5.0-beta.1) — `release.yml` marks as prerelease
+
+### Key Lessons from v0.5.0 Release
+
+1. **Documentation drift is the biggest risk.** PRs from other agents may merge code
+   without updating docs. Always audit docs coverage BEFORE release.
+2. **Ghost versions in CHANGELOG are dangerous.** If a version entry exists but has
+   no tag, merge it into the next real version before release.
+3. **Test count changes with every PR.** Verify actual test count matches AGENT.md.
+4. **Deploy-website trigger must be main-only.** develop pushes should never deploy to production.
+5. **Code Scanning alerts accumulate.** Dismiss false positives with reason, fix real ones.
+
 ## External Submissions
 
 When submitting cora to directories, aggregators, or showcases (Trendshift, etc.):

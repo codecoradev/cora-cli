@@ -40,7 +40,7 @@
 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
 ```
 
-> Pin a version: `CORA_VERSION=v0.4.6 curl -fsSL ... | sh`  
+> Pin a version: `CORA_VERSION=v0.5.0 curl -fsSL ... | sh`  
 > Or: `cargo install --git https://github.com/codecoradev/cora-cli`  
 > Pre-built binaries: [GitHub Releases](https://github.com/codecoradev/cora-cli/releases)
 
