@@ -54,6 +54,11 @@ Complete command reference for the cora CLI.
 | `cora debt --branch main` | Filter by branch |
 | `cora completion` `<shell>` | Generate shell completions (bash/zsh/fish) |
 | `cora mcp` | Start MCP server for AI coding agents (Claude Code, Cursor, Windsurf) |
+| `cora debt` | Show tech debt report from review history |
+| `cora debt --json` | Debt report in JSON format |
+| `cora debt --trend` | Quality score trend graph |
+| `cora debt --since <date\|tag>` | Filter by date or git tag |
+| `cora debt --branch <name>` | Filter by branch name |
 
 ## Quick Examples
 

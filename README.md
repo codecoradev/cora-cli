@@ -137,6 +137,7 @@ Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](https://codecor
 | `cora auth login` | Save API key |
 | `cora config show` | Show resolved config |
 | `cora providers` | List available LLM providers |
+| `cora debt` | Show tech debt report from review history |
 | `cora mcp` | Start MCP server for AI coding agents |
 | `cora hook install` | Install pre-commit hook |
 
