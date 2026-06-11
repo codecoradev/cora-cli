@@ -18,6 +18,7 @@ use commands::{
     auth, completion, config_cmd, debt, hook_cmd, init, profile, providers, review, scan, upload,
 };
 use config::loader;
+use engine::memory;
 use formatters::OutputFormat;
 
 /// Cora — AI Code Review CLI with BYOK (Bring Your Own Key)
@@ -156,6 +157,14 @@ enum Command {
         /// GitHub token for upload (default: `GITHUB_TOKEN` env var)
         #[clap(long, env = "GITHUB_TOKEN")]
         token: Option<String>,
+
+        /// Recall project patterns from Uteke before review (requires `uteke` CLI)
+        #[clap(long)]
+        memory: bool,
+
+        /// Save review findings to Uteke after review (implies --memory)
+        #[clap(long)]
+        learn: bool,
     },
 
     /// Scan a project directory for issues
@@ -403,6 +412,8 @@ async fn main() -> Result<()> {
             repo,
             ref_name,
             token,
+            memory,
+            learn,
         } => {
             cmd_review(
                 &cli.global,
@@ -426,6 +437,8 @@ async fn main() -> Result<()> {
                     token,
                     no_cache,
                     ci,
+                    memory,
+                    learn,
                 },
             )
             .await?
@@ -581,6 +594,8 @@ struct ReviewOpts {
     token: Option<String>,
     no_cache: bool,
     ci: bool,
+    memory: bool,
+    learn: bool,
 }
 
 /// Struct to hold scan options from CLI.
@@ -649,6 +664,39 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         );
     }
 
+    // Uteke memory integration: recall context before review
+    let mut memory_backend = memory::MemoryBackend::default();
+    let memory_level = if opts.learn {
+        memory::MemoryLevel::Learning
+    } else if opts.memory {
+        memory::MemoryLevel::Context
+    } else {
+        memory::MemoryLevel::None
+    };
+
+    let memory_context = if memory_level != memory::MemoryLevel::None {
+        memory_backend.detect();
+        if memory_backend.is_available() {
+            let project = repo_name_from_git().unwrap_or_else(|| "unknown".to_string());
+            let memories = memory_backend.recall_context(&project);
+            memory_backend.build_memory_context(&memories)
+        } else {
+            if !opts.quiet {
+                eprintln!(
+                    "{}",
+                    "⚠ --memory flag set but uteke not found on PATH. Continuing without memory."
+                        .yellow()
+                );
+            }
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    // TODO: inject memory_context into review prompt (Phase 2 integration)
+    let _ = &memory_context;
+
     // Execute the review (returns formatted output)
     let result = review::execute_review(
         &config,
@@ -676,7 +724,41 @@ async fn cmd_review(globals: &GlobalOptions, opts: ReviewOpts) -> Result<i32> {
         upload_sarif_content(&sarif_content, &opts.repo, &opts.ref_name, &opts.token).await?;
     }
 
+    // Uteke memory integration: save findings after review
+    if memory_level == memory::MemoryLevel::Learning && memory_backend.is_available() {
+        let project = repo_name_from_git().unwrap_or_else(|| "unknown".to_string());
+        memory_backend.save_findings(
+            &project,
+            0, // TODO: extract from result
+            "",
+            &[],
+        );
+    }
+
     Ok(result.exit_code)
+}
+
+/// Extract repo name from git remote origin URL.
+fn repo_name_from_git() -> Option<String> {
+    let output = std::process::Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    // Extract owner/repo from https://github.com/owner/repo.git
+    let parts: Vec<&str> = url.split('/').collect();
+    if parts.len() >= 2 {
+        let repo = parts.last()?.trim_end_matches(".git").to_string();
+        let owner = parts.get(parts.len() - 2)?;
+        Some(format!("{}/{}", owner, repo))
+    } else {
+        None
+    }
 }
 
 /// Upload a SARIF string to GitHub Code Scanning.

@@ -6,6 +6,7 @@ pub mod debt_tracker;
 pub mod diff_parser;
 pub mod language_analyzer;
 pub mod llm;
+pub mod memory;
 pub mod profiles;
 pub mod quality_gate;
 pub mod review;
