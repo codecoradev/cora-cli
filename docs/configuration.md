@@ -307,6 +307,32 @@ rules:
 
 Rules run during the deterministic pre-scan phase (no LLM needed).
 
+## Tech Debt Tracker
+
+cora tracks review history and calculates tech debt metrics over time.
+
+### Config
+
+```yaml
+debt:
+  enabled: true           # default: true
+  history_dir: .cora/history  # snapshot storage
+  retention_days: 90      # auto-cleanup old snapshots
+```
+
+### CLI
+
+```bash
+cora debt                    # Show debt report table
+cora debt --json             # Machine-readable JSON output
+cora debt --trend            # ASCII quality score graph
+cora debt --since 2026-06-01 # Filter by date
+cora debt --since v0.4.5     # Filter by git tag
+cora debt --branch develop   # Filter by branch
+```
+
+Snapshots are auto-saved after every review (best-effort, never fails the review).
+
 ## MCP Server
 
 cora includes a built-in MCP (Model Context Protocol) server that exposes rules and config to AI coding agents like Claude Code, Cursor, Copilot, and Windsurf.

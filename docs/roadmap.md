@@ -71,7 +71,7 @@ Demand-gated — we build what people actually need. Track progress on [GitHub I
 - [#207](https://github.com/codecoradev/cora-cli/issues/207) MCP server — expose rules to AI agents — ✓ Done
 - [#238](https://github.com/codecoradev/cora-cli/issues/238) Quality profiles bug fix — path resolution, fail-fast, dedup — ✓ Done
 - [#188](https://github.com/codecoradev/cora-cli/issues/188) Auto-chunking for large diffs — ✓ Done
-- [#206](https://github.com/codecoradev/cora-cli/issues/206) Tech debt metrics — review history — ◎ Planned
+- [#206](https://github.com/codecoradev/cora-cli/issues/206) Tech debt metrics — review history — ✓ Done
 
 ## v0.6 — Growth & Marketplace
 

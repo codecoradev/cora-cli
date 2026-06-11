@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-chunking** — large diffs split into reviewable chunks automatically (#188)
   - `--no-auto-chunk` flag to disable
   - `src/engine/chunker.rs` module (~310 lines)
+- **Tech debt metrics** — cumulative review history and trend tracking (#206)
+  - `DebtSnapshot` per-review JSON snapshots with quality score (0-10)
+  - `cora debt` subcommand — terminal table, `--json`, `--trend` ASCII graph, `--since`, `--branch` filters
+  - Auto-save after every review (best-effort, never fails review)
+  - `debt:` config section in `.cora.yaml` (history_dir, retention_days)
+  - 32 unit tests
 - **Multi-platform CI docs** — Gitea/Forgejo, GitLab CI, Bitbucket Pipelines workflow examples (#225)
 - **GitHub Marketplace action** — published as [`codecoradev/cora-review-action@v1`](https://github.com/marketplace/actions/cora-ai-code-review)
 - **Improved review prompt** — better consistency, lower false-negative rate, explicit error handling focus area

@@ -17,7 +17,7 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 ```bash
 cargo build              # Build (debug)
 cargo build --release    # Build (release)
-cargo test               # Run all 453 tests
+cargo test               # Run all 485 tests
 cargo clippy --all-targets -- -D warnings  # Lint (strict)
 cargo fmt --all -- --check  # Format check
 ```
@@ -39,6 +39,7 @@ src/
 │   ├── init.rs          # cora init (project scaffolding)
 │   ├── upload.rs        # cora upload (review upload)
 │   ├── completion.rs    # Shell completion generation
+│   ├── debt.rs          # cora debt (tech debt report)
 │   └── providers.rs     # cora providers (list providers)
 ├── config/
 │   ├── mod.rs
@@ -58,6 +59,7 @@ src/
 │   ├── security_scanner.rs  # Static security pattern matching
 │   ├── language_analyzer.rs # Language-specific review guidance
 │   ├── secrets_scanner.rs   # Secret/credential detection
+│   ├── debt_tracker.rs  # Tech debt metrics + history snapshots
 │   └── rules/           # Custom rule engine
 │       ├── mod.rs
 │       ├── builtin.rs   # Built-in rules
@@ -96,8 +98,8 @@ src/
 ## Testing
 
 ```bash
-cargo test               # 453 tests total
-                         #   431 unit tests
+cargo test               # 485 tests total
+                         #   463 unit tests
                          #    16 CLI integration tests
                          #     6 config tests
 cargo test --no-verify   # Skip pre-commit hooks (avoids timeout in hooks)
