@@ -361,30 +361,29 @@ fn parse_commit_message(raw: &str) -> Result<CommitMessage> {
 fn open_editor(initial: &str) -> Result<String> {
     let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
 
+    // Unique temp file using nanosecond timestamp
     let tmp_dir = std::env::temp_dir();
-    // Unique temp file per process to avoid collision
-    let tmp_path = tmp_dir.join(format!("cora-commit-msg-{}.tmp", std::process::id()));
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let tmp_path = tmp_dir.join(format!("cora-commit-{nonce}.tmp"));
 
     std::fs::write(&tmp_path, initial)
         .with_context(|| format!("Failed to write temp file: {}", tmp_path.display()))?;
 
-    // Handle multi-word editor commands (e.g. "code --wait", "vim -f")
-    let parts: Vec<&str> = editor.split_whitespace().collect();
-    let (cmd, editor_args) = parts
-        .split_first()
-        .expect("editor command should not be empty");
+    let path_str = tmp_path.to_string_lossy().to_string();
 
-    let mut cmd = std::process::Command::new(cmd);
-    for arg in editor_args {
-        cmd.arg(arg);
-    }
-    cmd.arg(&tmp_path);
-
-    let status = cmd
+    // Use sh -c to handle multi-word editors properly
+    let shell_cmd = format!("{editor} '{path_str}'");
+    let status = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&shell_cmd)
         .status()
         .with_context(|| format!("Failed to open editor: {editor}"))?;
 
     if !status.success() {
+        let _ = std::fs::remove_file(&tmp_path);
         anyhow::bail!("Editor exited with non-zero status");
     }
 
@@ -411,17 +410,21 @@ fn open_editor(initial: &str) -> Result<String> {
 
 /// Execute git commit with the given message.
 fn do_commit(message: &str, quiet: bool) -> Result<i32> {
-    // Write to temp file — handles multi-line messages safely
+    // Unique temp file for commit message
     let tmp_dir = std::env::temp_dir();
-    let msg_file = tmp_dir.join(format!("cora-commit-{}.msg", std::process::id()));
-    std::fs::write(&msg_file, message).context("Failed to write commit message file")?;
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let msg_path = tmp_dir.join(format!("cora-commit-{nonce}.msg"));
+    std::fs::write(&msg_path, message).context("Failed to write commit message file")?;
 
     let status = std::process::Command::new("git")
-        .args(["commit", "-F", &msg_file.to_string_lossy()])
+        .args(["commit", "-F", &msg_path.to_string_lossy()])
         .status()
         .context("Failed to run git commit")?;
 
-    let _ = std::fs::remove_file(&msg_file);
+    let _ = std::fs::remove_file(&msg_path);
 
     if status.success() {
         if !quiet {
