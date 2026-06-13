@@ -135,6 +135,21 @@ Now that you have cora running, explore these topics to get the most out of it:
 - [CLI Reference](./cli-reference) — full command documentation
 - [Examples](./examples) — CI/CD setup for GitHub, GitLab, Gitea, Bitbucket
 
+### Daily Workflow
+
+Once set up, your daily workflow becomes:
+
+```bash
+git add -A
+cora commit          # review + generate commit message + commit
+```
+
+Or skip the prompt in CI/trusted workflows:
+
+```bash
+cora commit --yolo    # auto-commit, no prompts
+```
+
 ## AI Agent Integration
 
 cora includes a built-in MCP server for AI coding agents. After installation:
