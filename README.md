@@ -58,6 +58,8 @@ Pick a provider, enter your API key. Done. Provider env vars (`ZAI_API_KEY`, `OP
 cora review              # staged changes
 cora review --base main  # vs a branch
 cora review --unpushed   # unpushed commits
+cora commit              # review + generate commit msg + commit
+cora commit --yolo       # auto-commit, no prompts
 ```
 
 ### Project Config
@@ -131,6 +133,7 @@ Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](https://codecor
 
 | Command | Description |
 |---------|-------------|
+| `cora commit` | Review + generate commit message + commit |
 | `cora review` | Review code changes |
 | `cora scan` | Scan files for issues |
 | `cora init` | Create project config + hook |

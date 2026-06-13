@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`cora commit`** — review staged diff + generate commit message + commit (#262)
+  - HITL mode (default): interactive `[Y]es / [E]dit / [N]o` prompt
+  - YOLO mode (`--yolo`): auto-commit without prompts
+  - `--force`: commit even if quality gate fails
+  - `--no-review`: skip review, only generate commit message
+  - `--edit`: always open `$EDITOR`
+  - Conventional commit format (feat/fix/refactor/perf/docs/test/chore/style/build/ci)
+  - Auto-truncates subjects to 72 chars
+  - Quality gate integration (block on FAIL unless `--force`)
+  - Debt snapshot saved after commit
+  - `chat_completion_raw()` + `chat_completion_stream_raw()` in `engine/llm.rs`
+  - 22 unit tests
+
 ## [0.5.0] - 2026-06-10
 
 ### Added

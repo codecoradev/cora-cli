@@ -67,6 +67,59 @@ $ cora review --staged --format json
 }
 ```
 
+## Commit Workflow
+
+`cora commit` combines review, commit message generation, and commit into a single
+command. It runs in two modes:
+
+### HITL mode (default)
+
+Reviews staged changes, generates a conventional commit message, then prompts:
+
+```bash
+$ git add -A
+$ cora commit
+🔍 Reviewing staged changes (3 files, 247 lines)...
+✅ No issues found (quality score: 9.2/10)
+
+📝 Generated commit message:
+  feat(auth): add session expiry validation
+
+Accept commit message? [Y]es / [E]dit / [N]o › y
+✅ Committed: feat(auth): add session expiry validation
+```
+
+- `Y` (or Enter) — accept the message and commit
+- `E` — open `$EDITOR` to edit, then commit
+- `N` — abort
+
+### YOLO mode (`--yolo`)
+
+Auto-commits with no prompts. Use for trusted workflows (e.g. CI, rapid iteration):
+
+```bash
+$ cora commit --yolo
+```
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--yolo` | Auto-commit without prompts |
+| `--force` | Commit even if quality gate fails |
+| `--no-review` | Skip review, only generate commit message |
+| `--edit` | Always open `$EDITOR` |
+| `--stream` | Stream LLM response in real-time |
+| `-q, --quiet` | Suppress all output except the result |
+
+### Quality gate integration
+
+If the quality gate is enabled and returns `FAIL`, `cora commit` blocks the
+commit unless `--force` is passed:
+```bash
+$ cora commit --force
+```
+
 ## Configuration File
 
 The `.cora.yaml` file provides persistent configuration. Place it in your project root.

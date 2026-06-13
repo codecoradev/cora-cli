@@ -274,6 +274,25 @@ fn atty_check() -> bool {
     std::io::stderr().is_terminal()
 }
 
+/// Raw chat completion — returns the raw string response.
+/// Used by commit message generation and other non-review tasks.
+pub async fn chat_completion_raw(
+    llm_config: &LLMConfig,
+    system_prompt: &str,
+    user_message: &str,
+) -> std::result::Result<String, CoraError> {
+    chat_completion(llm_config, system_prompt, user_message, None, "none").await
+}
+
+/// Raw streaming chat completion — collects the full stream and returns the response string.
+pub async fn chat_completion_stream_raw(
+    llm_config: &LLMConfig,
+    system_prompt: &str,
+    user_message: &str,
+) -> std::result::Result<String, CoraError> {
+    chat_completion_stream(llm_config, system_prompt, user_message, "none").await
+}
+
 /// Review a diff using the LLM. Returns a `ReviewResponse`.
 #[allow(clippy::too_many_arguments)]
 pub async fn review_diff(

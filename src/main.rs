@@ -15,7 +15,8 @@ mod mcp;
 mod progress;
 
 use commands::{
-    auth, completion, config_cmd, debt, hook_cmd, init, profile, providers, review, scan, upload,
+    auth, commit_cmd, completion, config_cmd, debt, hook_cmd, init, profile, providers, review,
+    scan, upload,
 };
 use config::loader;
 use engine::memory;
@@ -79,6 +80,33 @@ struct GlobalOptions {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Review staged changes, generate commit message, and commit
+    Commit {
+        /// YOLO mode — auto-commit without prompts
+        #[clap(long)]
+        yolo: bool,
+
+        /// Force commit even if quality gate fails
+        #[clap(long)]
+        force: bool,
+
+        /// Skip review, only generate commit message
+        #[clap(long)]
+        no_review: bool,
+
+        /// Always open editor to edit message
+        #[clap(long)]
+        edit: bool,
+
+        /// Stream LLM response in real-time
+        #[clap(long)]
+        stream: bool,
+
+        /// Suppress all output except the result
+        #[clap(long, short)]
+        quiet: bool,
+    },
+
     /// Review a git diff (staged, unpushed, or branch)
     Review {
         /// Review staged changes (git diff --cached)
@@ -392,6 +420,33 @@ async fn main() -> Result<()> {
 
     // Dispatch based on subcommand
     let exit_code = match cli.command {
+        Command::Commit {
+            yolo,
+            force,
+            no_review,
+            edit,
+            stream,
+            quiet,
+        } => {
+            let config = loader::load_config(
+                cli.global.config.as_deref(),
+                cli.global.provider.as_deref(),
+                cli.global.model.as_deref(),
+                cli.global.base_url.as_deref(),
+                cli.global.format.as_deref(),
+                cli.global.no_color,
+            )?;
+            let llm_config = loader::build_llm_config(&config, cli.global.api_key.as_deref())?;
+            let opts = commit_cmd::CommitOptions {
+                yolo,
+                force,
+                no_review,
+                edit,
+                stream,
+                quiet,
+            };
+            commit_cmd::execute_commit(&config, &llm_config, &opts).await?
+        }
         Command::Review {
             staged,
             unpushed,

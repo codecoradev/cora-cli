@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod commit_cmd;
 pub mod completion;
 pub mod config_cmd;
 pub mod debt;
