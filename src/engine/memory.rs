@@ -96,22 +96,11 @@ impl MemoryBackend {
             return Vec::new();
         }
 
-        // Parse JSON output — uteke --json returns a JSON array:
-        // [{"memory":{"content":"...",...},"score":0.xx}, ...]
+        // Parse JSON output — uteke --json returns one of:
+        // - Non-empty: [{"memory":{"content":"...",...},"score":0.xx}, ...]
+        // - Empty:     {"message":"No memories above similarity threshold","results":[],...}
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let mut memories = Vec::new();
-
-        if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout) {
-            for val in arr {
-                if let Some(content) = val
-                    .get("memory")
-                    .and_then(|m| m.get("content"))
-                    .and_then(|c| c.as_str())
-                {
-                    memories.push(content.to_string());
-                }
-            }
-        }
+        let memories = parse_recall_json(&stdout);
 
         tracing::info!("Recalled {} memories from Uteke", memories.len());
         memories
@@ -208,6 +197,42 @@ impl MemoryBackend {
     }
 }
 
+/// Parse uteke recall --json output.
+/// Handles two formats:
+/// - Non-empty: bare JSON array `[{"memory":{"content":"..."},...}]`
+/// - Empty: wrapped object `{"message":"...","results":[],...}`
+fn parse_recall_json(stdout: &str) -> Vec<String> {
+    // Try bare array first (non-empty results)
+    if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(stdout) {
+        return arr
+            .iter()
+            .filter_map(|val| {
+                val.get("memory")
+                    .and_then(|m| m.get("content"))
+                    .and_then(|c| c.as_str())
+                    .map(String::from)
+            })
+            .collect();
+    }
+
+    // Fallback: uteke v0.1.0+ wraps empty results in {"results":[...]}
+    if let Ok(obj) = serde_json::from_str::<serde_json::Value>(stdout) {
+        if let Some(results) = obj.get("results").and_then(|r| r.as_array()) {
+            return results
+                .iter()
+                .filter_map(|val| {
+                    val.get("memory")
+                        .and_then(|m| m.get("content"))
+                        .and_then(|c| c.as_str())
+                        .map(String::from)
+                })
+                .collect();
+        }
+    }
+
+    Vec::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,5 +321,57 @@ mod tests {
     #[test]
     fn test_memory_level_learning() {
         assert_eq!(MemoryLevel::Learning, MemoryLevel::Learning);
+    }
+
+    // ─── parse_recall_json ───
+
+    #[test]
+    fn test_parse_recall_json_nonempty_array() {
+        let json = r#"[{"memory":{"content":"hello world","id":"abc"},"score":0.95}]"#;
+        let result = parse_recall_json(json);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "hello world");
+    }
+
+    #[test]
+    fn test_parse_recall_json_multiple_results() {
+        let json = r#"[
+            {"memory":{"content":"first"},"score":0.9},
+            {"memory":{"content":"second"},"score":0.8}
+        ]"#;
+        let result = parse_recall_json(json);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "first");
+        assert_eq!(result[1], "second");
+    }
+
+    #[test]
+    fn test_parse_recall_json_empty_wrapped_v010() {
+        // uteke v0.1.0+ returns {"message":"...","results":[],...}
+        let json = r#"{"message":"No memories above similarity threshold","results":[],"threshold":0.3,"total":0}"#;
+        let result = parse_recall_json(json);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_parse_recall_json_empty_bare_array() {
+        let json = "[]";
+        let result = parse_recall_json(json);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_parse_recall_json_wrapped_with_results() {
+        // Edge case: wrapped format but with actual results
+        let json = r#"{"results":[{"memory":{"content":"found it"},"score":0.7}]}"#;
+        let result = parse_recall_json(json);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "found it");
+    }
+
+    #[test]
+    fn test_parse_recall_json_invalid() {
+        let result = parse_recall_json("not json at all");
+        assert!(result.is_empty());
     }
 }
