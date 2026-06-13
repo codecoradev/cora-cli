@@ -1,4 +1,4 @@
-name: Sync to CodeCorraDev Roadmap
+name: Sync to CodeCoraDev Roadmap
 
 on:
   issues:
@@ -11,9 +11,7 @@ permissions:
   repository-projects: read
 
 env:
-  PROJECT_TOKEN: ${{ secrets.PROJECT_BOARD_TOKEN }}
   PROJECT_NODE_ID: ${{ secrets.PROJECT_NODE_ID }}
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   sync:
@@ -37,10 +35,12 @@ jobs:
           echo "Project: $PROJECT_NODE_ID"
           echo "::endgroup::"
 
-          if [ -z "$PROJECT_NODE_ID" ] || [ "$PROJECT_NODE_ID" = "" ]; then
+          if [ -z "$PROJECT_NODE_ID" ]; then
             echo "::warning::PROJECT_NODE_ID not set. Skipping."
             exit 0
           fi
+
+          # ─── Helpers ───
 
           add_to_project() {
             local node_id="$1"
@@ -52,22 +52,153 @@ jobs:
                   }
                 }" 2>&1)
             if echo "$RESULT" | grep -q '"item"'; then
-              echo "✅ Added to project"
+              # Extract item ID
+              ITEM_ID=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['addProjectV2ItemById']['item']['id'])" 2>/dev/null || echo "")
+              echo "✅ Added to project (item: $ITEM_ID)"
             else
               echo "⚠️ Add failed (may already exist): $RESULT"
             fi
           }
+
+          # Find the project item ID for this issue
+          find_item_id() {
+            local issue_node_id="$1"
+            gh api graphql \
+              -f query="
+                query {
+                  node(id: \"$PROJECT_NODE_ID\") {
+                    ... on ProjectV2 {
+                      items(first: 100) {
+                        nodes {
+                          id
+                          content {
+                            ... on Issue { id }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }" 2>&1 | python3 -c "
+          import sys, json
+          try:
+              data = json.load(sys.stdin)
+              items = data['data']['node']['items']['nodes']
+              for item in items:
+                  c = item.get('content')
+                  if c and c.get('id') == '$issue_node_id':
+                      print(item['id'])
+                      break
+          except Exception:
+              pass
+          " 2>/dev/null || echo ""
+          }
+
+          # Resolve Status field ID + option ID by name
+          # Args: $1 = option name (e.g. "Todo", "Done", "In Progress")
+          set_status() {
+            local target_status="$1"
+            local item_id="$2"
+
+            if [ -z "$item_id" ]; then
+              echo "⚠️ No item ID — cannot set status"
+              return 1
+            fi
+
+            # Query field + option IDs dynamically
+            FIELD_DATA=$(gh api graphql \
+              -f query="
+                query {
+                  node(id: \"$PROJECT_NODE_ID\") {
+                    ... on ProjectV2 {
+                      fields(first: 20) {
+                        nodes {
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options { id name }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }" 2>&1)
+
+            # Extract Status field ID and option ID
+            FIELD_INFO=$(echo "$FIELD_DATA" | python3 -c "
+          import sys, json
+          try:
+              data = json.load(sys.stdin)
+              fields = data['data']['node']['fields']['nodes']
+              for f in fields:
+                  if f.get('name') == 'Status':
+                      print(f['id'])
+                      for opt in f.get('options', []):
+                          if opt['name'] == '$target_status':
+                              print(opt['id'])
+                              break
+                      break
+          except Exception:
+              pass
+          " 2>/dev/null || echo "")
+
+            FIELD_ID=$(echo "$FIELD_INFO" | head -1)
+            OPTION_ID=$(echo "$FIELD_INFO" | tail -1)
+
+            if [ -z "$FIELD_ID" ] || [ -z "$OPTION_ID" ]; then
+              echo "⚠️ Could not resolve Status field or option '$target_status'"
+              return 1
+            fi
+
+            # Update the field
+            UPDATE_RESULT=$(gh api graphql \
+              -f query="
+                mutation {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: \"$PROJECT_NODE_ID\"
+                    itemId: \"$item_id\"
+                    fieldId: \"$FIELD_ID\"
+                    value: { singleSelectOptionId: \"$OPTION_ID\" }
+                  }) {
+                    projectV2Item { id }
+                  }
+                }" 2>&1)
+
+            if echo "$UPDATE_RESULT" | grep -q 'projectV2Item'; then
+              echo "✅ Status set to '$target_status'"
+            else
+              echo "⚠️ Status update failed: $UPDATE_RESULT"
+            fi
+          }
+
+          # ─── Main Logic ───
 
           case "$EVENT" in
             opened|reopened)
               if [ "$ISSUE_STATE" = "open" ]; then
                 echo "Adding opened/reopened issue #$ISSUE_NUMBER..."
                 add_to_project "$ISSUE_NODE_ID"
+
+                # If reopened, find existing item and set status back
+                if [ "$EVENT" = "reopened" ]; then
+                  ITEM_ID=$(find_item_id "$ISSUE_NODE_ID")
+                  set_status "In Progress" "$ITEM_ID"
+                fi
               fi
               ;;
+
             closed)
-              echo "Issue #$ISSUE_NUMBER closed — item stays in board (visibility handled by project)"
+              echo "Issue #$ISSUE_NUMBER closed — setting Status to Done..."
+              ITEM_ID=$(find_item_id "$ISSUE_NODE_ID")
+              if [ -n "$ITEM_ID" ]; then
+                set_status "Done" "$ITEM_ID"
+              else
+                echo "⚠️ Issue not found in project board — adding first..."
+                add_to_project "$ISSUE_NODE_ID"
+                ITEM_ID=$(find_item_id "$ISSUE_NODE_ID")
+                set_status "Done" "$ITEM_ID"
+              fi
               ;;
+
             labeled)
               echo "Issue #$ISSUE_NUMBER labeled — no action needed"
               ;;
