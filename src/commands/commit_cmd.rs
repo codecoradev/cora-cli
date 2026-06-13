@@ -362,13 +362,25 @@ fn open_editor(initial: &str) -> Result<String> {
     let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
 
     let tmp_dir = std::env::temp_dir();
-    let tmp_path = tmp_dir.join("cora-commit-msg.tmp");
+    // Unique temp file per process to avoid collision
+    let tmp_path = tmp_dir.join(format!("cora-commit-msg-{}.tmp", std::process::id()));
 
     std::fs::write(&tmp_path, initial)
         .with_context(|| format!("Failed to write temp file: {}", tmp_path.display()))?;
 
-    let status = std::process::Command::new(&editor)
-        .arg(&tmp_path)
+    // Handle multi-word editor commands (e.g. "code --wait", "vim -f")
+    let parts: Vec<&str> = editor.split_whitespace().collect();
+    let (cmd, editor_args) = parts
+        .split_first()
+        .expect("editor command should not be empty");
+
+    let mut cmd = std::process::Command::new(cmd);
+    for arg in editor_args {
+        cmd.arg(arg);
+    }
+    cmd.arg(&tmp_path);
+
+    let status = cmd
         .status()
         .with_context(|| format!("Failed to open editor: {editor}"))?;
 
@@ -399,14 +411,20 @@ fn open_editor(initial: &str) -> Result<String> {
 
 /// Execute git commit with the given message.
 fn do_commit(message: &str, quiet: bool) -> Result<i32> {
+    // Write to temp file — handles multi-line messages safely
+    let tmp_dir = std::env::temp_dir();
+    let msg_file = tmp_dir.join(format!("cora-commit-{}.msg", std::process::id()));
+    std::fs::write(&msg_file, message).context("Failed to write commit message file")?;
+
     let status = std::process::Command::new("git")
-        .args(["commit", "-m", message])
+        .args(["commit", "-F", &msg_file.to_string_lossy()])
         .status()
         .context("Failed to run git commit")?;
 
+    let _ = std::fs::remove_file(&msg_file);
+
     if status.success() {
         if !quiet {
-            // Show the first line of the commit message
             let subject = message.lines().next().unwrap_or("committed");
             eprintln!("{}", format!("✅ Committed: {subject}").green().bold());
         }
@@ -447,17 +465,20 @@ fn get_git_context() -> (Option<String>, Option<String>) {
 /// Count files and lines in a diff.
 fn diff_stats(diff: &str) -> (usize, usize) {
     let mut files = 0usize;
-    let mut lines = 0usize;
+    let mut added = 0usize;
+    let mut removed = 0usize;
 
     for line in diff.lines() {
         if line.starts_with("diff --git") {
             files += 1;
         } else if line.starts_with('+') && !line.starts_with("+++") {
-            lines += 1;
+            added += 1;
+        } else if line.starts_with('-') && !line.starts_with("---") {
+            removed += 1;
         }
     }
 
-    (files.max(1), lines)
+    (files.max(1), added + removed)
 }
 
 #[cfg(test)]
@@ -525,10 +546,11 @@ mod tests {
 
     #[test]
     fn diff_stats_counts_files_and_lines() {
-        let diff = "diff --git a/a.rs b/a.rs\n+line1\n+line2\ndiff --git a/b.rs b/b.rs\n+line3";
+        let diff =
+            "diff --git a/a.rs b/a.rs\n+line1\n+line2\ndiff --git a/b.rs b/b.rs\n+line3\n-old";
         let (files, lines) = diff_stats(diff);
         assert_eq!(files, 2);
-        assert_eq!(lines, 3);
+        assert_eq!(lines, 4); // 3 added + 1 removed
     }
 
     #[test]
