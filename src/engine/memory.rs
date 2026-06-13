@@ -61,7 +61,7 @@ impl MemoryBackend {
 
     /// Recall project patterns from Uteke before review.
     ///
-    /// Calls: `uteke recall "{project} code-pattern" --namespace cora --limit 5`
+    /// Calls: `uteke recall "{project} code-pattern" --namespace cora --limit 5 --json`
     pub fn recall_context(&self, project: &str) -> Vec<String> {
         if !self.enabled {
             return Vec::new();
@@ -77,8 +77,7 @@ impl MemoryBackend {
                 &self.namespace,
                 "--limit",
                 "5",
-                "--format",
-                "json",
+                "--json",
             ])
             .output()
         {
@@ -97,13 +96,18 @@ impl MemoryBackend {
             return Vec::new();
         }
 
-        // Parse JSON output — each line is a result with "content" field
+        // Parse JSON output — uteke --json returns a JSON array:
+        // [{"memory":{"content":"...",...},"score":0.xx}, ...]
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut memories = Vec::new();
 
-        for line in stdout.lines() {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
-                if let Some(content) = val.get("content").and_then(|c| c.as_str()) {
+        if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout) {
+            for val in arr {
+                if let Some(content) = val
+                    .get("memory")
+                    .and_then(|m| m.get("content"))
+                    .and_then(|c| c.as_str())
+                {
                     memories.push(content.to_string());
                 }
             }
