@@ -17,7 +17,7 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 ```bash
 cargo build              # Build (debug)
 cargo build --release    # Build (release)
-cargo test               # Run all 506 tests
+cargo test               # Run all 517 tests
 cargo clippy --all-targets -- -D warnings  # Lint (strict)
 cargo fmt --all -- --check  # Format check
 ```
@@ -34,6 +34,7 @@ src/
 │   ├── review.rs        # cora review (diff-based review)
 │   ├── scan.rs          # cora scan (full-file scan)
 │   ├── debt.rs          # cora debt (tech debt report)
+│   ├── commit_cmd.rs    # cora commit (review + commit message + commit)
 │   ├── config_cmd.rs    # cora config (show/set/validate)
 │   ├── auth.rs          # cora auth (API key management)
 │   ├── hook_cmd.rs      # cora hook (pre-commit hook install/uninstall)
@@ -101,7 +102,7 @@ src/
 ## Testing
 
 ```bash
-cargo test               # 506 tests total
+cargo test               # 517 tests total
                          #   484 unit tests
                          #    16 CLI integration tests
                          #     6 config tests

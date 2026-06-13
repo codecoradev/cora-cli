@@ -24,6 +24,11 @@ Complete command reference for the cora CLI.
 | Command | Description |
 |---------|-------------|
 | `cora init` | Create `.cora.yaml` config file |
+| `cora commit` | Review staged + generate commit message + commit (HITL prompt) |
+| `cora commit --yolo` | Auto-commit without prompts (YOLO mode) |
+| `cora commit --force` | Commit even if quality gate fails |
+| `cora commit --no-review` | Skip review, only generate commit message |
+| `cora commit --edit` | Always open `$EDITOR` to edit message |
 | `cora review` | Review code changes (default: staged files) |
 | `cora review --staged` | Review staged git changes explicitly |
 | `cora review --memory` | Recall project patterns from Uteke before review |
@@ -82,4 +87,12 @@ $ cora scan --incremental
 ```bash
 # Install pre-commit hook
 $ cora hook install
+```
+
+```bash
+# Review + auto-generate commit message + commit
+$ cora commit
+
+# YOLO mode — auto-commit, no prompts
+$ cora commit --yolo
 ```
