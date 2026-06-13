@@ -17,7 +17,7 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 ```bash
 cargo build              # Build (debug)
 cargo build --release    # Build (release)
-cargo test               # Run all 517 tests
+cargo test               # Run all 523 tests
 cargo clippy --all-targets -- -D warnings  # Lint (strict)
 cargo fmt --all -- --check  # Format check
 ```
@@ -102,7 +102,7 @@ src/
 ## Testing
 
 ```bash
-cargo test               # 517 tests total
+cargo test               # 523 tests total
                          #   484 unit tests
                          #    16 CLI integration tests
                          #     6 config tests
@@ -234,7 +234,7 @@ Missing any = release blocker.
 ### 1. Code
 
 - [ ] All target issues merged to `develop`
-- [ ] `cargo test` — all 517+ tests pass
+- [ ] `cargo test` — all 523+ tests pass
 - [ ] `cargo clippy --all-targets -- -D warnings` — clean
 - [ ] `cargo fmt --all -- --check` — clean
 - [ ] `cargo build --release` — no errors

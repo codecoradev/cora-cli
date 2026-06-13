@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `chat_completion_raw()` + `chat_completion_stream_raw()` in `engine/llm.rs`
   - 22 unit tests
 
+### Fixed
+
+- **Uteke recall flag** — `--format json` → `--json` (uteke v0.0.13+ API change) (#259)
+- **Uteke recall JSON parser** — handle both bare `[]` and wrapped `{"results":[]}` formats (uteke v0.1.0+)
+- Extracted `parse_recall_json()` with 6 unit tests for format compatibility
+
 ## [0.5.0] - 2026-06-10
 
 ### Added
