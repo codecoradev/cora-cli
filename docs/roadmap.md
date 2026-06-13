@@ -73,6 +73,7 @@ Demand-gated — we build what people actually need. Track progress on [GitHub I
 - [#188](https://github.com/codecoradev/cora-cli/issues/188) Auto-chunking for large diffs — ✓ Done
 - [#206](https://github.com/codecoradev/cora-cli/issues/206) Tech debt metrics — review history — ✓ Done
 - [#232](https://github.com/codecoradev/cora-cli/issues/232) Uteke memory integration — recall + learn — ✓ Done
+- [#262](https://github.com/codecoradev/cora-cli/issues/262) `cora commit` — review + auto commit message + quality gate — ✓ Done
 
 ## v0.6 — Growth & Marketplace
 

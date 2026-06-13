@@ -234,7 +234,7 @@ Missing any = release blocker.
 ### 1. Code
 
 - [ ] All target issues merged to `develop`
-- [ ] `cargo test` — all 506+ tests pass
+- [ ] `cargo test` — all 517+ tests pass
 - [ ] `cargo clippy --all-targets -- -D warnings` — clean
 - [ ] `cargo fmt --all -- --check` — clean
 - [ ] `cargo build --release` — no errors

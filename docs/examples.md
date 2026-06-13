@@ -50,6 +50,43 @@ Stream results as they come in from the LLM.
 $ cora review --staged --stream
 ```
 
+## 06 — Auto-Commit (Review + Message + Commit)
+
+Review staged changes, generate a conventional commit message, and commit in one step.
+
+### HITL mode (default — interactive prompt)
+
+```bash
+$ git add -A
+$ cora commit
+🔍 Reviewing staged changes (3 files, 247 lines)...
+✅ No issues found (quality score: 9.2/10)
+
+📝 Generated commit message:
+  feat(auth): add session expiry validation
+
+Accept commit message? [Y]es / [E]dit / [N]o › y
+✅ Committed: feat(auth): add session expiry validation
+```
+
+### YOLO mode (CI / trusted workflows)
+
+```bash
+$ cora commit --yolo
+```
+
+### Skip review (message only)
+
+```bash
+$ cora commit --no-review
+```
+
+### Force commit past quality gate
+
+```bash
+$ cora commit --force
+```
+
 ## 06 — GitHub Actions CI (Recommended)
 
 The easiest way to add cora to your PR workflow. This reusable action installs cora, runs the review, posts a PR comment with findings, and optionally uploads SARIF to GitHub Code Scanning.
