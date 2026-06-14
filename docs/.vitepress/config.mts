@@ -6,8 +6,8 @@ export default defineConfig({
   base: '/docs/cora/',
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/docs/cora/favicon.svg' }],
-    ['link', { rel: 'alternate icon', type: 'image/png', href: '/docs/cora/favicon.png' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
+    ['link', { rel: 'alternate icon', type: 'image/png', href: '/favicon.png' }],
     ['meta', { name: 'theme-color', content: '#6366f1' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'Cora — AI Code Review CLI' }],
@@ -17,13 +17,13 @@ export default defineConfig({
   ],
 
   themeConfig: {
-    logo: '/docs/cora/logo.svg',
+    logo: '/logo.svg',
 
     nav: [
       { text: 'Codecora', link: 'https://codecora.dev' },
-      { text: 'Docs', link: '/docs/cora/getting-started' },
-      { text: 'Examples', link: '/docs/cora/examples' },
-      { text: 'Changelog', link: '/docs/cora/changelog' },
+      { text: 'Docs', link: '/getting-started' },
+      { text: 'Examples', link: '/examples' },
+      { text: 'Changelog', link: '/changelog' },
       { text: 'GitHub', link: 'https://github.com/codecoradev/cora-cli' },
     ],
 
@@ -32,25 +32,25 @@ export default defineConfig({
         {
           text: 'Getting Started',
           items: [
-            { text: 'Quick Start', link: '/docs/cora/getting-started' },
-            { text: 'Installation', link: '/docs/cora/installation' },
+            { text: 'Quick Start', link: '/getting-started' },
+            { text: 'Installation', link: '/installation' },
           ],
         },
         {
           text: 'Guides',
           items: [
-            { text: 'Usage', link: '/docs/cora/usage' },
-            { text: 'Configuration', link: '/docs/cora/configuration' },
-            { text: 'Providers', link: '/docs/cora/providers' },
-            { text: 'CLI Reference', link: '/docs/cora/cli-reference' },
-            { text: 'Examples', link: '/docs/cora/examples' },
+            { text: 'Usage', link: '/usage' },
+            { text: 'Configuration', link: '/configuration' },
+            { text: 'Providers', link: '/providers' },
+            { text: 'CLI Reference', link: '/cli-reference' },
+            { text: 'Examples', link: '/examples' },
           ],
         },
         {
           text: 'Project',
           items: [
-            { text: 'Changelog', link: '/docs/cora/changelog' },
-            { text: 'Roadmap', link: '/docs/cora/roadmap' },
+            { text: 'Changelog', link: '/changelog' },
+            { text: 'Roadmap', link: '/roadmap' },
           ],
         },
       ],
