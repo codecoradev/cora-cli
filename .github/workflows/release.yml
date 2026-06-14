@@ -11,23 +11,42 @@ env:
 
 jobs:
   sync-main:
-    name: Sync main branch
+    name: Sync main ← tag commit
     runs-on: ubuntu-latest
-    # Only runs on v* tag pushes (release trigger). Uses force-push because main
-    # is a release-only mirror of develop — any commits on main not in develop
-    # are stale snapshots that should be overwritten by the current release.
+    # Blocking: main MUST be synced before release artifacts are built.
+    # If main can't be fast-forwarded, the release aborts to prevent
+    # stale install.sh / mismatched main branch.
+    # (Hardened after uteke issue #325 — same pattern caused main to get
+    # stuck at old version while release proceeded.)
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          ref: develop
+          fetch-depth: 0
 
-      - name: Push to main
+      - name: Fast-forward main to tag commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git push origin HEAD:main --force
-          echo "✅ main synced to develop at ${{ github.sha }}"
+          # Fetch main branch ref so merge-base can check ancestry.
+          git fetch origin main
+
+          TAG_SHA=$(git rev-parse "${{ github.ref }}^{commit}")
+          echo "Tag commit: $TAG_SHA"
+
+          # Check if main is an ancestor of TAG_SHA (safe fast-forward).
+          # If main is NOT an ancestor, abort — force-updating would
+          # rewrite history and potentially lose commits.
+          if git merge-base --is-ancestor origin/main "$TAG_SHA" 2>/dev/null; then
+            git push origin "$TAG_SHA:refs/heads/main"
+            echo "✅ main fast-forwarded to $TAG_SHA"
+          else
+            echo "::error::main is not an ancestor of tag commit. Refusing to force-update."
+            echo "Manual intervention required: merge develop into main first."
+            exit 1
+          fi
 
   build-release:
     needs: sync-main
@@ -59,7 +78,7 @@ jobs:
             ext: zip
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -106,12 +125,12 @@ jobs:
 
   publish-crates:
     name: Publish to crates.io
-    needs: []
+    needs: [sync-main]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -126,7 +145,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
