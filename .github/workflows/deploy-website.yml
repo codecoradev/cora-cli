@@ -36,7 +36,7 @@ jobs:
         working-directory: docs
 
       - name: Build
-        run: npm run build
+        run: npm run docs:build
         working-directory: docs
 
       - name: Verify build output
