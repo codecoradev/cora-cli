@@ -1,35 +1,30 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
-  title: 'cora',
+  title: 'Cora',
   description: 'AI-Powered Code Review CLI — BYOK, zero config, runs in your terminal',
+  base: '/docs/cora/',
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
     ['link', { rel: 'alternate icon', type: 'image/png', href: '/favicon.png' }],
     ['meta', { name: 'theme-color', content: '#6366f1' }],
     ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:title', content: 'cora — AI Code Review CLI' }],
+    ['meta', { property: 'og:title', content: 'Cora — AI Code Review CLI' }],
     ['meta', { property: 'og:description', content: 'BYOK, zero config, runs in your terminal' }],
-    ['meta', { property: 'og:image', content: 'https://codecora.dev/og.png' }],
-    ['meta', { property: 'og:url', content: 'https://codecora.dev/' }],
+    ['meta', { property: 'og:image', content: 'https://codecora.dev/docs/cora/og.png' }],
+    ['meta', { property: 'og:url', content: 'https://codecora.dev/docs/cora/' }],
   ],
 
   themeConfig: {
     logo: '/logo.svg',
 
     nav: [
+      { text: 'Codecora', link: 'https://codecora.dev' },
       { text: 'Docs', link: '/getting-started' },
       { text: 'Examples', link: '/examples' },
       { text: 'Changelog', link: '/changelog' },
-      { text: 'Roadmap', link: '/roadmap' },
-      {
-        text: 'v0.5.1',
-        items: [
-          { text: 'GitHub', link: 'https://github.com/codecoradev/cora-cli' },
-          { text: 'Releases', link: 'https://github.com/codecoradev/cora-cli/releases' },
-        ],
-      },
+      { text: 'GitHub', link: 'https://github.com/codecoradev/cora-cli' },
     ],
 
     sidebar: {

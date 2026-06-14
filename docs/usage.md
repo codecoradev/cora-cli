@@ -175,6 +175,47 @@ $ cora review --staged --exclude "**/*.test.ts" --exclude "**/generated/**"
 
 Alternatively, set include/exclude patterns in `.cora.yaml` for persistent configuration.
 
+## Uteke Memory Integration
+
+Cora works standalone. Install [Uteke](https://github.com/codecoradev/uteke) to unlock reviews that learn from your codebase history.
+
+### Three Levels
+
+| Level | Command | Uteke Required | What It Does |
+|-------|---------|:---:|-------------|
+| **Standalone** | `cora review` | No | AI review, zero deps |
+| **Recall** | `cora review --memory` | Yes | Recall project patterns before review |
+| **Learning** | `cora review --memory --learn` | Yes | Recall + save findings after review |
+
+### Install Both
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-bundle.sh | sh
+```
+
+### Usage
+
+```bash
+# Review with memory recall
+cora review --staged --memory
+
+# Review + save to memory (reviews improve over time)
+cora review --staged --memory --learn
+
+# Works with all review modes
+cora review --base main --memory --learn
+cora commit --memory  # Note: --memory only on review, not commit
+```
+
+### How It Works
+
+1. Before review, Cora calls `uteke recall` to find relevant memories (past findings, code patterns)
+2. These memories are injected into the LLM prompt as context
+3. After review (with `--learn`), findings are saved to Uteke via `uteke remember`
+4. Next review benefits from accumulated knowledge
+
+Cora auto-detects Uteke on PATH. If not installed, memory features are silently disabled.
+
 ## Exit Codes
 
 cora uses standard exit codes for scripting and CI integration:

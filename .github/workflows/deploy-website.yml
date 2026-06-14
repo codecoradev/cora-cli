@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  id-token: write
   contents: read
+  deployments: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -23,9 +23,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -47,9 +47,9 @@ jobs:
           fi
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          preCommands: npx wrangler pages project create cora --production-branch=main || true
-          command: pages deploy docs/.vitepress/dist/ --project-name=cora --commit-dirty=true --branch=main
+          preCommands: npx wrangler pages project create cora-cli --production-branch=main || true
+          command: pages deploy docs/.vitepress/dist/ --project-name=cora-cli --commit-dirty=true --branch=main

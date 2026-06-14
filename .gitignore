@@ -44,3 +44,4 @@ dist/
 *.tar.gz
 *.zip
 .cora/history/
+.cora/index.db

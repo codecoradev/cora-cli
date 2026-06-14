@@ -1,5 +1,13 @@
 name: Release
 
+# Release is triggered by pushing a vX.Y.Z tag.
+#
+# PREREQUISITE: Before tagging, merge develop → main via PR.
+# The tag must point to a commit on main, NOT develop.
+# GitFlow: develop (default) → PR → main → tag → release.
+#
+# This workflow does NOT sync main — main must already be up to date.
+
 on:
   push:
     tags:
@@ -10,27 +18,32 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  sync-main:
-    name: Sync main branch
+  verify-main:
+    name: Verify tag is on main
     runs-on: ubuntu-latest
-    # Only runs on v* tag pushes (release trigger). Uses force-push because main
-    # is a release-only mirror of develop — any commits on main not in develop
-    # are stale snapshots that should be overwritten by the current release.
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          ref: develop
-
-      - name: Push to main
+          fetch-depth: 0
+      - name: Check tag is on main
         run: |
-          git push origin HEAD:main --force
-          echo "✅ main synced to develop at ${{ github.sha }}"
+          git fetch origin main
+          TAG_SHA=$(git rev-parse "${{ github.ref }}^{commit}")
+          MAIN_SHA=$(git rev-parse origin/main)
+          echo "Tag: $TAG_SHA"
+          echo "main: $MAIN_SHA"
+          if [ "$TAG_SHA" = "$MAIN_SHA" ]; then
+            echo "✅ Tag is main HEAD"
+          elif git merge-base --is-ancestor "$TAG_SHA" origin/main 2>/dev/null; then
+            echo "✅ Tag commit $TAG_SHA is in main history"
+          else
+            echo "::error::Tag commit $TAG_SHA is NOT on main."
+            echo "Merge develop → main via PR before tagging."
+            exit 1
+          fi
 
   build-release:
-    needs: sync-main
+    needs: [verify-main]
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -59,7 +72,7 @@ jobs:
             ext: zip
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -106,12 +119,12 @@ jobs:
 
   publish-crates:
     name: Publish to crates.io
-    needs: []
+    needs: [verify-main]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -126,7 +139,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4

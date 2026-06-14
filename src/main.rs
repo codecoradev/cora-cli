@@ -11,6 +11,7 @@ mod error;
 mod formatters;
 mod git;
 mod hook;
+mod index;
 mod mcp;
 mod progress;
 
@@ -80,6 +81,101 @@ struct GlobalOptions {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Build or update the symbol index for code intelligence
+    Index {
+        /// Show index statistics instead of building
+        #[clap(long)]
+        stats: bool,
+
+        /// Prune deleted files from index
+        #[clap(long)]
+        prune: bool,
+
+        /// Rebuild index from scratch (drop existing)
+        #[clap(long)]
+        rebuild: bool,
+
+        /// Watch for file changes and auto-update index
+        #[clap(long)]
+        watch: bool,
+
+        /// Verbose output
+        #[clap(long, short)]
+        verbose: bool,
+    },
+
+    /// Search the symbol index for code intelligence
+    Explore {
+        /// Search query (symbol name or keyword)
+        query: Option<String>,
+
+        /// Filter by symbol kind (function, struct, enum, trait, etc.)
+        #[clap(long)]
+        kind: Option<String>,
+
+        /// Filter by file path prefix
+        #[clap(long)]
+        file: Option<String>,
+
+        /// Filter by language
+        #[clap(long)]
+        language: Option<String>,
+
+        /// Maximum results
+        #[clap(long, default_value = "50")]
+        limit: usize,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
+    /// Find all callers of a symbol (who calls this?)
+    Callers {
+        /// Symbol name to search for
+        symbol: String,
+
+        /// Maximum results
+        #[clap(long, default_value = "50")]
+        limit: usize,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
+    /// Analyze the impact of changing a symbol (what breaks?)
+    Impact {
+        /// Symbol name to analyze
+        symbol: String,
+
+        /// Traversal depth (how many levels up the call graph)
+        #[clap(long, default_value = "3")]
+        depth: u32,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
+    /// Find tests affected by changed files
+    Affected {
+        /// Changed files (space-separated). If empty, reads from git diff.
+        files: Vec<String>,
+
+        /// Read changed files from stdin (pipe from git diff --name-only)
+        #[clap(long)]
+        stdin: bool,
+
+        /// Test file glob pattern (default: *test*, *spec*)
+        #[clap(long)]
+        filter: Option<String>,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
     /// Review staged changes, generate commit message, and commit
     Commit {
         /// YOLO mode — auto-commit without prompts
@@ -390,6 +486,17 @@ enum ProfileAction {
     },
 }
 
+/// Format bytes as human-readable string.
+fn format_bytes(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -420,6 +527,385 @@ async fn main() -> Result<()> {
 
     // Dispatch based on subcommand
     let exit_code = match cli.command {
+        Command::Index {
+            stats: show_stats,
+            prune,
+            rebuild,
+            watch,
+            verbose,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+
+            if rebuild && db_path.exists() {
+                std::fs::remove_file(&db_path)?;
+                eprintln!("{}", "Dropped existing index.".dimmed());
+            }
+
+            let conn = index::open_index(&db_path)?;
+
+            if show_stats {
+                let summary = index::index_stats(&conn)?;
+                println!("{}", "SYMBOL INDEX".cyan().bold());
+                println!("{}", "────────────────────────────".dimmed());
+                println!("  Total symbols:  {}", summary.total_symbols);
+                println!("  Total files:    {}", summary.total_files);
+                println!("  Database size:  {}", format_bytes(summary.db_size_bytes));
+                println!();
+                println!("  {}", "By Kind".cyan());
+                for (kind, count) in &summary.symbols_by_kind {
+                    println!("    {kind:<16} {count}");
+                }
+                println!();
+                println!("  {}", "By Language".cyan());
+                for (lang, count) in &summary.symbols_by_language {
+                    println!("    {lang:<16} {count}");
+                }
+            } else if prune {
+                let deleted = index::prune_deleted(&conn, &project_root)?;
+                println!(
+                    "{}",
+                    format!("Pruned {deleted} deleted files from index.").green()
+                );
+            } else if watch {
+                // Initial index
+                eprintln!("{}", "🔍 Initial index...".cyan());
+                let stats =
+                    index::index_project(&conn, &project_root, verbose || cli.global.verbose)?;
+                eprintln!(
+                    "{}",
+                    format!(
+                        "✅ Indexed {} symbols. Watching for changes... (Ctrl+C to stop)",
+                        stats.symbols_indexed
+                    )
+                    .green()
+                );
+
+                // Poll loop: re-index changed files every 2 seconds
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    let stats = index::index_project(&conn, &project_root, false)?;
+                    if stats.files_indexed > 0 {
+                        eprintln!(
+                            "{}",
+                            format!(
+                                "🔄 Updated {} files, {} symbols",
+                                stats.files_indexed, stats.symbols_indexed
+                            )
+                            .cyan()
+                        );
+                    }
+                }
+            } else {
+                eprintln!("{}", "🔍 Indexing project...".cyan());
+                let stats =
+                    index::index_project(&conn, &project_root, verbose || cli.global.verbose)?;
+                eprintln!(
+                    "{}",
+                    format!(
+                        "✅ Indexed {} symbols from {} files ({} skipped, {} errors)",
+                        stats.symbols_indexed,
+                        stats.files_indexed,
+                        stats.files_skipped,
+                        stats.errors
+                    )
+                    .green()
+                );
+                eprintln!("{}", format!("   Database: {}", db_path.display()).dimmed());
+            }
+            0
+        }
+
+        Command::Explore {
+            query,
+            kind,
+            file,
+            language,
+            limit,
+            json,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run `cora index` first.".yellow());
+                std::process::exit(1);
+            }
+
+            let conn = index::open_index(&db_path)?;
+
+            let sym_kind = kind.as_deref().map(index::SymbolKind::from_str);
+
+            let q = index::SymbolQuery {
+                text: query,
+                kind: sym_kind,
+                file_prefix: file,
+                language,
+                limit,
+            };
+
+            let results = index::search(&conn, &q)?;
+
+            if json {
+                let json_results: Vec<serde_json::Value> = results
+                    .iter()
+                    .map(|r| {
+                        serde_json::json!({
+                            "name": r.symbol.name,
+                            "kind": r.symbol.kind.as_str(),
+                            "file": r.symbol.file,
+                            "line": r.symbol.line,
+                            "signature": r.symbol.signature,
+                            "language": r.symbol.language,
+                            "score": r.score,
+                        })
+                    })
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&json_results)?);
+            } else if results.is_empty() {
+                eprintln!("{}", "No symbols found.".yellow());
+            } else {
+                println!("{}", format!("Found {} symbols:", results.len()).cyan());
+                println!(
+                    "{}",
+                    "───────────────────────────────────────────────".dimmed()
+                );
+                for r in &results {
+                    println!(
+                        "  {} {} {}:{}",
+                        r.symbol.kind.as_str().blue(),
+                        r.symbol.name.white().bold(),
+                        r.symbol.file.dimmed(),
+                        r.symbol.line
+                    );
+                    if !r.symbol.signature.is_empty() {
+                        println!(
+                            "    {} {}",
+                            "→".dimmed(),
+                            r.symbol.signature.trim().dimmed()
+                        );
+                    }
+                }
+            }
+            0
+        }
+
+        Command::Callers {
+            symbol,
+            limit,
+            json,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run `cora index` first.".yellow());
+                std::process::exit(1);
+            }
+            let conn = index::open_index(&db_path)?;
+            let callers = index::graph::find_callers(&conn, &symbol, limit)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&callers)?);
+            } else if callers.is_empty() {
+                eprintln!("{}", format!("No callers found for '{symbol}'.").yellow());
+            } else {
+                println!(
+                    "{}",
+                    format!("Callers of '{symbol}' ({}):", callers.len()).cyan()
+                );
+                println!("{}", "─".repeat(50).dimmed());
+                for c in &callers {
+                    println!(
+                        "  {} {}:{}",
+                        c.caller.white().bold(),
+                        c.file.dimmed(),
+                        c.line
+                    );
+                }
+            }
+            0
+        }
+
+        Command::Impact {
+            symbol,
+            depth,
+            json,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run 'cora index' first.".yellow());
+                std::process::exit(1);
+            }
+            let conn = index::open_index(&db_path)?;
+            let impact = index::graph::impact_analysis(&conn, &symbol, depth)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&impact)?);
+            } else if impact.is_empty() {
+                eprintln!("{}", format!("No impact found for '{}'.", symbol).yellow());
+            } else {
+                println!(
+                    "{}",
+                    format!(
+                        "Impact of changing '{}' ({} affected):",
+                        symbol,
+                        impact.len()
+                    )
+                    .cyan()
+                );
+                println!("{}", "\u{2500}".repeat(50).dimmed());
+                let mut prev_depth = 0;
+                for node in &impact {
+                    if node.depth != prev_depth {
+                        prev_depth = node.depth;
+                        println!("  {}", format!("depth {}", node.depth).blue().bold());
+                    }
+                    println!(
+                        "    {} {}:{}",
+                        node.symbol.white(),
+                        node.file.dimmed(),
+                        node.line
+                    );
+                }
+            }
+            0
+        }
+
+        Command::Affected {
+            files,
+            stdin,
+            filter,
+            json,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run 'cora index' first.".yellow());
+                std::process::exit(1);
+            }
+            let conn = index::open_index(&db_path)?;
+
+            // Gather changed files
+            let mut changed: Vec<String> = files;
+            if stdin {
+                use std::io::BufRead;
+                let stdin = std::io::stdin();
+                for line in stdin.lock().lines().map_while(Result::ok) {
+                    let trimmed = line.trim().to_string();
+                    if !trimmed.is_empty() {
+                        changed.push(trimmed);
+                    }
+                }
+            }
+
+            if changed.is_empty() {
+                // Fallback: get from git diff
+                let output = std::process::Command::new("git")
+                    .args(["diff", "--name-only", "HEAD"])
+                    .output()?;
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                changed = stdout
+                    .lines()
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+            }
+
+            if changed.is_empty() {
+                eprintln!("{}", "No changed files detected.".yellow());
+                std::process::exit(0);
+            }
+
+            // Default test patterns
+            let patterns: Vec<String> = filter.map(|f| vec![f]).unwrap_or_else(|| {
+                vec![
+                    "test".to_string(),
+                    "spec".to_string(),
+                    "_test".to_string(),
+                    "_spec".to_string(),
+                ]
+            });
+
+            // Find test files that import/reference changed source files
+            let mut affected_tests: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
+
+            // Strategy 1: Find symbols in changed files, then find callers that are in test files
+            for file in &changed {
+                // Get all symbols defined in this file
+                let symbols_in_file: Vec<String> = {
+                    let mut stmt =
+                        conn.prepare("SELECT DISTINCT name FROM symbols WHERE file = ?1")?;
+                    let rows =
+                        stmt.query_map(rusqlite::params![file], |row| row.get::<_, String>(0))?;
+                    rows.filter_map(|r| r.ok()).collect()
+                };
+
+                // For each symbol, find callers
+                for sym_name in &symbols_in_file {
+                    let callers = index::graph::find_callers(&conn, sym_name, 100)?;
+                    for caller in callers {
+                        // Check if caller file looks like a test file
+                        if patterns.iter().any(|p| caller.file.contains(p.as_str())) {
+                            affected_tests.insert(caller.file.clone());
+                        }
+                    }
+                }
+            }
+
+            // Strategy 2: Direct test file name convention (mod_test.rs, foo_test.go)
+            for file in &changed {
+                // For Rust: src/foo.rs → tests/foo.rs or src/foo.rs → src/foo_test.rs
+                let stem = file
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(file)
+                    .rsplit('.')
+                    .next()
+                    .unwrap_or("");
+                let test_patterns = [
+                    format!("{stem}_test.rs"),
+                    format!("tests/{stem}.rs"),
+                    format!("test_{stem}.rs"),
+                    format!("{stem}_test.go"),
+                    format!("{stem}_test.py"),
+                    format!("test_{stem}.py"),
+                    format!("{stem}.test.ts"),
+                    format!("{stem}.spec.ts"),
+                ];
+                for tp in &test_patterns {
+                    let mut stmt =
+                        conn.prepare("SELECT DISTINCT path FROM files WHERE path LIKE ?1")?;
+                    let pattern = format!("%{tp}");
+                    let rows =
+                        stmt.query_map(rusqlite::params![pattern], |row| row.get::<_, String>(0))?;
+                    for f in rows.map_while(Result::ok) {
+                        affected_tests.insert(f);
+                    }
+                }
+            }
+
+            let mut sorted: Vec<String> = affected_tests.into_iter().collect();
+            sorted.sort();
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&sorted)?);
+            } else if sorted.is_empty() {
+                eprintln!("{}", "No affected test files found.".yellow());
+            } else {
+                println!(
+                    "{}",
+                    format!("Affected test files ({}):", sorted.len()).cyan()
+                );
+                println!("{}", "\u{2500}".repeat(50).dimmed());
+                for f in &sorted {
+                    println!("  {}", f.white().bold());
+                }
+            }
+            0
+        }
+
         Command::Commit {
             yolo,
             force,
