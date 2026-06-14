@@ -351,6 +351,184 @@ fn extract_zig(line: &str, line_no: u32, file: &str, raw: &str, out: &mut Vec<Ex
 }
 
 /// Helper: create an ExtractedDef from a regex capture.
+/// Extract function call sites from source code.
+/// Returns (caller_name, callee_name, file, line) tuples.
+/// The caller_name is the enclosing function (best-effort via scope tracking).
+pub fn extract_calls(content: &str, language: &str, file_path: &str) -> Vec<CallSite> {
+    use crate::engine::context::extraction as ctx_extract;
+    use crate::engine::context::types::SymbolKind as CtxSymbolKind;
+
+    let lines: Vec<&str> = content.lines().collect();
+    let mut current_fn: Option<String> = None;
+    let mut brace_depth: i32 = 0;
+    let mut calls = Vec::new();
+
+    for (i, line) in lines.iter().enumerate() {
+        let line_no = (i + 1) as u32;
+
+        // Track current function scope for Rust/Go/C/Java
+        if language == "rs"
+            || language == "go"
+            || language == "c"
+            || language == "cpp"
+            || language == "java"
+        {
+            // Check if we're entering a function
+            if let Some(fn_name) = detect_function_entry(line, language) {
+                current_fn = Some(fn_name);
+                brace_depth = 0;
+            }
+        }
+
+        // Track brace depth for scope
+        brace_depth += line.chars().filter(|&c| c == '{').count() as i32
+            - line.chars().filter(|&c| c == '}').count() as i32;
+        if brace_depth <= 0 && current_fn.is_some() {
+            current_fn = None;
+        }
+
+        // Extract function calls from this line
+        let symbols = ctx_extract::extract_symbols_from_line(line, language);
+        for sym in symbols {
+            if let CtxSymbolKind::FunctionCall(name) = sym {
+                // Skip self-references and builtins
+                if name == current_fn.as_deref().unwrap_or("") {
+                    continue;
+                }
+                if is_builtin(&name) {
+                    continue;
+                }
+                if let Some(caller) = &current_fn {
+                    calls.push(CallSite {
+                        caller: caller.clone(),
+                        callee: name,
+                        file: file_path.to_string(),
+                        line: line_no,
+                    });
+                }
+            }
+        }
+    }
+
+    calls
+}
+
+/// Detect function entry from a line (returns function name).
+fn detect_function_entry(line: &str, language: &str) -> Option<String> {
+    let trimmed = line.trim();
+
+    match language {
+        "rs" => {
+            // pub fn name( or fn name(
+            let re = regex::Regex::new(r"(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*[(<]").unwrap();
+            re.captures(trimmed)
+                .map(|c| c.get(1).unwrap().as_str().to_string())
+        }
+        "go" => {
+            let re = regex::Regex::new(r"func\s+(?:\([^)]+\)\s+)?(\w+)\s*\(").unwrap();
+            re.captures(trimmed)
+                .map(|c| c.get(1).unwrap().as_str().to_string())
+        }
+        "c" | "cpp" | "h" | "hpp" => {
+            let re = regex::Regex::new(r"[\w:*]+\s+(\w+)\s*\([^;]*\)\s*\{").unwrap();
+            re.captures(trimmed)
+                .map(|c| c.get(1).unwrap().as_str().to_string())
+        }
+        "java" | "kt" => {
+            let re = regex::Regex::new(r"\b(\w+)\s*\([^)]*\)\s*\{").unwrap();
+            re.captures(trimmed)
+                .map(|c| c.get(1).unwrap().as_str().to_string())
+        }
+        "py" => {
+            let re = regex::Regex::new(r"def\s+(\w+)").unwrap();
+            re.captures(trimmed)
+                .map(|c| c.get(1).unwrap().as_str().to_string())
+        }
+        _ => None,
+    }
+}
+
+/// Check if a name is a builtin/keyword to skip.
+fn is_builtin(name: &str) -> bool {
+    matches!(
+        name,
+        "if" | "for"
+            | "while"
+            | "match"
+            | "return"
+            | "break"
+            | "continue"
+            | "print"
+            | "println"
+            | "eprintln"
+            | "format"
+            | "write"
+            | "writeln"
+            | "vec"
+            | "Box"
+            | "Some"
+            | "None"
+            | "Ok"
+            | "Err"
+            | "Result"
+            | "Option"
+            | "String"
+            | "str"
+            | "Vec"
+            | "HashMap"
+            | "HashSet"
+            | "dbg"
+            | "todo"
+            | "unimplemented"
+            | "unreachable"
+            | "panic"
+            | "assert"
+            | "assert_eq"
+            | "assert_ne"
+            | "len"
+            | "is_empty"
+            | "push"
+            | "pop"
+            | "insert"
+            | "remove"
+            | "get"
+            | "set"
+            | "new"
+            | "default"
+            | "clone"
+            | "into"
+            | "from"
+            | "iter"
+            | "collect"
+            | "map"
+            | "filter"
+            | "fold"
+            | "next"
+            | "unwrap"
+            | "expect"
+            | "as_ref"
+            | "as_mut"
+            | "as_str"
+            | "to_string"
+            | "to_owned"
+            | "to_vec"
+            | "drop"
+            | "copy"
+            | "send"
+            | "sync"
+            | "main"
+    )
+}
+
+/// A function call site extracted from source code.
+#[derive(Debug, Clone)]
+pub struct CallSite {
+    pub caller: String,
+    pub callee: String,
+    pub file: String,
+    pub line: u32,
+}
+
 fn def(cap: regex::Captures, kind: SymbolKind, line: u32, file: &str, raw: &str) -> ExtractedDef {
     ExtractedDef {
         name: cap

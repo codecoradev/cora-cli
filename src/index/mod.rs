@@ -91,9 +91,22 @@ pub fn index_file(
         count += 1;
     }
 
+    // Extract and store call graph edges
+    graph::clear_edges_for_file(&tx, file_path)?;
+    let call_sites = extract::extract_calls(content, language, file_path);
+    for site in &call_sites {
+        tx.execute(
+            "INSERT INTO call_graph (caller, callee, file, line) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![site.caller, site.callee, site.file, site.line as i64],
+        )?;
+    }
+
     tx.commit()?;
 
-    debug!("Indexed {file_path}: {count} symbols ({language})");
+    debug!(
+        "Indexed {file_path}: {count} symbols, {} edges ({language})",
+        call_sites.len()
+    );
     Ok(count)
 }
 
