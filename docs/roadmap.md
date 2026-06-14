@@ -79,25 +79,28 @@ Demand-gated — we build what people actually need. Track progress on [GitHub I
 
 The foundation layer for structural code understanding — persistent symbol index, semantic search, and deep Uteke integration.
 
-- [#264](https://github.com/codecoradev/cora-cli/issues/264) `cora index` — Symbol index & SQLite persistence — ◎ Planned
-- [#265](https://github.com/codecoradev/cora-cli/issues/265) `cora explore` — Structural + semantic code search — ◎ Planned
-- [#235](https://github.com/codecoradev/cora-cli/issues/235) Cora + Uteke cross-product integration bundle — ◎ Planned
+- [#264](https://github.com/codecoradev/cora-cli/issues/264) `cora index` — Symbol index & SQLite persistence — ✓ Done
+- [#265](https://github.com/codecoradev/cora-cli/issues/265) `cora explore` — Structural + semantic code search — ✓ Done
+- [#235](https://github.com/codecoradev/cora-cli/issues/235) Cora + Uteke cross-product integration bundle — ✓ Done
+- [#284](https://github.com/codecoradev/cora-cli/issues/284) MCP Phase 1 — Code Intelligence tools (5 tools) — ✓ Done
+- [#285](https://github.com/codecoradev/cora-cli/issues/285) MCP Phase 2 — Review + Debt tools (2 tools) — ✓ Done
+- [#286](https://github.com/codecoradev/cora-cli/issues/286) MCP Phase 3 — Context enrichment tools (2 tools) — ✓ Done
 
 ### Also in v0.6
 
 - [#47](https://github.com/codecoradev/cora-cli/issues/47) GitHub Marketplace action — ✓ Done
 - [#196](https://github.com/codecoradev/cora-cli/issues/196) VitePress docs site — ✓ Done
-- [#161](https://github.com/codecoradev/cora-cli/issues/161) `cora gain` — local stats + viral sharing — ◎ Planned
-- [#160](https://github.com/codecoradev/cora-cli/issues/160) Landing page redesign — ◎ Planned
+- [#161](https://github.com/codecoradev/cora-cli/issues/161) `cora gain` — local stats + viral sharing — ✓ Done
+- [#160](https://github.com/codecoradev/cora-cli/issues/160) Landing page redesign — ✓ Done
 
 ## v0.7 — Multi-Language & Code Graph
 
 Query layer built on top of the v0.6 index — call graph traversal, test impact analysis, broader language support, and real-time sync.
 
-- [#266](https://github.com/codecoradev/cora-cli/issues/266) `cora callers` / `cora impact` — Call graph query commands — ◎ Planned
-- [#267](https://github.com/codecoradev/cora-cli/issues/267) `cora affected` — Find tests affected by changes — ◎ Planned
-- [#268](https://github.com/codecoradev/cora-cli/issues/268) Language expansion — 6 → 15+ language support — ◎ Planned
-- [#269](https://github.com/codecoradev/cora-cli/issues/269) Auto-sync file watcher daemon — ◎ Planned
+- [#266](https://github.com/codecoradev/cora-cli/issues/266) `cora callers` / `cora impact` — Call graph query commands — ✓ Done
+- [#267](https://github.com/codecoradev/cora-cli/issues/267) `cora affected` — Find tests affected by changes — ✓ Done
+- [#268](https://github.com/codecoradev/cora-cli/issues/268) Language expansion — 6 → 15+ language support — ✓ Done
+- [#269](https://github.com/codecoradev/cora-cli/issues/269) Auto-sync file watcher daemon — ✓ Done
 
 ## Future — What's Next
 
