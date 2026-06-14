@@ -3,7 +3,6 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'Cora',
   description: 'AI-Powered Code Review CLI — BYOK, zero config, runs in your terminal',
-  base: '/docs/cora/',
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
