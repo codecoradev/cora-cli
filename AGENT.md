@@ -17,7 +17,7 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 ```bash
 cargo build              # Build (debug)
 cargo build --release    # Build (release)
-cargo test               # Run all 523 tests
+cargo test               # Run all 567 tests
 cargo clippy --all-targets -- -D warnings  # Lint (strict)
 cargo fmt --all -- --check  # Format check
 ```
@@ -35,6 +35,12 @@ src/
 │   ├── scan.rs          # cora scan (full-file scan)
 │   ├── debt.rs          # cora debt (tech debt report)
 │   ├── commit_cmd.rs    # cora commit (review + commit message + commit)
+├── index/               # Symbol index (v0.6 — Code Intelligence)
+│   ├── mod.rs           # Index engine (open, index_project, search)
+│   ├── schema.rs        # SQLite schema + FTS5
+│   ├── symbols.rs       # SymbolKind, SymbolQuery, SearchResult
+│   ├── extract.rs       # Per-language definition + call extraction
+│   └── graph.rs         # Call graph (callers, impact, affected)
 │   ├── config_cmd.rs    # cora config (show/set/validate)
 │   ├── auth.rs          # cora auth (API key management)
 │   ├── hook_cmd.rs      # cora hook (pre-commit hook install/uninstall)
@@ -102,7 +108,7 @@ src/
 ## Testing
 
 ```bash
-cargo test               # 523 tests total
+cargo test               # 567 tests total
                          #   484 unit tests
                          #    16 CLI integration tests
                          #     6 config tests
@@ -234,7 +240,7 @@ Missing any = release blocker.
 ### 1. Code
 
 - [ ] All target issues merged to `develop`
-- [ ] `cargo test` — all 523+ tests pass
+- [ ] `cargo test` — all 567+ tests pass
 - [ ] `cargo clippy --all-targets -- -D warnings` — clean
 - [ ] `cargo fmt --all -- --check` — clean
 - [ ] `cargo build --release` — no errors

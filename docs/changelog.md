@@ -7,10 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.6.0] - 2026-06-14
 
-- **Cora + Uteke bundle installer** (`install-bundle.sh`) — single command installs both tools (#235)
-- **Documentation** — Uteke memory integration docs across README, usage, getting-started, cli-reference
+### Added — Code Intelligence
+
+- **`cora index`** — persistent SQLite symbol index with FTS5 (#264)
+  - Regex-based definition extraction for 13 languages
+  - Incremental reindex via SHA-256 file fingerprints
+  - `--stats`, `--prune`, `--rebuild`, `--watch` flags
+  - Database: `.cora/index.db`
+
+- **`cora explore`** — search the symbol index (#265)
+  - FTS5 full-text search with bm25 ranking
+  - Filter by `--kind`, `--file`, `--language`
+  - JSON output mode
+
+- **`cora callers` / `cora impact`** — call graph analysis (#266)
+  - Reverse call graph traversal (who calls this?)
+  - Forward impact analysis (what breaks if changed?)
+  - Depth-limited traversal
+
+- **`cora affected`** — test file selection (#267)
+  - Find tests affected by source changes
+  - Call graph + naming convention strategies
+  - stdin support for `git diff --name-only | cora affected --stdin`
+
+- **Language expansion** — 6 → 13 languages (#268)
+  - Ruby, PHP, Swift, Scala, Lua, Zig
+
+- **`cora index --watch`** — auto-sync file watcher (#269)
+  - Poll-based incremental reindex (2s interval)
+  - No extra dependencies
+
+### Added — MCP Server (14 tools)
+
+- **Phase 1: Code Intelligence** (#284) — 5 new MCP tools:
+  `cora.search_symbols`, `cora.find_callers`, `cora.find_impact`, `cora.find_affected_tests`, `cora.index_status`
+
+- **Phase 2: Review Pipeline** (#285) — 2 new MCP tools:
+  `cora.review_diff`, `cora.get_debt`
+
+- **Phase 3: Context Enrichment** (#286) — 2 new MCP tools:
+  `cora.get_project_info`, `cora.get_memory`
+
+### Added — Cross-Product Bundle
+
+- **Cora + Uteke bundle installer** (#235)
+  - `install-bundle.sh` — single command installs both tools
+  - Cross-referencing documentation across all docs
+
+### Fixed
+
+- **Uteke recall flag** — `--format json` → `--json` (uteke v0.0.13+ API) (#259)
+- **Uteke v0.1.0 empty results parser** — handle both bare `[]` and wrapped `{"results":[]}`
 
 ## [0.5.1] - 2026-06-13
 
