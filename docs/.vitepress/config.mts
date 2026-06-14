@@ -6,8 +6,8 @@ export default defineConfig({
   base: '/docs/cora/',
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/docs/cora/favicon.svg' }],
-    ['link', { rel: 'alternate icon', type: 'image/png', href: '/docs/cora/favicon.png' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
+    ['link', { rel: 'alternate icon', type: 'image/png', href: '/favicon.png' }],
     ['meta', { name: 'theme-color', content: '#6366f1' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'Cora — AI Code Review CLI' }],
@@ -17,7 +17,7 @@ export default defineConfig({
   ],
 
   themeConfig: {
-    logo: '/docs/cora/logo.svg',
+    logo: '/logo.svg',
 
     nav: [
       { text: 'Codecora', link: 'https://codecora.dev' },
