@@ -95,6 +95,10 @@ enum Command {
         #[clap(long)]
         rebuild: bool,
 
+        /// Watch for file changes and auto-update index
+        #[clap(long)]
+        watch: bool,
+
         /// Verbose output
         #[clap(long, short)]
         verbose: bool,
@@ -148,6 +152,24 @@ enum Command {
         /// Traversal depth (how many levels up the call graph)
         #[clap(long, default_value = "3")]
         depth: u32,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
+    /// Find tests affected by changed files
+    Affected {
+        /// Changed files (space-separated). If empty, reads from git diff.
+        files: Vec<String>,
+
+        /// Read changed files from stdin (pipe from git diff --name-only)
+        #[clap(long)]
+        stdin: bool,
+
+        /// Test file glob pattern (default: *test*, *spec*)
+        #[clap(long)]
+        filter: Option<String>,
 
         /// Output as JSON
         #[clap(long)]
@@ -509,6 +531,7 @@ async fn main() -> Result<()> {
             stats: show_stats,
             prune,
             rebuild,
+            watch,
             verbose,
         } => {
             let project_root = std::env::current_dir()?;
@@ -544,6 +567,35 @@ async fn main() -> Result<()> {
                     "{}",
                     format!("Pruned {deleted} deleted files from index.").green()
                 );
+            } else if watch {
+                // Initial index
+                eprintln!("{}", "🔍 Initial index...".cyan());
+                let stats =
+                    index::index_project(&conn, &project_root, verbose || cli.global.verbose)?;
+                eprintln!(
+                    "{}",
+                    format!(
+                        "✅ Indexed {} symbols. Watching for changes... (Ctrl+C to stop)",
+                        stats.symbols_indexed
+                    )
+                    .green()
+                );
+
+                // Poll loop: re-index changed files every 2 seconds
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    let stats = index::index_project(&conn, &project_root, false)?;
+                    if stats.files_indexed > 0 {
+                        eprintln!(
+                            "{}",
+                            format!(
+                                "🔄 Updated {} files, {} symbols",
+                                stats.files_indexed, stats.symbols_indexed
+                            )
+                            .cyan()
+                        );
+                    }
+                }
             } else {
                 eprintln!("{}", "🔍 Indexing project...".cyan());
                 let stats =
@@ -715,6 +767,140 @@ async fn main() -> Result<()> {
                         node.file.dimmed(),
                         node.line
                     );
+                }
+            }
+            0
+        }
+
+        Command::Affected {
+            files,
+            stdin,
+            filter,
+            json,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run 'cora index' first.".yellow());
+                std::process::exit(1);
+            }
+            let conn = index::open_index(&db_path)?;
+
+            // Gather changed files
+            let mut changed: Vec<String> = files;
+            if stdin {
+                use std::io::BufRead;
+                let stdin = std::io::stdin();
+                for line in stdin.lock().lines().map_while(Result::ok) {
+                    let trimmed = line.trim().to_string();
+                    if !trimmed.is_empty() {
+                        changed.push(trimmed);
+                    }
+                }
+            }
+
+            if changed.is_empty() {
+                // Fallback: get from git diff
+                let output = std::process::Command::new("git")
+                    .args(["diff", "--name-only", "HEAD"])
+                    .output()?;
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                changed = stdout
+                    .lines()
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+            }
+
+            if changed.is_empty() {
+                eprintln!("{}", "No changed files detected.".yellow());
+                std::process::exit(0);
+            }
+
+            // Default test patterns
+            let patterns: Vec<String> = filter.map(|f| vec![f]).unwrap_or_else(|| {
+                vec![
+                    "test".to_string(),
+                    "spec".to_string(),
+                    "_test".to_string(),
+                    "_spec".to_string(),
+                ]
+            });
+
+            // Find test files that import/reference changed source files
+            let mut affected_tests: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
+
+            // Strategy 1: Find symbols in changed files, then find callers that are in test files
+            for file in &changed {
+                // Get all symbols defined in this file
+                let symbols_in_file: Vec<String> = {
+                    let mut stmt =
+                        conn.prepare("SELECT DISTINCT name FROM symbols WHERE file = ?1")?;
+                    let rows =
+                        stmt.query_map(rusqlite::params![file], |row| row.get::<_, String>(0))?;
+                    rows.filter_map(|r| r.ok()).collect()
+                };
+
+                // For each symbol, find callers
+                for sym_name in &symbols_in_file {
+                    let callers = index::graph::find_callers(&conn, sym_name, 100)?;
+                    for caller in callers {
+                        // Check if caller file looks like a test file
+                        if patterns.iter().any(|p| caller.file.contains(p.as_str())) {
+                            affected_tests.insert(caller.file.clone());
+                        }
+                    }
+                }
+            }
+
+            // Strategy 2: Direct test file name convention (mod_test.rs, foo_test.go)
+            for file in &changed {
+                // For Rust: src/foo.rs → tests/foo.rs or src/foo.rs → src/foo_test.rs
+                let stem = file
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(file)
+                    .rsplit('.')
+                    .next()
+                    .unwrap_or("");
+                let test_patterns = [
+                    format!("{stem}_test.rs"),
+                    format!("tests/{stem}.rs"),
+                    format!("test_{stem}.rs"),
+                    format!("{stem}_test.go"),
+                    format!("{stem}_test.py"),
+                    format!("test_{stem}.py"),
+                    format!("{stem}.test.ts"),
+                    format!("{stem}.spec.ts"),
+                ];
+                for tp in &test_patterns {
+                    let mut stmt =
+                        conn.prepare("SELECT DISTINCT path FROM files WHERE path LIKE ?1")?;
+                    let pattern = format!("%{tp}");
+                    let rows =
+                        stmt.query_map(rusqlite::params![pattern], |row| row.get::<_, String>(0))?;
+                    for f in rows.map_while(Result::ok) {
+                        affected_tests.insert(f);
+                    }
+                }
+            }
+
+            let mut sorted: Vec<String> = affected_tests.into_iter().collect();
+            sorted.sort();
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&sorted)?);
+            } else if sorted.is_empty() {
+                eprintln!("{}", "No affected test files found.".yellow());
+            } else {
+                println!(
+                    "{}",
+                    format!("Affected test files ({}):", sorted.len()).cyan()
+                );
+                println!("{}", "\u{2500}".repeat(50).dimmed());
+                for f in &sorted {
+                    println!("  {}", f.white().bold());
                 }
             }
             0

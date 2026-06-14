@@ -73,7 +73,7 @@ static RE_JAVA_TYPE: LazyLock<Regex> =
 const MAX_SYMBOLS_PER_FILE: usize = 50;
 
 /// Extract symbols from a single line of code for a given language.
-fn extract_symbols_from_line(line: &str, language: &str) -> Vec<SymbolKind> {
+pub fn extract_symbols_from_line(line: &str, language: &str) -> Vec<SymbolKind> {
     let mut symbols = Vec::new();
     let mut seen = HashSet::new();
 
