@@ -126,6 +126,34 @@ enum Command {
         json: bool,
     },
 
+    /// Find all callers of a symbol (who calls this?)
+    Callers {
+        /// Symbol name to search for
+        symbol: String,
+
+        /// Maximum results
+        #[clap(long, default_value = "50")]
+        limit: usize,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
+    /// Analyze the impact of changing a symbol (what breaks?)
+    Impact {
+        /// Symbol name to analyze
+        symbol: String,
+
+        /// Traversal depth (how many levels up the call graph)
+        #[clap(long, default_value = "3")]
+        depth: u32,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
     /// Review staged changes, generate commit message, and commit
     Commit {
         /// YOLO mode — auto-commit without prompts
@@ -605,6 +633,88 @@ async fn main() -> Result<()> {
                             r.symbol.signature.trim().dimmed()
                         );
                     }
+                }
+            }
+            0
+        }
+
+        Command::Callers {
+            symbol,
+            limit,
+            json,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run `cora index` first.".yellow());
+                std::process::exit(1);
+            }
+            let conn = index::open_index(&db_path)?;
+            let callers = index::graph::find_callers(&conn, &symbol, limit)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&callers)?);
+            } else if callers.is_empty() {
+                eprintln!("{}", format!("No callers found for '{symbol}'.").yellow());
+            } else {
+                println!(
+                    "{}",
+                    format!("Callers of '{symbol}' ({}):", callers.len()).cyan()
+                );
+                println!("{}", "─".repeat(50).dimmed());
+                for c in &callers {
+                    println!(
+                        "  {} {}:{}",
+                        c.caller.white().bold(),
+                        c.file.dimmed(),
+                        c.line
+                    );
+                }
+            }
+            0
+        }
+
+        Command::Impact {
+            symbol,
+            depth,
+            json,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run 'cora index' first.".yellow());
+                std::process::exit(1);
+            }
+            let conn = index::open_index(&db_path)?;
+            let impact = index::graph::impact_analysis(&conn, &symbol, depth)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&impact)?);
+            } else if impact.is_empty() {
+                eprintln!("{}", format!("No impact found for '{}'.", symbol).yellow());
+            } else {
+                println!(
+                    "{}",
+                    format!(
+                        "Impact of changing '{}' ({} affected):",
+                        symbol,
+                        impact.len()
+                    )
+                    .cyan()
+                );
+                println!("{}", "\u{2500}".repeat(50).dimmed());
+                let mut prev_depth = 0;
+                for node in &impact {
+                    if node.depth != prev_depth {
+                        prev_depth = node.depth;
+                        println!("  {}", format!("depth {}", node.depth).blue().bold());
+                    }
+                    println!(
+                        "    {} {}:{}",
+                        node.symbol.white(),
+                        node.file.dimmed(),
+                        node.line
+                    );
                 }
             }
             0

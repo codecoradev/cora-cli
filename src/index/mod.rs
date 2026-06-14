@@ -5,6 +5,7 @@
 //! stored in SQLite with FTS5 for fast full-text search.
 
 mod extract;
+pub mod graph;
 mod schema;
 mod symbols;
 
@@ -15,6 +16,8 @@ use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use tracing::{debug, info};
 
+#[allow(unused_imports)]
+pub use graph::{CallEdge, CalleeResult, CallerResult, ImpactNode};
 pub use symbols::{SearchResult, SymbolKind, SymbolQuery};
 
 /// Default index database path relative to project root.

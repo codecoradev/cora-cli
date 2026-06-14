@@ -71,6 +71,19 @@ fn migrate_v1(conn: &Connection) -> anyhow::Result<()> {
             tokenize='unicode61 remove_diacritics 1'
         );
 
+        -- Call graph edges: caller → callee relationships
+        CREATE TABLE IF NOT EXISTS call_graph (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            caller      TEXT NOT NULL,
+            callee      TEXT NOT NULL,
+            file        TEXT NOT NULL,
+            line        INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_cg_caller ON call_graph(caller);
+        CREATE INDEX IF NOT EXISTS idx_cg_callee ON call_graph(callee);
+        CREATE INDEX IF NOT EXISTS idx_cg_file ON call_graph(file);
+
         -- Triggers to keep FTS5 in sync with symbols table
         CREATE TRIGGER IF NOT EXISTS symbols_fts_insert
         AFTER INSERT ON symbols

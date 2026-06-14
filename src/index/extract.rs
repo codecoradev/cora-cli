@@ -89,6 +89,61 @@ static RE_C_FN: LazyLock<Regex> =
 static RE_C_STRUCT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\s*(?:typedef\s+)?struct\s+(\w+)").unwrap());
 
+// ─── Ruby ───
+
+static RE_RB_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*def\s+(?:self\.)?(\w+)").unwrap());
+
+static RE_RB_CLASS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*(?:class|module)\s+(\w+)").unwrap());
+
+// ─── PHP ───
+
+static RE_PHP_FN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*(?:public|private|protected)?\s*(?:static\s+)?function\s+(\w+)").unwrap()
+});
+
+static RE_PHP_CLASS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*(?:abstract\s+)?(?:final\s+)?class\s+(\w+)").unwrap());
+
+static RE_PHP_INTERFACE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*interface\s+(\w+)").unwrap());
+
+// ─── Swift ───
+
+static RE_SW_FN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*(?:public|private|internal|fileprivate)?\s*(?:static\s+)?func\s+(\w+)")
+        .unwrap()
+});
+
+static RE_SW_TYPE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*(?:public|internal|final|open)?\s*(?:class|struct|enum|protocol)\s+(\w+)")
+        .unwrap()
+});
+
+// ─── Scala ───
+
+static RE_SCALA_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*(?:private|protected)?\s*def\s+(\w+)").unwrap());
+
+static RE_SCALA_TYPE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*(?:abstract\s+)?(?:sealed\s+)?(?:class|object|trait|case class)\s+(\w+)")
+        .unwrap()
+});
+
+// ─── Lua ───
+
+static RE_LUA_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*(?:local\s+)?function\s+(?:[\w.:]+\.)?(\w+)").unwrap());
+
+// ─── Zig ───
+
+static RE_ZIG_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*(?:pub\s+)?fn\s+(\w+)").unwrap());
+
+static RE_ZIG_CONST: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*(?:pub\s+)?const\s+(\w+)").unwrap());
+
 /// Extract symbols from source code.
 ///
 /// Returns a list of `IndexedSymbol` entries (without id, which is assigned by the database).
@@ -109,6 +164,12 @@ pub fn extract_symbols(content: &str, language: &str, file_path: &str) -> Vec<Ex
             "c" | "cpp" | "cc" | "cxx" | "h" | "hpp" => {
                 extract_c(line, line_no, file_path, line, &mut symbols)
             }
+            "rb" => extract_ruby(line, line_no, file_path, line, &mut symbols),
+            "php" => extract_php(line, line_no, file_path, line, &mut symbols),
+            "swift" => extract_swift(line, line_no, file_path, line, &mut symbols),
+            "scala" => extract_scala(line, line_no, file_path, line, &mut symbols),
+            "lua" => extract_lua(line, line_no, file_path, line, &mut symbols),
+            "zig" => extract_zig(line, line_no, file_path, line, &mut symbols),
             _ => {}
         }
     }
@@ -232,6 +293,60 @@ fn extract_c(line: &str, line_no: u32, file: &str, raw: &str, out: &mut Vec<Extr
     }
     if let Some(cap) = RE_C_STRUCT.captures(line) {
         out.push(def(cap, SymbolKind::Struct, line_no, file, raw));
+    }
+}
+
+fn extract_ruby(line: &str, line_no: u32, file: &str, raw: &str, out: &mut Vec<ExtractedDef>) {
+    if let Some(cap) = RE_RB_FN.captures(line) {
+        out.push(def(cap, SymbolKind::Method, line_no, file, raw));
+    }
+    if let Some(cap) = RE_RB_CLASS.captures(line) {
+        out.push(def(cap, SymbolKind::Class, line_no, file, raw));
+    }
+}
+
+fn extract_php(line: &str, line_no: u32, file: &str, raw: &str, out: &mut Vec<ExtractedDef>) {
+    if let Some(cap) = RE_PHP_FN.captures(line) {
+        out.push(def(cap, SymbolKind::Function, line_no, file, raw));
+    }
+    if let Some(cap) = RE_PHP_CLASS.captures(line) {
+        out.push(def(cap, SymbolKind::Class, line_no, file, raw));
+    }
+    if let Some(cap) = RE_PHP_INTERFACE.captures(line) {
+        out.push(def(cap, SymbolKind::Interface, line_no, file, raw));
+    }
+}
+
+fn extract_swift(line: &str, line_no: u32, file: &str, raw: &str, out: &mut Vec<ExtractedDef>) {
+    if let Some(cap) = RE_SW_FN.captures(line) {
+        out.push(def(cap, SymbolKind::Function, line_no, file, raw));
+    }
+    if let Some(cap) = RE_SW_TYPE.captures(line) {
+        out.push(def(cap, SymbolKind::Class, line_no, file, raw));
+    }
+}
+
+fn extract_scala(line: &str, line_no: u32, file: &str, raw: &str, out: &mut Vec<ExtractedDef>) {
+    if let Some(cap) = RE_SCALA_FN.captures(line) {
+        out.push(def(cap, SymbolKind::Function, line_no, file, raw));
+    }
+    if let Some(cap) = RE_SCALA_TYPE.captures(line) {
+        out.push(def(cap, SymbolKind::Class, line_no, file, raw));
+    }
+}
+
+fn extract_lua(line: &str, line_no: u32, file: &str, raw: &str, out: &mut Vec<ExtractedDef>) {
+    if let Some(cap) = RE_LUA_FN.captures(line) {
+        out.push(def(cap, SymbolKind::Function, line_no, file, raw));
+    }
+}
+
+fn extract_zig(line: &str, line_no: u32, file: &str, raw: &str, out: &mut Vec<ExtractedDef>) {
+    if let Some(cap) = RE_ZIG_FN.captures(line) {
+        out.push(def(cap, SymbolKind::Function, line_no, file, raw));
+    }
+    if let Some(cap) = RE_ZIG_CONST.captures(line) {
+        out.push(def(cap, SymbolKind::Constant, line_no, file, raw));
     }
 }
 
@@ -367,5 +482,101 @@ const DefaultPort = 8080
     fn test_extract_empty() {
         let symbols = extract_symbols("", "rs", "empty.rs");
         assert!(symbols.is_empty());
+    }
+
+    #[test]
+    fn test_extract_ruby() {
+        let code = r#"
+class ApplicationController
+  def authenticate_user
+    @current_user
+  end
+end
+
+module Auth
+  def validate_token(token)
+    false
+  end
+end
+"#;
+        let symbols = extract_symbols(code, "rb", "app.rb");
+        let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"ApplicationController"));
+        assert!(names.contains(&"authenticate_user"));
+        assert!(names.contains(&"Auth"));
+    }
+
+    #[test]
+    fn test_extract_php() {
+        let code = r#"
+<?php
+class UserController {
+    public function show($id) {
+        return $this->find($id);
+    }
+}
+
+interface Repository {
+    public function find($id);
+}
+"#;
+        let symbols = extract_symbols(code, "php", "user.php");
+        let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"UserController"));
+        assert!(names.contains(&"show"));
+        assert!(names.contains(&"Repository"));
+    }
+
+    #[test]
+    fn test_extract_swift() {
+        let code = r#"
+public struct User {
+    var id: String
+}
+
+func authenticate(token: String) -> Bool {
+    return false
+}
+
+enum AuthError: Error {
+    case invalidToken
+}
+"#;
+        let symbols = extract_symbols(code, "swift", "auth.swift");
+        let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"User"));
+        assert!(names.contains(&"authenticate"));
+    }
+
+    #[test]
+    fn test_extract_lua() {
+        let code = r#"
+local function validate(input)
+    return true
+end
+
+function M.handler(req)
+    return validate(req.body)
+end
+"#;
+        let symbols = extract_symbols(code, "lua", "handler.lua");
+        let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"validate"));
+        assert!(names.contains(&"handler"));
+    }
+
+    #[test]
+    fn test_extract_zig() {
+        let code = r#"
+pub fn main() !void {
+    try run();
+}
+
+const MAX_RETRIES: u32 = 3;
+"#;
+        let symbols = extract_symbols(code, "zig", "main.zig");
+        let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"main"));
+        assert!(names.contains(&"MAX_RETRIES"));
     }
 }
