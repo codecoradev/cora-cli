@@ -11,6 +11,7 @@ mod error;
 mod formatters;
 mod git;
 mod hook;
+mod index;
 mod mcp;
 mod progress;
 
@@ -80,6 +81,51 @@ struct GlobalOptions {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Build or update the symbol index for code intelligence
+    Index {
+        /// Show index statistics instead of building
+        #[clap(long)]
+        stats: bool,
+
+        /// Prune deleted files from index
+        #[clap(long)]
+        prune: bool,
+
+        /// Rebuild index from scratch (drop existing)
+        #[clap(long)]
+        rebuild: bool,
+
+        /// Verbose output
+        #[clap(long, short)]
+        verbose: bool,
+    },
+
+    /// Search the symbol index for code intelligence
+    Explore {
+        /// Search query (symbol name or keyword)
+        query: Option<String>,
+
+        /// Filter by symbol kind (function, struct, enum, trait, etc.)
+        #[clap(long)]
+        kind: Option<String>,
+
+        /// Filter by file path prefix
+        #[clap(long)]
+        file: Option<String>,
+
+        /// Filter by language
+        #[clap(long)]
+        language: Option<String>,
+
+        /// Maximum results
+        #[clap(long, default_value = "50")]
+        limit: usize,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
     /// Review staged changes, generate commit message, and commit
     Commit {
         /// YOLO mode — auto-commit without prompts
@@ -390,6 +436,17 @@ enum ProfileAction {
     },
 }
 
+/// Format bytes as human-readable string.
+fn format_bytes(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -420,6 +477,139 @@ async fn main() -> Result<()> {
 
     // Dispatch based on subcommand
     let exit_code = match cli.command {
+        Command::Index {
+            stats: show_stats,
+            prune,
+            rebuild,
+            verbose,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+
+            if rebuild && db_path.exists() {
+                std::fs::remove_file(&db_path)?;
+                eprintln!("{}", "Dropped existing index.".dimmed());
+            }
+
+            let conn = index::open_index(&db_path)?;
+
+            if show_stats {
+                let summary = index::index_stats(&conn)?;
+                println!("{}", "SYMBOL INDEX".cyan().bold());
+                println!("{}", "────────────────────────────".dimmed());
+                println!("  Total symbols:  {}", summary.total_symbols);
+                println!("  Total files:    {}", summary.total_files);
+                println!("  Database size:  {}", format_bytes(summary.db_size_bytes));
+                println!();
+                println!("  {}", "By Kind".cyan());
+                for (kind, count) in &summary.symbols_by_kind {
+                    println!("    {kind:<16} {count}");
+                }
+                println!();
+                println!("  {}", "By Language".cyan());
+                for (lang, count) in &summary.symbols_by_language {
+                    println!("    {lang:<16} {count}");
+                }
+            } else if prune {
+                let deleted = index::prune_deleted(&conn, &project_root)?;
+                println!(
+                    "{}",
+                    format!("Pruned {deleted} deleted files from index.").green()
+                );
+            } else {
+                eprintln!("{}", "🔍 Indexing project...".cyan());
+                let stats =
+                    index::index_project(&conn, &project_root, verbose || cli.global.verbose)?;
+                eprintln!(
+                    "{}",
+                    format!(
+                        "✅ Indexed {} symbols from {} files ({} skipped, {} errors)",
+                        stats.symbols_indexed,
+                        stats.files_indexed,
+                        stats.files_skipped,
+                        stats.errors
+                    )
+                    .green()
+                );
+                eprintln!("{}", format!("   Database: {}", db_path.display()).dimmed());
+            }
+            0
+        }
+
+        Command::Explore {
+            query,
+            kind,
+            file,
+            language,
+            limit,
+            json,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = index::default_db_path(&project_root);
+
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run `cora index` first.".yellow());
+                std::process::exit(1);
+            }
+
+            let conn = index::open_index(&db_path)?;
+
+            let sym_kind = kind.as_deref().map(index::SymbolKind::from_str);
+
+            let q = index::SymbolQuery {
+                text: query,
+                kind: sym_kind,
+                file_prefix: file,
+                language,
+                limit,
+            };
+
+            let results = index::search(&conn, &q)?;
+
+            if json {
+                let json_results: Vec<serde_json::Value> = results
+                    .iter()
+                    .map(|r| {
+                        serde_json::json!({
+                            "name": r.symbol.name,
+                            "kind": r.symbol.kind.as_str(),
+                            "file": r.symbol.file,
+                            "line": r.symbol.line,
+                            "signature": r.symbol.signature,
+                            "language": r.symbol.language,
+                            "score": r.score,
+                        })
+                    })
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&json_results)?);
+            } else if results.is_empty() {
+                eprintln!("{}", "No symbols found.".yellow());
+            } else {
+                println!("{}", format!("Found {} symbols:", results.len()).cyan());
+                println!(
+                    "{}",
+                    "───────────────────────────────────────────────".dimmed()
+                );
+                for r in &results {
+                    println!(
+                        "  {} {} {}:{}",
+                        r.symbol.kind.as_str().blue(),
+                        r.symbol.name.white().bold(),
+                        r.symbol.file.dimmed(),
+                        r.symbol.line
+                    );
+                    if !r.symbol.signature.is_empty() {
+                        println!(
+                            "    {} {}",
+                            "→".dimmed(),
+                            r.symbol.signature.trim().dimmed()
+                        );
+                    }
+                }
+            }
+            0
+        }
+
         Command::Commit {
             yolo,
             force,
