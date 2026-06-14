@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Cora + Uteke bundle installer** (`install-bundle.sh`) — single command installs both tools (#235)
+- **Documentation** — Uteke memory integration docs across README, usage, getting-started, cli-reference
+
 ## [0.5.1] - 2026-06-13
 
 ### Added
