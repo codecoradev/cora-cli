@@ -96,3 +96,11 @@ $ cora commit
 # YOLO mode — auto-commit, no prompts
 $ cora commit --yolo
 ```
+
+```bash
+# Install both Cora + Uteke (code review with memory)
+$ curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-bundle.sh | sh
+
+# Then review with memory:
+$ cora review --staged --memory --learn
+```
