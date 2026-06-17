@@ -48,6 +48,25 @@ curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-b
 > Or: `cargo install --git https://github.com/codecoradev/cora-cli`  
 > Pre-built binaries: [GitHub Releases](https://github.com/codecoradev/cora-cli/releases)
 
+<details>
+<summary><b>macOS note — binary killed on launch (<code>Killed: 9</code>)?</b></summary>
+
+The prebuilt `aarch64-apple-darwin` binary is not Apple-notarized. On macOS, downloaded
+binaries may be tagged with `com.apple.quarantine` / `com.apple.provenance` and killed by
+Gatekeeper with **no error message**.
+
+The `install.sh` installer strips these attributes automatically. If you downloaded the
+binary manually (e.g. `gh release download`), strip them yourself:
+
+```bash
+xattr -dr com.apple.quarantine /path/to/cora
+xattr -dr com.apple.provenance /path/to/cora
+```
+
+Or install via `cargo` / Homebrew to sidestep Gatekeeper entirely.
+
+</details>
+
 ### Authenticate
 
 ```bash

@@ -141,6 +141,16 @@ install() {
 
     chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
 
+    # macOS Gatekeeper workaround (#313): strip quarantine/provenance xattrs
+    # that the browser/curl attaches to downloaded binaries. Without this,
+    # macOS kills the unsigned binary with `Killed: 9` and no error message.
+    if [ "$OS" = "darwin" ] && command -v xattr >/dev/null 2>&1; then
+        # Best-effort — failures here are non-fatal (binary may already be clean).
+        xattr -dr com.apple.quarantine "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
+        xattr -dr com.apple.provenance "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
+        info "Stripped macOS quarantine attributes (Gatekeeper workaround)"
+    fi
+
     # Cleanup
     rm -rf "$TEMP_DIR"
 
