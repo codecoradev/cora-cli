@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-17
+
+### Fixed — Scan
+
+- **`cora scan` no longer aborts on non-JSON LLM responses (#316)**
+  - Detect non-JSON responses early (provider error pages, rate-limit bodies, empty responses, prose wrappers) and surface the raw response prefix (first 512 bytes) in the error message so users can diagnose the cause.
+  - Per-batch parse failures are now **non-fatal by default**: the failing batch is skipped with a `warn`-level log and a stderr warning listing the affected files, and the scan continues with the remaining batches. Set `--no-continue-on-batch-error` to restore the old abort behavior.
+  - Added `--batch-files <N>` flag (default: 20) to control the maximum number of files per LLM batch — lower it to work around provider token limits or rate-limit errors on large scans.
+  - Truncated-JSON and general parse errors now include the raw response prefix for easier debugging without `--verbose`.
+
 ## [0.6.0] - 2026-06-14
 
 ### Added — Code Intelligence
@@ -502,7 +512,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.5.0...develop
+[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.6.1...develop
+[0.6.1]: https://github.com/codecoradev/cora-cli/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/codecoradev/cora-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/codecoradev/cora-cli/compare/v0.4.6...v0.5.0
 [0.4.6]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...v0.4.5

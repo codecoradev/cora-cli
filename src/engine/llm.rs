@@ -720,6 +720,14 @@ pub(crate) fn parse_review_response(
 pub(crate) fn parse_scan_response(
     raw: &str,
 ) -> std::result::Result<(Vec<ReviewIssue>, Option<String>, Option<TokenUsage>), CoraError> {
+    // Fast-fail when the response is clearly not JSON (e.g. provider error page,
+    // empty body, rate-limit message, or prose wrapper). Surfacing the raw
+    // prefix lets users diagnose whether it's truncation, a provider error,
+    // or HTML.
+    if !looks_like_json_array(raw) {
+        return Err(CoraError::LlmParse(non_json_error_message(raw)));
+    }
+
     let (json_str, summary) = extract_json_and_summary(raw);
     let json_str = strip_code_fences(&json_str);
 
@@ -741,12 +749,16 @@ pub(crate) fn parse_scan_response(
                     }
                     Err(repair_err) => {
                         return Err(CoraError::LlmParse(format!(
-                            "parse failed (original: {err_msg}, after repair: {repair_err})"
+                            "parse failed (original: {err_msg}, after repair: {repair_err}). Raw response prefix: {}",
+                            preview_raw(raw)
                         )));
                     }
                 }
             } else {
-                return Err(CoraError::LlmParse(e.to_string()));
+                return Err(CoraError::LlmParse(format!(
+                    "{err_msg}. Raw response prefix: {}",
+                    preview_raw(raw)
+                )));
             }
         }
     };
@@ -758,6 +770,53 @@ pub(crate) fn parse_scan_response(
     };
 
     Ok((issues, summary, None))
+}
+
+/// Check whether a raw LLM response plausibly contains a JSON payload.
+///
+/// Accepts responses that (after trimming leading whitespace and optional
+/// markdown fences) begin with `[` or `{`. Rejects obvious non-JSON bodies
+/// such as HTML error pages, empty strings, or pure prose.
+pub(crate) fn looks_like_json_array(raw: &str) -> bool {
+    let trimmed = raw.trim_start();
+    if trimmed.is_empty() {
+        return false;
+    }
+    // Strip a leading ```json or ``` fence if present
+    let stripped = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .map(str::trim_start)
+        .unwrap_or(trimmed);
+    matches!(stripped.chars().next(), Some('[') | Some('{'))
+}
+
+/// Build a human-readable diagnostic for a non-JSON LLM response, including a
+/// truncated preview of the raw body (first 512 bytes) so users can tell
+/// whether the provider returned an error page, rate-limit message, or prose.
+pub(crate) fn non_json_error_message(raw: &str) -> String {
+    let len = raw.len();
+    format!(
+        "LLM response is not valid JSON (length={len}). This usually means the provider returned an error body, rate-limit page, or truncated output. Raw response prefix: {}",
+        preview_raw(raw)
+    )
+}
+
+/// Return a single-line, length-capped preview of a raw LLM response for logs
+/// and error messages. Collapses whitespace and caps at 512 bytes.
+pub(crate) fn preview_raw(raw: &str) -> String {
+    const MAX_BYTES: usize = 512;
+    let collapsed: String = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.len() <= MAX_BYTES {
+        collapsed
+    } else {
+        // Split at a char boundary <= MAX_BYTES to avoid slicing mid-codepoint.
+        let mut end = MAX_BYTES;
+        while end > 0 && !collapsed.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}… [truncated]", &collapsed[..end])
+    }
 }
 
 /// Extract JSON and optional summary (after ||| separator).
@@ -1422,5 +1481,85 @@ mod tests {
         let result = parse_scan_response(raw).unwrap();
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.0[0].file, "config.rs");
+    }
+
+    // ─── looks_like_json_array / non-JSON guard (#316) ───
+
+    #[test]
+    fn looks_like_json_array_accepts_plain_array() {
+        assert!(looks_like_json_array(EMPTY_ARRAY));
+        assert!(looks_like_json_array(SINGLE_ISSUE_JSON));
+    }
+
+    #[test]
+    fn looks_like_json_array_accepts_fenced_json() {
+        let fenced = format!("```json\n{SINGLE_ISSUE_JSON}\n```");
+        assert!(looks_like_json_array(&fenced));
+        let plain_fence = format!("```\n{EMPTY_ARRAY}\n```");
+        assert!(looks_like_json_array(&plain_fence));
+    }
+
+    #[test]
+    fn looks_like_json_array_accepts_leading_whitespace() {
+        let padded = format!("\n   \t  {SINGLE_ISSUE_JSON}");
+        assert!(looks_like_json_array(&padded));
+    }
+
+    #[test]
+    fn looks_like_json_array_rejects_empty() {
+        assert!(!looks_like_json_array(""));
+        assert!(!looks_like_json_array("   \n\t\n"));
+    }
+
+    #[test]
+    fn looks_like_json_array_rejects_html_error_page() {
+        let html = "<html><body><h1>503 Service Unavailable</h1></body></html>";
+        assert!(!looks_like_json_array(html));
+    }
+
+    #[test]
+    fn looks_like_json_array_rejects_prose() {
+        let prose = "Sure, here are the issues I found in your code: first, ...";
+        assert!(!looks_like_json_array(prose));
+    }
+
+    #[test]
+    fn parse_scan_response_rejects_non_json_with_preview() {
+        let html = "<html><body>Rate limited</body></html>";
+        let err = parse_scan_response(html).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("not valid JSON"), "msg = {msg}");
+        assert!(msg.contains("Rate limited"), "msg = {msg}");
+        assert!(msg.contains("length="), "msg = {msg}");
+    }
+
+    #[test]
+    fn parse_scan_response_rejects_empty_body() {
+        let err = parse_scan_response("").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("not valid JSON"), "msg = {msg}");
+        assert!(msg.contains("length=0"), "msg = {msg}");
+    }
+
+    #[test]
+    fn preview_raw_is_truncated_to_max_bytes() {
+        // 2000-char prose should be collapsed and capped at 512 bytes.
+        let long = "word ".repeat(500);
+        let preview = preview_raw(&long);
+        assert!(preview.ends_with("… [truncated]"));
+        // Hard cap (512 + suffix length).
+        assert!(preview.len() < 600);
+    }
+
+    #[test]
+    fn preview_raw_preserves_short_input() {
+        let short = "hello world";
+        assert_eq!(preview_raw(short), short);
+    }
+
+    #[test]
+    fn preview_raw_collapses_whitespace() {
+        let messy = "hello\n\t  world\n\n";
+        assert_eq!(preview_raw(messy), "hello world");
     }
 }
