@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `--batch-files <N>` flag (default: 20) to control the maximum number of files per LLM batch — lower it to work around provider token limits or rate-limit errors on large scans.
   - Truncated-JSON and general parse errors now include the raw response prefix for easier debugging without `--verbose`.
 
+### Fixed — Review
+
+- **`cora review` no longer exits 2 when severity filtering removes all blocking findings (#312)**
+  - Recompute `should_block` against the **filtered** issue list (after `--severity` filtering) so the exit code matches the SARIF/pretty output the user sees.
+  - Extracted exit-code logic into `compute_exit_code()` helper (pure function) with 8 unit tests covering gate pass/fail, CI mode, and hook `block` vs non-`block` modes.
+  - Applies to both the single-chunk and auto-chunked (`--auto-chunk`) review paths.
+
 ## [0.6.0] - 2026-06-14
 
 ### Added — Code Intelligence
