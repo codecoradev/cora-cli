@@ -55,7 +55,7 @@ curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-b
 cargo install --git https://github.com/codecoradev/cora-cli
 ```
 
-> Pin a version: `CORA_VERSION=v0.6.0 curl -fsSL ... | sh`
+> Pin a version: `CORA_VERSION=v0.6.1 curl -fsSL ... | sh`
 
 **Verify which `cora` you're running** — `which -a cora` will reveal stale copies from other channels:
 
