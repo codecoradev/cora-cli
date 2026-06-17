@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `install.sh` now runs `xattr -dr` for both attributes on the installed binary on macOS (best-effort, non-fatal).
   - Added a prominent `<details>` block in the README install section explaining the symptom, the manual `xattr` workaround for users who download the binary directly, and the `cargo` / Homebrew alternatives.
 
+### Changed — Docs
+
+- **Install section now warns about multiple distribution channels (#314)**
+  - Recommends a single install method per platform and lists the supported channels (installer script, `cargo`, pre-built binaries).
+  - Adds a `which -a cora && cora --version` check snippet and guidance for removing stale copies when more than one `cora` is on `PATH` (e.g. `~/.local/bin` vs `~/.cargo/bin` vs npm global).
+  - Cross-links the original issue for background.
+
 ## [0.6.0] - 2026-06-14
 
 ### Added — Code Intelligence
