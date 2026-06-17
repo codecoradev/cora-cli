@@ -316,6 +316,16 @@ enum Command {
         /// Focus areas for review (overrides config)
         #[clap(long)]
         focus: Vec<String>,
+
+        /// Maximum files per LLM batch (default: 20). Lower this to work around
+        /// provider token limits or rate-limit errors on large scans.
+        #[clap(long, value_name = "N", default_value_t = 20)]
+        batch_files: usize,
+
+        /// Abort the entire scan when a batch fails to parse instead of
+        /// skipping it and continuing (default: skip and continue).
+        #[clap(long)]
+        no_continue_on_batch_error: bool,
     },
 
     /// Manage quality profiles (preset rule sets)
@@ -991,6 +1001,8 @@ async fn main() -> Result<()> {
             extensions,
             incremental,
             focus,
+            batch_files,
+            no_continue_on_batch_error,
         } => {
             cmd_scan(
                 &cli.global,
@@ -1001,6 +1013,8 @@ async fn main() -> Result<()> {
                     extensions,
                     incremental,
                     focus,
+                    batch_files,
+                    continue_on_batch_error: !no_continue_on_batch_error,
                 },
             )
             .await?
@@ -1147,6 +1161,8 @@ struct ScanOpts {
     extensions: Vec<String>,
     incremental: bool,
     focus: Vec<String>,
+    batch_files: usize,
+    continue_on_batch_error: bool,
 }
 
 /// Handle the `review` subcommand.
@@ -1375,6 +1391,8 @@ async fn cmd_scan(globals: &GlobalOptions, opts: ScanOpts) -> Result<i32> {
         extensions: opts.extensions,
         incremental: opts.incremental,
         focus: opts.focus,
+        batch_files: opts.batch_files,
+        continue_on_batch_error: opts.continue_on_batch_error,
     };
 
     scan::execute_scan(&config, &llm_config, &scan_opts, format).await

@@ -267,6 +267,13 @@ pub async fn execute_review(
     filtered_response
         .issues
         .retain(|i| i.severity <= min_severity);
+    // Recompute should_block against the filtered issue list so the exit code
+    // matches the output the user actually sees (e.g. when `--severity critical`
+    // filters out all Major/Minor issues, we must not block). See #312.
+    filtered_response.should_block = filtered_response
+        .issues
+        .iter()
+        .any(|i| i.severity <= min_severity);
 
     // 7. Format output
     let formatter = formatter_for(format);
@@ -309,7 +316,7 @@ pub async fn execute_review(
         } else {
             EXIT_OK
         }
-    } else if response.should_block && config.hook.mode == "block" {
+    } else if filtered_response.should_block && config.hook.mode == "block" {
         EXIT_BLOCKED
     } else {
         EXIT_OK
@@ -592,6 +599,12 @@ async fn execute_chunked_review(
     filtered_response
         .issues
         .retain(|i| i.severity <= min_severity);
+    // Recompute should_block against the filtered issue list so the exit code
+    // matches the output the user actually sees (see #312).
+    filtered_response.should_block = filtered_response
+        .issues
+        .iter()
+        .any(|i| i.severity <= min_severity);
 
     // 7. Format output
     let formatter = formatter_for(format);
@@ -632,22 +645,12 @@ async fn execute_chunked_review(
     }
 
     // 9. Return exit code
-    let exit_code = if gate_result
-        .as_ref()
-        .is_some_and(|g| g.status == quality_gate::GateStatus::Fail)
-    {
-        EXIT_BLOCKED
-    } else if opts.ci {
-        if !filtered_response.issues.is_empty() {
-            EXIT_BLOCKED
-        } else {
-            EXIT_OK
-        }
-    } else if merged_response.should_block && config.hook.mode == "block" {
-        EXIT_BLOCKED
-    } else {
-        EXIT_OK
-    };
+    let exit_code = compute_exit_code(
+        gate_result.as_ref().map(|g| g.status),
+        opts.ci,
+        &filtered_response,
+        config.hook.mode.as_str(),
+    );
 
     // 10. Emit complete event
     if progress.is_enabled() {
@@ -667,4 +670,128 @@ async fn execute_chunked_review(
         output,
         &filtered_response,
     ))
+}
+
+/// Compute the review exit code from the gate status, CI flag, and the
+/// **filtered** review response (issues after severity filtering).
+///
+/// Exit code semantics (see #312):
+///
+/// | Code | Meaning |
+/// |------|---------|
+/// | 0 | Review completed; no findings at or above the severity threshold |
+/// | 2 | Review completed but findings are blocking (gate fail, CI with any
+///     issue, or hook in block mode with blocking severity) |
+///
+/// `should_block` must be computed against the **filtered** issue list so that
+/// the exit code matches the SARIF/pretty output the user sees.
+fn compute_exit_code(
+    gate_status: Option<quality_gate::GateStatus>,
+    ci: bool,
+    filtered_response: &ReviewResponse,
+    hook_mode: &str,
+) -> i32 {
+    if gate_status == Some(quality_gate::GateStatus::Fail) {
+        return EXIT_BLOCKED;
+    }
+    if ci {
+        return if filtered_response.issues.is_empty() {
+            EXIT_OK
+        } else {
+            EXIT_BLOCKED
+        };
+    }
+    if filtered_response.should_block && hook_mode == "block" {
+        EXIT_BLOCKED
+    } else {
+        EXIT_OK
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::ReviewResponse;
+    use crate::engine::Severity;
+    use crate::engine::types::ReviewIssue;
+
+    fn issue(severity: Severity) -> ReviewIssue {
+        ReviewIssue {
+            file: "src/main.rs".to_string(),
+            line: Some(1),
+            severity,
+            issue_type: Some("bug".to_string()),
+            title: "test".to_string(),
+            body: "body".to_string(),
+            suggested_fix: None,
+        }
+    }
+
+    fn response(issues: Vec<ReviewIssue>, should_block: bool) -> ReviewResponse {
+        ReviewResponse {
+            issues,
+            summary: String::new(),
+            tokens_used: None,
+            should_block,
+        }
+    }
+
+    // ─── #312: exit code must match filtered output ───
+
+    #[test]
+    fn exit_code_zero_when_no_findings_after_filter() {
+        let resp = response(vec![], false);
+        assert_eq!(compute_exit_code(None, false, &resp, "block"), EXIT_OK);
+    }
+
+    #[test]
+    fn exit_code_zero_when_filtered_should_block_false() {
+        // Even if the unfiltered response would have blocked, after filtering
+        // should_block is false → exit 0. This is the core regression in #312.
+        let resp = response(vec![], false);
+        assert_eq!(compute_exit_code(None, false, &resp, "block"), EXIT_OK);
+    }
+
+    #[test]
+    fn exit_code_blocked_when_filtered_should_block_true_and_hook_blocks() {
+        let resp = response(vec![issue(Severity::Critical)], true);
+        assert_eq!(compute_exit_code(None, false, &resp, "block"), EXIT_BLOCKED);
+    }
+
+    #[test]
+    fn exit_code_zero_when_hook_mode_not_block() {
+        let resp = response(vec![issue(Severity::Critical)], true);
+        assert_eq!(compute_exit_code(None, false, &resp, "warn"), EXIT_OK);
+        assert_eq!(compute_exit_code(None, false, &resp, ""), EXIT_OK);
+    }
+
+    #[test]
+    fn exit_code_ci_zero_when_no_findings() {
+        let resp = response(vec![], false);
+        assert_eq!(compute_exit_code(None, true, &resp, "block"), EXIT_OK);
+    }
+
+    #[test]
+    fn exit_code_ci_blocked_when_any_finding() {
+        let resp = response(vec![issue(Severity::Minor)], false);
+        assert_eq!(compute_exit_code(None, true, &resp, "block"), EXIT_BLOCKED);
+    }
+
+    #[test]
+    fn exit_code_gate_fail_overrides_everything() {
+        let resp = response(vec![], false);
+        assert_eq!(
+            compute_exit_code(Some(quality_gate::GateStatus::Fail), false, &resp, "block"),
+            EXIT_BLOCKED
+        );
+    }
+
+    #[test]
+    fn exit_code_gate_pass_then_falls_through() {
+        let resp = response(vec![], false);
+        assert_eq!(
+            compute_exit_code(Some(quality_gate::GateStatus::Pass), false, &resp, "block"),
+            EXIT_OK
+        );
+    }
 }

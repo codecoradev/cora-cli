@@ -41,6 +41,8 @@ Complete command reference for the cora CLI.
 | `cora review --upload` | Review and upload SARIF to GitHub Code Scanning |
 | `cora scan` `<path>` | Scan files for issues |
 | `cora scan .` `[--incremental]` | Scan only changed files |
+| `cora scan .` `[--batch-files N]` | Max files per LLM batch (default: 20). Lower to work around provider token limits |
+| `cora scan .` `[--no-continue-on-batch-error]` | Abort the scan when a batch fails to parse (default: skip and continue) |
 | `cora config show` | Show resolved configuration |
 | `cora config show --global` | Show global config (`~/.cora/config.yaml`) |
 | `cora config show --project` | Show project config (`.cora.yaml`) |

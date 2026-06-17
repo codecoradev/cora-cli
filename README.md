@@ -36,17 +36,54 @@
 
 ### Install
 
+Pick **one** install method — mixing channels can leave stale binaries on your `PATH`.
+
+| Method | When to use |
+|---|---|
+| **`curl … install.sh`** (recommended) | Quick standalone install; fetches the latest GitHub release binary |
+| **`cargo install --git …`** | You already have a Rust toolchain; builds from source |
+| **Pre-built binaries** | Manual download from [Releases](https://github.com/codecoradev/cora-cli/releases) |
+
 ```bash
-# Cora only (standalone)
+# Recommended: Cora only (standalone)
 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
 
 # Or install both Cora + Uteke (code review with memory)
 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-bundle.sh | sh
+
+# Or build from source with cargo
+cargo install --git https://github.com/codecoradev/cora-cli
 ```
 
-> Pin a version: `CORA_VERSION=v0.6.0 curl -fsSL ... | sh`  
-> Or: `cargo install --git https://github.com/codecoradev/cora-cli`  
-> Pre-built binaries: [GitHub Releases](https://github.com/codecoradev/cora-cli/releases)
+> Pin a version: `CORA_VERSION=v0.6.1 curl -fsSL ... | sh`
+
+**Verify which `cora` you're running** — `which -a cora` will reveal stale copies from other channels:
+
+```bash
+which -a cora            # list every `cora` on your PATH (one entry = healthy)
+cora --version           # should match the latest release
+```
+
+If `which -a cora` shows more than one path (e.g. `~/.local/bin/cora` and `~/.cargo/bin/cora`), remove the one you don't want or reorder your `PATH`. See [Issue #314](https://github.com/codecoradev/cora-cli/issues/314) for background.
+
+<details>
+<summary><b>macOS note — binary killed on launch (<code>Killed: 9</code>)?</b></summary>
+
+The prebuilt `aarch64-apple-darwin` binary is not Apple-notarized. On macOS, downloaded
+binaries may be tagged with `com.apple.quarantine` / `com.apple.provenance` and killed by
+Gatekeeper with **no error message**.
+
+The `install.sh` installer strips these attributes automatically. If you downloaded the
+binary manually (e.g. `gh release download`), strip them yourself:
+
+```bash
+xattr -dr com.apple.quarantine /path/to/cora
+xattr -dr com.apple.provenance /path/to/cora
+```
+
+Or install via `cargo` / Homebrew to sidestep Gatekeeper entirely.
+
+</details>
 
 ### Authenticate
 
