@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Extracted exit-code logic into `compute_exit_code()` helper (pure function) with 8 unit tests covering gate pass/fail, CI mode, and hook `block` vs non-`block` modes.
   - Applies to both the single-chunk and auto-chunked (`--auto-chunk`) review paths.
 
+### Fixed — Install (macOS)
+
+- **macOS installer now strips Gatekeeper quarantine attributes (#313)**
+  - Prebuilt macOS binaries (`aarch64-apple-darwin`) are not Apple-notarized. When downloaded directly, macOS attaches `com.apple.quarantine` / `com.apple.provenance` xattrs and kills the binary with `Killed: 9` on first launch.
+  - `install.sh` now runs `xattr -dr` for both attributes on the installed binary on macOS (best-effort, non-fatal).
+  - Added a prominent `<details>` block in the README install section explaining the symptom, the manual `xattr` workaround for users who download the binary directly, and the `cargo` / Homebrew alternatives.
+
 ## [0.6.0] - 2026-06-14
 
 ### Added — Code Intelligence
