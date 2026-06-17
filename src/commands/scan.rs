@@ -22,6 +22,12 @@ pub struct ScanOptions {
     pub incremental: bool,
     /// Focus areas for review (overrides config).
     pub focus: Vec<String>,
+    /// Maximum files per LLM batch (0 = use default 20).
+    pub batch_files: usize,
+    /// Whether to continue scanning when a batch fails to parse.
+    /// When true (default), a failed batch is skipped with a warning and the
+    /// rest of the scan continues. When false, a failed batch aborts the run.
+    pub continue_on_batch_error: bool,
 }
 
 /// Execute the scan command.
@@ -99,12 +105,22 @@ pub async fn execute_scan(
     let total_lines: usize = files.iter().map(|f| f.lines).sum();
 
     // 3. Batch files
-    let batches = batch_files(&files, 60_000, 20);
-    debug!(batches = batches.len(), "batched files");
+    let max_files_per_batch = if opts.batch_files > 0 {
+        opts.batch_files
+    } else {
+        20
+    };
+    let batches = batch_files(&files, 60_000, max_files_per_batch);
+    debug!(
+        batches = batches.len(),
+        max_files = max_files_per_batch,
+        "batched files"
+    );
 
     // 4. Process batches and collect issues
     let mut all_issues = Vec::new();
     let mut total_tokens = None;
+    let mut skipped_batches: Vec<(usize, Vec<String>, String)> = Vec::new();
 
     for (batch_idx, batch) in batches.iter().enumerate() {
         let files_content = format_batch_for_prompt(batch);
@@ -116,7 +132,7 @@ pub async fn execute_scan(
 
         println!("  Reviewing{batch_label}…");
 
-        let (issues, _summary, tokens) = crate::engine::llm::scan_files(
+        match crate::engine::llm::scan_files(
             llm_config,
             &files_content,
             &effective_focus,
@@ -124,12 +140,59 @@ pub async fn execute_scan(
             &config.response_format,
             None,
         )
-        .await?;
+        .await
+        {
+            Ok((issues, _summary, tokens)) => {
+                all_issues.extend(issues);
+                if tokens.is_some() {
+                    total_tokens = tokens;
+                }
+            }
+            Err(err) => {
+                let file_list: Vec<String> =
+                    batch.iter().map(|f| f.path.clone()).collect::<Vec<_>>();
+                let err_string = err.to_string();
 
-        all_issues.extend(issues);
-        if tokens.is_some() {
-            total_tokens = tokens;
+                // Always log the failure at warn level so it shows even without --verbose.
+                tracing::warn!(
+                    batch = batch_idx + 1,
+                    total_batches = batches.len(),
+                    files = ?file_list,
+                    error = %err_string,
+                    "batch scan failed"
+                );
+
+                if !opts.continue_on_batch_error {
+                    eprintln!(
+                        "  {} batch {}/{}: {}",
+                        "failed".red().bold(),
+                        batch_idx + 1,
+                        batches.len(),
+                        err_string
+                    );
+                    return Err(err.into());
+                }
+
+                eprintln!(
+                    "  {} batch {}/{} — skipping ({} files): {}",
+                    "warn".yellow().bold(),
+                    batch_idx + 1,
+                    batches.len(),
+                    file_list.len(),
+                    err_string
+                );
+                skipped_batches.push((batch_idx + 1, file_list, err_string));
+            }
         }
+    }
+
+    if !skipped_batches.is_empty() {
+        eprintln!(
+            "  {} {} of {} batches skipped due to parse failures.",
+            skipped_batches.len().to_string().yellow(),
+            skipped_batches.len(),
+            batches.len()
+        );
     }
 
     // 5. Build response and format
