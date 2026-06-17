@@ -288,5 +288,6 @@ Trend indicators: ▼ improving (fewer findings), ► stable, ▲ worsening (mor
 - Use `cora review` with no flags for the fastest pre-commit feedback
 - Combine `--format json` with `--base main` in CI pipelines
 - Use `cora scan . --incremental` for large codebases — only changed files are analyzed
+- For large scans that hit provider token limits or rate-limits, lower the batch size with `--batch-files 10` (default: 20). Failed batches are skipped by default — pass `--no-continue-on-batch-error` to abort instead
 - Use `--quiet` for minimal output and `--severity` to filter by severity level
 - Use `cora auth login` to store API keys securely instead of environment variables

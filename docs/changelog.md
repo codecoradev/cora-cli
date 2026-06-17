@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-17
+
+### Fixed — Scan
+
+- **`cora scan` no longer aborts on non-JSON LLM responses (#316)**
+  - Detect non-JSON responses early (provider error pages, rate-limit bodies, empty responses, prose wrappers) and surface the raw response prefix (first 512 bytes) in the error message so users can diagnose the cause.
+  - Per-batch parse failures are now **non-fatal by default**: the failing batch is skipped with a `warn`-level log and a stderr warning listing the affected files, and the scan continues with the remaining batches. Set `--no-continue-on-batch-error` to restore the old abort behavior.
+  - Added `--batch-files <N>` flag (default: 20) to control the maximum number of files per LLM batch — lower it to work around provider token limits or rate-limit errors on large scans.
+  - Truncated-JSON and general parse errors now include the raw response prefix for easier debugging without `--verbose`.
+
+### Fixed — Review
+
+- **`cora review` no longer exits 2 when severity filtering removes all blocking findings (#312)**
+  - Recompute `should_block` against the **filtered** issue list (after `--severity` filtering) so the exit code matches the SARIF/pretty output the user sees.
+  - Extracted exit-code logic into `compute_exit_code()` helper (pure function) with 8 unit tests covering gate pass/fail, CI mode, and hook `block` vs non-`block` modes.
+  - Applies to both the single-chunk and auto-chunked (`--auto-chunk`) review paths.
+
+### Fixed — Install (macOS)
+
+- **macOS installer now strips Gatekeeper quarantine attributes (#313)**
+  - Prebuilt macOS binaries (`aarch64-apple-darwin`) are not Apple-notarized. When downloaded directly, macOS attaches `com.apple.quarantine` / `com.apple.provenance` xattrs and kills the binary with `Killed: 9` on first launch.
+  - `install.sh` now runs `xattr -dr` for both attributes on the installed binary on macOS (best-effort, non-fatal).
+  - Added a prominent `<details>` block in the README install section explaining the symptom, the manual `xattr` workaround for users who download the binary directly, and the `cargo` / Homebrew alternatives.
+
+### Changed — Docs
+
+- **Install section now warns about multiple distribution channels (#314)**
+  - Recommends a single install method per platform and lists the supported channels (installer script, `cargo`, pre-built binaries).
+  - Adds a `which -a cora && cora --version` check snippet and guidance for removing stale copies when more than one `cora` is on `PATH` (e.g. `~/.local/bin` vs `~/.cargo/bin` vs npm global).
+  - Cross-links the original issue for background.
+
 ## [0.6.0] - 2026-06-14
 
 ### Added — Code Intelligence
@@ -502,7 +533,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.5.0...develop
+[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.6.1...develop
+[0.6.1]: https://github.com/codecoradev/cora-cli/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/codecoradev/cora-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/codecoradev/cora-cli/compare/v0.4.6...v0.5.0
 [0.4.6]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...v0.4.5
