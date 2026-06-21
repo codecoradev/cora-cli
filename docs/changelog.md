@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-06-21
+
+### Fixed — Token Usage Tracking
+
+- **`tokens_used` is no longer always `None` in review and scan responses.**
+  - `parse_review_response` and `parse_scan_response` previously discarded the `usage` object returned by the LLM API, hardcoding `Ok((..., None))`. Token counts and cost estimates were silently dropped.
+  - `chat_completion` now returns `(content, Option<Usage>)` and the parse functions thread `usage` through as `TokenUsage`. All call sites updated.
+  - `ReviewResponse.tokens_used` and `ScanResponse.tokens_used` now report real values when the provider supplies them.
+
+- **`cora review --stream` now collects token usage.**
+  - The streaming path (`chat_completion_stream`) previously only accumulated `delta.content` and ignored the `usage` field. It now sends `stream_options: { include_usage: true }` and parses `usage` from the final SSE chunk (top-level or nested in `choices[0].delta.usage`).
+  - Token counts are now reported correctly for both streaming and non-streaming review.
+
+- **`cora scan` multi-batch token accumulation.**
+  - When scanning multiple batches, `total_tokens` was overwritten by each batch instead of accumulated. Only the last successful batch's tokens were reported.
+  - Token usage now accumulates across all batches (`input_tokens`, `output_tokens`, and `estimated_cost_usd` are summed).
+
+### Changed — Code Quality
+
+- **Extracted magic numbers into named constants.**
+  - `scan.rs`: the hardcoded batch size fallback `20` and token budget `60_000` are now `DEFAULT_MAX_FILES_PER_BATCH` and `DEFAULT_BATCH_TOKEN_BUDGET`.
+- **`Usage` struct now accepts camelCase aliases.**
+  - Some providers (e.g. Azure OpenAI, certain third-party gateways) return `promptTokens` / `completionTokens` / `totalTokens` instead of snake_case. Both forms are now accepted via `#[serde(alias = ...)]`.
+
+### Tests
+
+- Added 4 regression tests for token usage threading.
+
 ## [0.6.1] - 2026-06-17
 
 ### Fixed — Scan
