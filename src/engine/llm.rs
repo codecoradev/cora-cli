@@ -78,15 +78,71 @@ struct ChatChoice {
 }
 
 /// Usage statistics from the LLM API response.
-/// `prompt_tokens` and `completion_tokens` are kept for API completeness
-/// (deserialization) even though only `total_tokens` is currently accessed.
-#[allow(dead_code)]
+///
+/// OpenAI-compatible providers return these in every non-streaming response,
+/// and in the final SSE chunk when `stream_options.include_usage` is set.
+/// Some providers send them under snake_case (`prompt_tokens`), others under
+/// camelCase (`promptTokens`) — both are accepted here.
+///
+/// `total_tokens` is accepted but not used by cora (we sum prompt+completion
+/// instead) — it is kept for completeness so that providers that omit
+/// `prompt_tokens` / `completion_tokens` in favour of a single `total_tokens`
+/// can still be surfaced downstream.
 #[derive(Debug, Clone, Deserialize)]
-#[allow(clippy::struct_field_names)]
-struct Usage {
+pub(crate) struct Usage {
+    #[serde(default, alias = "promptTokens", alias = "input_tokens")]
     prompt_tokens: u32,
+    #[serde(default, alias = "completionTokens", alias = "output_tokens")]
     completion_tokens: u32,
+    #[serde(default, alias = "totalTokens")]
     total_tokens: u32,
+}
+
+impl Usage {
+    /// Effective input tokens.
+    ///
+    /// Prefers `prompt_tokens`; if that's zero but `total_tokens` is non-zero,
+    /// and `completion_tokens` is also zero (no breakdown at all), reports the
+    /// entire total as input to avoid double-counting. Otherwise derives from
+    /// `total - completion`.
+    fn effective_input(&self) -> u32 {
+        if self.prompt_tokens > 0 {
+            self.prompt_tokens
+        } else if self.completion_tokens > 0 {
+            self.total_tokens.saturating_sub(self.completion_tokens)
+        } else {
+            // No breakdown at all — report total as input, output stays 0.
+            self.total_tokens
+        }
+    }
+
+    /// Effective output tokens.
+    ///
+    /// Prefers `completion_tokens`; if that's zero but `prompt_tokens` is
+    /// non-zero, derives from `total - prompt`. If both are zero (only total
+    /// reported), returns 0 to avoid double-counting with `effective_input`.
+    fn effective_output(&self) -> u32 {
+        if self.completion_tokens > 0 {
+            self.completion_tokens
+        } else if self.prompt_tokens > 0 {
+            self.total_tokens.saturating_sub(self.prompt_tokens)
+        } else {
+            0
+        }
+    }
+}
+
+/// Convert a raw API `Usage` into cora's `TokenUsage`.
+///
+/// `input_tokens` / `output_tokens` map 1:1 to `prompt_tokens` / `completion_tokens`.
+/// Cost estimation is intentionally left at `0.0` here — pricing is provider-specific
+/// and should be enriched downstream (e.g. by a future pricing table).
+fn usage_to_token_usage(u: &Usage) -> crate::engine::types::TokenUsage {
+    crate::engine::types::TokenUsage {
+        input_tokens: u.effective_input(),
+        output_tokens: u.effective_output(),
+        estimated_cost_usd: 0.0,
+    }
 }
 
 /// System prompt for code review.
@@ -167,13 +223,16 @@ Return ONLY this format. No markdown code fences, no conversational text.
 Start the JSON array with [ and end with ]."#;
 
 /// Send a chat completion request to an OpenAI-compatible API.
+///
+/// Returns `(content, usage)` where `usage` is the token statistics reported
+/// by the provider (or `None` if the provider omits the `usage` field).
 async fn chat_completion(
     config: &LLMConfig,
     system_prompt: &str,
     user_message: &str,
     spinner: Option<&ProgressBar>,
     response_format: &str,
-) -> std::result::Result<String, CoraError> {
+) -> std::result::Result<(String, Option<Usage>), CoraError> {
     let client = shared_client();
 
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
@@ -244,7 +303,7 @@ async fn chat_completion(
     debug!(tokens = ?parsed.usage, "LLM response received");
     tracing::Span::current().record("tokens_used", parsed.usage.as_ref().map(|u| u.total_tokens));
 
-    Ok(content)
+    Ok((content, parsed.usage))
 }
 
 /// Create an animated spinner for LLM operations.
@@ -276,21 +335,31 @@ fn atty_check() -> bool {
 
 /// Raw chat completion — returns the raw string response.
 /// Used by commit message generation and other non-review tasks.
+///
+/// Token usage is intentionally discarded; callers that need it should use
+/// [`chat_completion`] directly.
 pub async fn chat_completion_raw(
     llm_config: &LLMConfig,
     system_prompt: &str,
     user_message: &str,
 ) -> std::result::Result<String, CoraError> {
-    chat_completion(llm_config, system_prompt, user_message, None, "none").await
+    chat_completion(llm_config, system_prompt, user_message, None, "none")
+        .await
+        .map(|(content, _)| content)
 }
 
 /// Raw streaming chat completion — collects the full stream and returns the response string.
+///
+/// Token usage is intentionally discarded; callers that need it should use
+/// [`chat_completion_stream`] directly.
 pub async fn chat_completion_stream_raw(
     llm_config: &LLMConfig,
     system_prompt: &str,
     user_message: &str,
 ) -> std::result::Result<String, CoraError> {
-    chat_completion_stream(llm_config, system_prompt, user_message, "none").await
+    chat_completion_stream(llm_config, system_prompt, user_message, "none")
+        .await
+        .map(|(content, _)| content)
 }
 
 /// Review a diff using the LLM. Returns a `ReviewResponse`.
@@ -315,7 +384,7 @@ pub async fn review_diff(
 
     let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
 
-    let raw = chat_completion(
+    let (raw, usage) = chat_completion(
         llm_config,
         system_prompt,
         &user_prompt,
@@ -324,7 +393,7 @@ pub async fn review_diff(
     )
     .await?;
 
-    let parse_result = parse_review_response(&raw);
+    let parse_result = parse_review_response(&raw, usage.as_ref());
     match parse_result {
         Ok(result) => {
             if let Some(sp) = spinner {
@@ -349,7 +418,7 @@ pub async fn review_diff(
                 Do NOT use raw backslashes in string values.",
                 &user_prompt
             );
-            let retry_raw = chat_completion(
+            let (retry_raw, retry_usage) = chat_completion(
                 llm_config,
                 system_prompt,
                 &strict_prompt,
@@ -357,7 +426,8 @@ pub async fn review_diff(
                 response_format,
             )
             .await?;
-            let (issues, summary, tokens_used) = parse_review_response(&retry_raw)?;
+            let (issues, summary, tokens_used) =
+                parse_review_response(&retry_raw, retry_usage.as_ref())?;
             if let Some(sp) = spinner {
                 sp.finish_and_clear();
             }
@@ -389,10 +459,10 @@ pub async fn review_diff_stream(
 
     let system_prompt = system_prompt_override.unwrap_or(REVIEW_SYSTEM_PROMPT);
 
-    let raw =
+    let (raw, usage) =
         chat_completion_stream(llm_config, system_prompt, &user_prompt, response_format).await?;
 
-    let (issues, summary, tokens_used) = parse_review_response(&raw)?;
+    let (issues, summary, tokens_used) = parse_review_response(&raw, usage.as_ref())?;
 
     println!(); // trailing newline after streamed output
 
@@ -414,7 +484,7 @@ async fn chat_completion_stream(
     system_prompt: &str,
     user_message: &str,
     response_format: &str,
-) -> std::result::Result<String, CoraError> {
+) -> std::result::Result<(String, Option<Usage>), CoraError> {
     use futures_util::StreamExt;
     use std::io::Write;
 
@@ -429,7 +499,10 @@ async fn chat_completion_stream(
         ],
         "temperature": config.temperature,
         "max_tokens": config.max_tokens,
-        "stream": true
+        "stream": true,
+        // Ask OpenAI-compatible providers to include token usage in the final
+        // SSE chunk. Providers that don't recognise this field simply ignore it.
+        "stream_options": { "include_usage": true }
     });
 
     if response_format == "json_object" {
@@ -462,6 +535,8 @@ async fn chat_completion_stream(
     // Buffer for assembling lines from byte chunks
     let mut line_buf = String::new();
     let mut accumulated = String::new();
+    // Token usage reported in the final chunk (if the provider supports it).
+    let mut final_usage: Option<Usage> = None;
 
     while let Some(chunk_result) = stream.next().await {
         let chunk = chunk_result.map_err(|e| CoraError::LlmStream(e.to_string()))?;
@@ -479,25 +554,26 @@ async fn chat_completion_stream(
 
                 if let Some(data) = line.strip_prefix("data: ") {
                     if data.trim() == "[DONE]" {
-                        debug!(accumulated_len = accumulated.len(), "streaming complete");
-                        return Ok(accumulated);
+                        debug!(
+                            accumulated_len = accumulated.len(),
+                            has_usage = final_usage.is_some(),
+                            "streaming complete"
+                        );
+                        return Ok((accumulated, final_usage));
                     }
 
                     match serde_json::from_str::<Value>(data) {
                         Ok(parsed) => {
-                            if let Some(content) = parsed
-                                .get("choices")
-                                .and_then(|c| c.get(0))
-                                .and_then(|c| c.get("delta"))
-                                .and_then(|d| d.get("content"))
-                                .and_then(|v| v.as_str())
-                            {
-                                if !content.is_empty() {
+                            if let Some(c) = extract_stream_content(&parsed) {
+                                if !c.is_empty() {
                                     // Print delta chunk immediately for live streaming effect
-                                    print!("{content}");
+                                    print!("{c}");
                                     let _ = std::io::stdout().flush();
-                                    accumulated.push_str(content);
+                                    accumulated.push_str(c);
                                 }
+                            }
+                            if let Some(u) = extract_stream_usage(&parsed) {
+                                final_usage = Some(u);
                             }
                         }
                         Err(e) => {
@@ -517,26 +593,56 @@ async fn chat_completion_stream(
         if let Some(data) = line.strip_prefix("data: ") {
             if data.trim() != "[DONE]" {
                 if let Ok(parsed) = serde_json::from_str::<Value>(data) {
-                    if let Some(content) = parsed
-                        .get("choices")
-                        .and_then(|c| c.get(0))
-                        .and_then(|c| c.get("delta"))
-                        .and_then(|d| d.get("content"))
-                        .and_then(|v| v.as_str())
-                    {
-                        if !content.is_empty() {
-                            print!("{content}");
+                    if let Some(c) = extract_stream_content(&parsed) {
+                        if !c.is_empty() {
+                            print!("{c}");
                             let _ = std::io::stdout().flush();
-                            accumulated.push_str(content);
+                            accumulated.push_str(c);
                         }
+                    }
+                    if let Some(u) = extract_stream_usage(&parsed) {
+                        final_usage = Some(u);
                     }
                 }
             }
         }
     }
 
-    debug!(accumulated_len = accumulated.len(), "streaming complete");
-    Ok(accumulated)
+    debug!(
+        accumulated_len = accumulated.len(),
+        has_usage = final_usage.is_some(),
+        "streaming complete"
+    );
+    Ok((accumulated, final_usage))
+}
+
+/// Extract the content delta from a parsed SSE chunk.
+fn extract_stream_content(parsed: &Value) -> Option<&str> {
+    parsed
+        .get("choices")
+        .and_then(|c| c.get(0))
+        .and_then(|c| c.get("delta"))
+        .and_then(|d| d.get("content"))
+        .and_then(|v| v.as_str())
+}
+
+/// Extract token usage from a parsed SSE chunk.
+///
+/// The `usage` field appears either at top level (OpenAI convention, sent in
+/// the final chunk when `stream_options.include_usage` is set) or inside the
+/// final choice's delta (some Azure / third-party providers).
+fn extract_stream_usage(parsed: &Value) -> Option<Usage> {
+    parsed
+        .get("usage")
+        .and_then(|u| serde_json::from_value::<Usage>(u.clone()).ok())
+        .or_else(|| {
+            parsed
+                .get("choices")
+                .and_then(|c| c.get(0))
+                .and_then(|c| c.get("delta"))
+                .and_then(|d| d.get("usage"))
+                .and_then(|u| serde_json::from_value::<Usage>(u.clone()).ok())
+        })
 }
 
 /// Scan a batch of file contents using the LLM. Returns issues found.
@@ -570,7 +676,7 @@ pub async fn scan_files(
     user_prompt.push_str("Files to review:\n\n");
     user_prompt.push_str(files_content);
 
-    let raw = chat_completion(
+    let (raw, usage) = chat_completion(
         llm_config,
         system_prompt,
         &user_prompt,
@@ -579,7 +685,7 @@ pub async fn scan_files(
     )
     .await?;
 
-    parse_scan_response(&raw)
+    parse_scan_response(&raw, usage.as_ref())
 }
 
 /// Extract file paths from a unified diff string.
@@ -678,6 +784,7 @@ fn build_review_prompt(
 #[allow(clippy::type_complexity)]
 pub(crate) fn parse_review_response(
     raw: &str,
+    usage: Option<&Usage>,
 ) -> std::result::Result<(Vec<ReviewIssue>, String, Option<TokenUsage>), CoraError> {
     let (json_str, summary) = extract_json_and_summary(raw);
 
@@ -712,13 +819,15 @@ pub(crate) fn parse_review_response(
         }
     };
 
-    Ok((issues, summary, None))
+    let tokens_used = usage.map(usage_to_token_usage);
+    Ok((issues, summary, tokens_used))
 }
 
 /// Parse the LLM response for scan mode.
 #[allow(clippy::type_complexity)]
 pub(crate) fn parse_scan_response(
     raw: &str,
+    usage: Option<&Usage>,
 ) -> std::result::Result<(Vec<ReviewIssue>, Option<String>, Option<TokenUsage>), CoraError> {
     // Fast-fail when the response is clearly not JSON (e.g. provider error page,
     // empty body, rate-limit message, or prose wrapper). Surfacing the raw
@@ -769,7 +878,8 @@ pub(crate) fn parse_scan_response(
         Some(summary)
     };
 
-    Ok((issues, summary, None))
+    let tokens_used = usage.map(usage_to_token_usage);
+    Ok((issues, summary, tokens_used))
 }
 
 /// Check whether a raw LLM response plausibly contains a JSON payload.
@@ -1113,7 +1223,7 @@ mod tests {
 
     #[test]
     fn parse_review_clean_json() {
-        let result = parse_review_response(SINGLE_ISSUE_JSON).unwrap();
+        let result = parse_review_response(SINGLE_ISSUE_JSON, None).unwrap();
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.0[0].file, "src/main.rs");
         assert_eq!(result.0[0].line, Some(42));
@@ -1124,7 +1234,7 @@ mod tests {
     #[test]
     fn parse_review_with_fences() {
         let input = format!("```json\n{SINGLE_ISSUE_JSON}\n```");
-        let result = parse_review_response(&input).unwrap();
+        let result = parse_review_response(&input, None).unwrap();
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.0[0].severity, Severity::Critical);
     }
@@ -1132,20 +1242,20 @@ mod tests {
     #[test]
     fn parse_review_with_pipe_summary() {
         let input = format!("{SINGLE_ISSUE_JSON}|||1 critical security vulnerability found.");
-        let result = parse_review_response(&input).unwrap();
+        let result = parse_review_response(&input, None).unwrap();
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.1, "1 critical security vulnerability found.");
     }
 
     #[test]
     fn parse_review_empty_array() {
-        let result = parse_review_response(EMPTY_ARRAY).unwrap();
+        let result = parse_review_response(EMPTY_ARRAY, None).unwrap();
         assert!(result.0.is_empty());
     }
 
     #[test]
     fn parse_review_two_issues() {
-        let result = parse_review_response(TWO_ISSUES_JSON).unwrap();
+        let result = parse_review_response(TWO_ISSUES_JSON, None).unwrap();
         assert_eq!(result.0.len(), 2);
         assert_eq!(result.0[0].severity, Severity::Major);
         assert_eq!(result.0[1].severity, Severity::Minor);
@@ -1153,13 +1263,13 @@ mod tests {
 
     #[test]
     fn parse_review_malformed_json_errors() {
-        let result = parse_review_response("not json at all");
+        let result = parse_review_response("not json at all", None);
         assert!(result.is_err());
     }
 
     #[test]
     fn parse_review_object_not_array_errors() {
-        let result = parse_review_response(r#"{"file":"x"}"#);
+        let result = parse_review_response(r#"{"file":"x"}"#, None);
         assert!(result.is_err());
     }
 
@@ -1167,7 +1277,7 @@ mod tests {
     fn parse_review_json_with_trailing_text() {
         // The parser should handle trailing text after the array
         let input = format!("{SINGLE_ISSUE_JSON}\nSome extra text");
-        let result = parse_review_response(&input).unwrap();
+        let result = parse_review_response(&input, None).unwrap();
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.0[0].file, "src/main.rs");
     }
@@ -1176,7 +1286,7 @@ mod tests {
 
     #[test]
     fn parse_scan_clean_json() {
-        let result = parse_scan_response(SINGLE_ISSUE_JSON).unwrap();
+        let result = parse_scan_response(SINGLE_ISSUE_JSON, None).unwrap();
         assert_eq!(result.0.len(), 1);
         assert!(result.1.is_none()); // no summary → None
     }
@@ -1184,14 +1294,14 @@ mod tests {
     #[test]
     fn parse_scan_with_pipe_summary() {
         let input = format!("{EMPTY_ARRAY}|||No issues found.");
-        let result = parse_scan_response(&input).unwrap();
+        let result = parse_scan_response(&input, None).unwrap();
         assert!(result.0.is_empty());
         assert_eq!(result.1.as_deref(), Some("No issues found."));
     }
 
     #[test]
     fn parse_scan_empty_no_summary() {
-        let result = parse_scan_response(EMPTY_ARRAY).unwrap();
+        let result = parse_scan_response(EMPTY_ARRAY, None).unwrap();
         assert!(result.0.is_empty());
         assert!(result.1.is_none());
     }
@@ -1199,13 +1309,13 @@ mod tests {
     #[test]
     fn parse_scan_with_fences() {
         let input = format!("```json\n{SINGLE_ISSUE_JSON}\n```");
-        let result = parse_scan_response(&input).unwrap();
+        let result = parse_scan_response(&input, None).unwrap();
         assert_eq!(result.0.len(), 1);
     }
 
     #[test]
     fn parse_scan_malformed_json_errors() {
-        assert!(parse_scan_response("{{invalid").is_err());
+        assert!(parse_scan_response("{{invalid", None).is_err());
     }
 
     // ─── Various severity values ───
@@ -1218,12 +1328,96 @@ mod tests {
             {"file":"c.rs","line":3,"severity":"minor","issue_type":"bugs","title":"T3","body":"B3"},
             {"file":"d.rs","line":4,"severity":"info","issue_type":"style","title":"T4","body":"B4"}
         ]"#;
-        let result = parse_review_response(input).unwrap();
+        let result = parse_review_response(input, None).unwrap();
         assert_eq!(result.0.len(), 4);
         assert_eq!(result.0[0].severity, Severity::Critical);
         assert_eq!(result.0[1].severity, Severity::Major);
         assert_eq!(result.0[2].severity, Severity::Minor);
         assert_eq!(result.0[3].severity, Severity::Info);
+    }
+
+    // ─── Token usage threading (BUG-1) ───
+
+    #[test]
+    fn parse_review_preserves_usage_when_provided() {
+        // Given a valid JSON response AND usage stats from the API,
+        // parse_review_response MUST surface them as Some(TokenUsage).
+        // Regression test: previously hardcoded to None.
+        let usage = Usage {
+            prompt_tokens: 150,
+            completion_tokens: 42,
+            total_tokens: 192,
+        };
+        let result = parse_review_response(SINGLE_ISSUE_JSON, Some(&usage)).unwrap();
+        let tokens = result
+            .2
+            .expect("tokens_used should be Some when usage is provided");
+        assert_eq!(tokens.input_tokens, 150);
+        assert_eq!(tokens.output_tokens, 42);
+    }
+
+    #[test]
+    fn parse_review_returns_none_usage_when_not_provided() {
+        // When the provider doesn't send usage (e.g. some local models),
+        // tokens_used must be None, not panic.
+        let result = parse_review_response(SINGLE_ISSUE_JSON, None).unwrap();
+        assert!(result.2.is_none());
+    }
+
+    #[test]
+    fn parse_scan_preserves_usage_when_provided() {
+        let usage = Usage {
+            prompt_tokens: 500,
+            completion_tokens: 100,
+            total_tokens: 600,
+        };
+        let result = parse_scan_response(SINGLE_ISSUE_JSON, Some(&usage)).unwrap();
+        let tokens = result
+            .2
+            .expect("tokens_used should be Some when usage is provided");
+        assert_eq!(tokens.input_tokens, 500);
+        assert_eq!(tokens.output_tokens, 100);
+    }
+
+    #[test]
+    fn usage_to_token_usage_maps_fields_correctly() {
+        let usage = Usage {
+            prompt_tokens: 111,
+            completion_tokens: 222,
+            total_tokens: 333,
+        };
+        let token_usage = usage_to_token_usage(&usage);
+        assert_eq!(token_usage.input_tokens, 111);
+        assert_eq!(token_usage.output_tokens, 222);
+        assert_eq!(token_usage.estimated_cost_usd, 0.0);
+    }
+
+    #[test]
+    fn usage_to_token_usage_handles_total_only_provider() {
+        // Some providers only report total_tokens without prompt/completion breakdown.
+        // Cora attributes the entire total to input (output stays 0) to avoid
+        // double-counting in downstream cost calculations.
+        let usage = Usage {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 500,
+        };
+        let token_usage = usage_to_token_usage(&usage);
+        assert_eq!(token_usage.input_tokens, 500);
+        assert_eq!(token_usage.output_tokens, 0);
+    }
+
+    #[test]
+    fn usage_to_token_usage_handles_partial_breakdown() {
+        // Provider reports prompt_tokens but not completion_tokens.
+        let usage = Usage {
+            prompt_tokens: 300,
+            completion_tokens: 0,
+            total_tokens: 450,
+        };
+        let token_usage = usage_to_token_usage(&usage);
+        assert_eq!(token_usage.input_tokens, 300);
+        assert_eq!(token_usage.output_tokens, 150); // total - prompt
     }
 
     // ─── Various issue_type values ───
@@ -1237,7 +1431,7 @@ mod tests {
             {"file":"d.rs","line":4,"severity":"info","issue_type":"best_practice","title":"T","body":"B"},
             {"file":"e.rs","line":5,"severity":"info","issue_type":"style","title":"T","body":"B"}
         ]"#;
-        let result = parse_review_response(input).unwrap();
+        let result = parse_review_response(input, None).unwrap();
         assert_eq!(result.0.len(), 5);
         assert_eq!(result.0[0].issue_type.as_deref(), Some("security"));
         assert_eq!(result.0[1].issue_type.as_deref(), Some("performance"));
@@ -1251,14 +1445,14 @@ mod tests {
     #[test]
     fn parse_issue_with_null_line() {
         let input = r#"[{"file":"a.rs","line":null,"severity":"info","title":"T","body":"B"}]"#;
-        let result = parse_review_response(input).unwrap();
+        let result = parse_review_response(input, None).unwrap();
         assert_eq!(result.0[0].line, None);
     }
 
     #[test]
     fn parse_issue_with_null_suggested_fix() {
         let input = r#"[{"file":"a.rs","line":1,"severity":"info","title":"T","body":"B","suggested_fix":null}]"#;
-        let result = parse_review_response(input).unwrap();
+        let result = parse_review_response(input, None).unwrap();
         assert!(result.0[0].suggested_fix.is_none());
     }
 
@@ -1266,7 +1460,7 @@ mod tests {
     fn parse_issue_with_type_alias() {
         // "type" should also work via serde alias
         let input = r#"[{"file":"a.rs","line":1,"severity":"info","type":"security","title":"T","body":"B"}]"#;
-        let result = parse_review_response(input).unwrap();
+        let result = parse_review_response(input, None).unwrap();
         assert_eq!(result.0[0].issue_type.as_deref(), Some("security"));
     }
 
@@ -1390,7 +1584,7 @@ mod tests {
     fn parse_response_with_invalid_escapes() {
         // End-to-end: LLM response with invalid escapes should parse successfully
         let raw = r#"[{"file":"src/main.rs","line":10,"severity":"critical","issue_type":"security","title":"SQL Injection","body":"query ends with \n no wait \\","suggested_fix":"Use params"}]"#;
-        let result = parse_review_response(raw).unwrap();
+        let result = parse_review_response(raw, None).unwrap();
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.0[0].title, "SQL Injection");
     }
@@ -1468,7 +1662,7 @@ mod tests {
     fn parse_response_truncated_e2e() {
         // End-to-end: truncated LLM response should be repaired and parsed
         let raw = r#"[{"file":"src/main.rs","line":42,"severity":"critical","issue_type":"security","title":"Hardcoded secret","body":"API key found in source","suggested_fix":"Use env vars"},{"file":"src/lib.rs","line":10,"severity":"major","issue_type":"bugs","title":"Unwrap panic","body":"incomplete"#;
-        let result = parse_review_response(raw).unwrap();
+        let result = parse_review_response(raw, None).unwrap();
         assert_eq!(result.0.len(), 2);
         assert_eq!(result.0[0].file, "src/main.rs");
         assert_eq!(result.0[0].severity, crate::engine::Severity::Critical);
@@ -1478,7 +1672,7 @@ mod tests {
     #[test]
     fn parse_scan_response_truncated_e2e() {
         let raw = r#"[{"file":"config.rs","line":5,"severity":"info","issue_type":"style","title":"Formatting","body":"Bad style"#;
-        let result = parse_scan_response(raw).unwrap();
+        let result = parse_scan_response(raw, None).unwrap();
         assert_eq!(result.0.len(), 1);
         assert_eq!(result.0[0].file, "config.rs");
     }
@@ -1526,7 +1720,7 @@ mod tests {
     #[test]
     fn parse_scan_response_rejects_non_json_with_preview() {
         let html = "<html><body>Rate limited</body></html>";
-        let err = parse_scan_response(html).unwrap_err();
+        let err = parse_scan_response(html, None).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("not valid JSON"), "msg = {msg}");
         assert!(msg.contains("Rate limited"), "msg = {msg}");
@@ -1535,7 +1729,7 @@ mod tests {
 
     #[test]
     fn parse_scan_response_rejects_empty_body() {
-        let err = parse_scan_response("").unwrap_err();
+        let err = parse_scan_response("", None).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("not valid JSON"), "msg = {msg}");
         assert!(msg.contains("length=0"), "msg = {msg}");

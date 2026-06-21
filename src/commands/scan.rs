@@ -6,7 +6,16 @@ use tracing::debug;
 
 use crate::config::schema::Config;
 use crate::engine::scanner::{batch_files, format_batch_for_prompt, walk_project};
+use crate::engine::types::TokenUsage;
 use crate::formatters::{OutputFormat, formatter_for};
+
+/// Default maximum files per LLM batch when `--batch-files` is not specified.
+/// Lower this to work around provider token limits or rate-limit errors.
+const DEFAULT_MAX_FILES_PER_BATCH: usize = 20;
+
+/// Approximate token budget per batch. Used by the scanner to split large file
+/// sets into review-sized chunks that fit within typical model context windows.
+const DEFAULT_BATCH_TOKEN_BUDGET: usize = 60_000;
 
 /// Scan command options.
 pub struct ScanOptions {
@@ -108,9 +117,9 @@ pub async fn execute_scan(
     let max_files_per_batch = if opts.batch_files > 0 {
         opts.batch_files
     } else {
-        20
+        DEFAULT_MAX_FILES_PER_BATCH
     };
-    let batches = batch_files(&files, 60_000, max_files_per_batch);
+    let batches = batch_files(&files, DEFAULT_BATCH_TOKEN_BUDGET, max_files_per_batch);
     debug!(
         batches = batches.len(),
         max_files = max_files_per_batch,
@@ -119,7 +128,7 @@ pub async fn execute_scan(
 
     // 4. Process batches and collect issues
     let mut all_issues = Vec::new();
-    let mut total_tokens = None;
+    let mut total_tokens: Option<TokenUsage> = None;
     let mut skipped_batches: Vec<(usize, Vec<String>, String)> = Vec::new();
 
     for (batch_idx, batch) in batches.iter().enumerate() {
@@ -144,9 +153,16 @@ pub async fn execute_scan(
         {
             Ok((issues, _summary, tokens)) => {
                 all_issues.extend(issues);
-                if tokens.is_some() {
-                    total_tokens = tokens;
-                }
+                total_tokens = match (total_tokens, tokens) {
+                    (Some(mut acc), Some(t)) => {
+                        acc.input_tokens += t.input_tokens;
+                        acc.output_tokens += t.output_tokens;
+                        acc.estimated_cost_usd += t.estimated_cost_usd;
+                        Some(acc)
+                    }
+                    (None, Some(t)) => Some(t),
+                    (acc, None) => acc,
+                };
             }
             Err(err) => {
                 let file_list: Vec<String> =
