@@ -1,0 +1,1 @@
+import{it as e,rt as t,s as n}from"../chunks/Du04-Wio.js";import{t as r}from"../chunks/DyVSz01m.js";import"../chunks/xihTtKlq.js";import"../chunks/qiBCaaew.js";function i(i,a){e(a,!1),r(`/docs/getting-started`,{replaceState:!0}),n(),t()}export{i as component};

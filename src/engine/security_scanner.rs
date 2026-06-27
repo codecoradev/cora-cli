@@ -63,7 +63,10 @@ pub static PATTERNS: &[SecurityPattern] = &[
     SecurityPattern {
         id: "injection/exec",
         name: "Command injection via exec/system with dynamic input",
-        regex: r"(?i)(?:exec|system|popen|subprocess\.(?:call|run))\s*\(",
+        // Only flag when there's a dynamic input signal on the same line
+        // (f-string, format(), string concat with +, shell=True, or raw user input).
+        // subprocess.run(["cmd", "arg"]) with literal list is safe and should not trigger.
+        regex: r#"(?i)(?:exec|system|popen|subprocess\.(?:call|run))\s*\((?:[^)]*(?:f"|f'|format\(|\.format\(|shell\s*=\s*True|\+\s*(?:req|request|input|params|data|user|query)|%s|%\(.*\)))"#,
         severity: Severity::Critical,
     },
     // ── Auth issues ──
@@ -300,6 +303,62 @@ mod tests {
         ];
         let findings = scan_security(&chunks, 2);
         assert_eq!(findings.len(), 2);
+    }
+
+    #[test]
+    fn subprocess_run_with_literal_list_no_false_positive() {
+        // subprocess.run(cmd) where cmd is a variable (controlled list) should NOT trigger.
+        let chunks = vec![make_chunk(
+            "src/provider.py",
+            &["cmd = [self._bin, 'recall', query]", "subprocess.run(cmd)"],
+        )];
+        let findings = scan_security(&chunks, 10);
+        let exec_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.rule_id == "injection/exec")
+            .collect();
+        assert!(
+            exec_findings.is_empty(),
+            "subprocess.run(cmd) with controlled list should not trigger"
+        );
+    }
+
+    #[test]
+    fn subprocess_run_with_fstring_triggers() {
+        // subprocess.run(f"...") with f-string (dynamic interpolation) SHOULD trigger.
+        let chunks = vec![make_chunk(
+            "src/handler.py",
+            &["subprocess.run(f'cat {user_input}')"],
+        )];
+        let findings = scan_security(&chunks, 10);
+        let exec_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.rule_id == "injection/exec")
+            .collect();
+        assert_eq!(
+            exec_findings.len(),
+            1,
+            "subprocess.run with f-string should trigger"
+        );
+    }
+
+    #[test]
+    fn subprocess_run_with_shell_true_triggers() {
+        // subprocess.run(..., shell=True) SHOULD trigger.
+        let chunks = vec![make_chunk(
+            "src/handler.py",
+            &["subprocess.run(cmd, shell=True)"],
+        )];
+        let findings = scan_security(&chunks, 10);
+        let exec_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.rule_id == "injection/exec")
+            .collect();
+        assert_eq!(
+            exec_findings.len(),
+            1,
+            "subprocess.run with shell=True should trigger"
+        );
     }
 
     #[test]

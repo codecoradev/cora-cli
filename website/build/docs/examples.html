@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="oklch(0.13 0.01 270)" />
+		<meta name="color-scheme" content="dark" />
+
+		<title>cora — AI Code Review CLI</title>
+		<meta name="description" content="CLI-first AI code review. BYOK, zero config, pre-commit hooks. Open source, MIT license." />
+
+		<!-- Open Graph -->
+		<meta property="og:title" content="cora — AI Code Review CLI" />
+		<meta property="og:description" content="CLI-first AI code review. BYOK, zero config, pre-commit hooks. Open source, MIT license." />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://codecora.dev" />
+		<meta property="og:image" content="https://codecora.dev/og.png" />
+
+		<link href="../_app/immutable/entry/start.CmvPVbW8.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/DyVSz01m.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/Du04-Wio.js" rel="modulepreload">
+		<link href="../_app/immutable/entry/app.DyiyvRxF.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/kNaey6uv.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/xihTtKlq.js" rel="modulepreload">
+		<link href="../_app/immutable/nodes/0.BZeUAe05.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/BuBrZOIh.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/DozEvg9T.js" rel="modulepreload">
+		<link href="../_app/immutable/nodes/2.DnuVmUIJ.js" rel="modulepreload">
+		<link href="../_app/immutable/nodes/8.FgjeHYDF.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/qiBCaaew.js" rel="modulepreload">
+		<!--1funsus--><!--[-1--><!--]--> <!----><script>(function setInitialMode({ defaultMode = "system", themeColors, darkClassNames = ["dark"], lightClassNames = [], defaultTheme = "", modeStorageKey = "mode-watcher-mode", themeStorageKey = "mode-watcher-theme" }) {
+	const rootEl = document.documentElement;
+	const mode = localStorage.getItem(modeStorageKey) ?? defaultMode;
+	const theme = localStorage.getItem(themeStorageKey) ?? defaultTheme;
+	const light = mode === "light" || mode === "system" && window.matchMedia("(prefers-color-scheme: light)").matches;
+	if (light) {
+		if (darkClassNames.length) rootEl.classList.remove(...darkClassNames.filter(Boolean));
+		if (lightClassNames.length) rootEl.classList.add(...lightClassNames.filter(Boolean));
+	} else {
+		if (lightClassNames.length) rootEl.classList.remove(...lightClassNames.filter(Boolean));
+		if (darkClassNames.length) rootEl.classList.add(...darkClassNames.filter(Boolean));
+	}
+	rootEl.style.colorScheme = light ? "light" : "dark";
+	if (themeColors) {
+		const themeMetaEl = document.querySelector("meta[name=\"theme-color\"]");
+		if (themeMetaEl) themeMetaEl.setAttribute("content", mode === "light" ? themeColors.light : themeColors.dark);
+	}
+	if (theme) {
+		rootEl.setAttribute("data-theme", theme);
+		localStorage.setItem(themeStorageKey, theme);
+	}
+	localStorage.setItem(modeStorageKey, mode);
+})({"defaultMode":"system","darkClassNames":["dark"],"lightClassNames":[],"defaultTheme":"","modeStorageKey":"mode-watcher-mode","themeStorageKey":"mode-watcher-theme"});</script><!----><!----><!--1bpnej--><!----><!--14ul9gg--><meta name="description" content="Practical examples for using cora - quick review, CI, pre-commit hooks, SARIF, and more."/><!----><title>Examples — cora docs</title>
+		<link href="../_app/immutable/assets/0.D7nPmqCL.css" rel="stylesheet">
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents"><!--[--><!--[0--><!--[--><!--[-1--><!--]--><!----> <div class="bg-background min-h-screen"><header class="site-header"><div class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14"><a href="/" class="font-semibold text-foreground text-lg tracking-tight flex items-center gap-2"><span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[var(--accent)] text-[var(--accent-foreground)] text-xs font-bold">C</span> cora</a> <nav class="hidden sm:flex items-center gap-6"><a href="/docs" class="site-header-link active">Docs</a> <a href="/docs/roadmap" class="site-header-link">Roadmap</a> <a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="site-header-link">GitHub</a></nav> <div class="hidden sm:flex items-center gap-3"><button class="p-2 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors" aria-label="Toggle theme"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-sun w-4 h-4 hidden dark:block"><!--[--><!----><circle cx="12" cy="12" r="4"><!----></circle><!----><!----><path d="M12 2v2"><!----></path><!----><!----><path d="M12 20v2"><!----></path><!----><!----><path d="m4.93 4.93 1.41 1.41"><!----></path><!----><!----><path d="m17.66 17.66 1.41 1.41"><!----></path><!----><!----><path d="M2 12h2"><!----></path><!----><!----><path d="M20 12h2"><!----></path><!----><!----><path d="m6.34 17.66-1.41 1.41"><!----></path><!----><!----><path d="m19.07 4.93-1.41 1.41"><!----></path><!----><!--]--><!----></svg><!----> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-moon w-4 h-4 block dark:hidden"><!--[--><!----><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"><!----></path><!----><!--]--><!----></svg><!----></button> <a href="/docs/getting-started" class="btn-primary text-[13px] px-3.5 py-1.5">Get Started</a></div> <div class="sm:hidden flex items-center gap-2"><button class="p-2 rounded-md text-[var(--muted-foreground)]" aria-label="Toggle theme"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-sun w-4 h-4 hidden dark:block"><!--[--><!----><circle cx="12" cy="12" r="4"><!----></circle><!----><!----><path d="M12 2v2"><!----></path><!----><!----><path d="M12 20v2"><!----></path><!----><!----><path d="m4.93 4.93 1.41 1.41"><!----></path><!----><!----><path d="m17.66 17.66 1.41 1.41"><!----></path><!----><!----><path d="M2 12h2"><!----></path><!----><!----><path d="M20 12h2"><!----></path><!----><!----><path d="m6.34 17.66-1.41 1.41"><!----></path><!----><!----><path d="m19.07 4.93-1.41 1.41"><!----></path><!----><!--]--><!----></svg><!----> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-moon w-4 h-4 block dark:hidden"><!--[--><!----><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"><!----></path><!----><!--]--><!----></svg><!----></button> <button class="p-2 rounded-md text-[var(--muted-foreground)]" aria-label="Menu"><!--[-1--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-menu w-5 h-5"><!--[--><!----><path d="M4 5h16"><!----></path><!----><!----><path d="M4 12h16"><!----></path><!----><!----><path d="M4 19h16"><!----></path><!----><!--]--><!----></svg><!--]--></button></div></div> <!--[-1--><!--]--></header> <main><!--[0--><!--[--><div class="min-h-screen flex bg-[var(--background)]"><aside class="docs-sidebar hidden lg:block"><div class="p-6"><a href="/" class="flex items-center gap-2 mb-8 text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 hover:text-[var(--foreground)]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg> Back to Home</a> <div class="mb-6"><a href="/docs" class="text-lg font-semibold text-[var(--accent)] no-underline -tracking-tight leading-tight">cora docs</a></div> <nav class="flex flex-col gap-1"><!--[--><a href="/docs/getting-started" class="docs-sidebar-link">Getting Started</a><a href="/docs/installation" class="docs-sidebar-link">Installation</a><a href="/docs/usage" class="docs-sidebar-link">Usage</a><a href="/docs/configuration" class="docs-sidebar-link">Configuration</a><a href="/docs/providers" class="docs-sidebar-link">Providers</a><a href="/docs/examples" class="docs-sidebar-link active">Examples</a><a href="/docs/roadmap" class="docs-sidebar-link">Roadmap</a><a href="/docs/cli-reference" class="docs-sidebar-link">CLI Reference</a><a href="/docs/changelog" class="docs-sidebar-link">Changelog</a><!--]--></nav></div></aside> <nav class="mobile-docs-nav"><a href="/" class="text-[var(--muted-foreground)]" aria-label="Back to Home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></a> <!--[--><a href="/docs/getting-started">Getting Started</a><a href="/docs/installation">Installation</a><a href="/docs/usage">Usage</a><a href="/docs/configuration">Configuration</a><a href="/docs/providers">Providers</a><a href="/docs/examples" class="active">Examples</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/cli-reference">CLI Reference</a><a href="/docs/changelog">Changelog</a><!--]--></nav> <main class="flex-1 min-w-0"><div class="max-w-3xl mx-auto px-8 py-12"><!--[--><div class="docs-content"><h1 class="scroll-reveal">Examples</h1> <p class="scroll-reveal">Practical examples to get you started with cora.</p> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><span class="text-[var(--accent)] font-mono text-sm">01</span> Quick Review</h2> <p class="text-sm text-[var(--muted-foreground)] mb-3">Review your staged changes before committing.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span></div> <div class="terminal-body"><span class="syntax-comment"># Review staged changes (default)</span><br/> <span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span><br/><br/> <span class="syntax-comment"># Or review with explicit flags</span><br/> <span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><span class="text-[var(--accent)] font-mono text-sm">02</span> Branch Comparison</h2> <p class="text-sm text-[var(--muted-foreground)] mb-3">Compare your current branch against main.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span></div> <div class="terminal-body"><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--base</span> <span class="syntax-string">main</span></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><span class="text-[var(--accent)] font-mono text-sm">03</span> Full Project Scan</h2> <p class="text-sm text-[var(--muted-foreground)] mb-3">Scan your entire project for issues.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span></div> <div class="terminal-body"><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora scan</span></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><span class="text-[var(--accent)] font-mono text-sm">04</span> Incremental Scan</h2> <p class="text-sm text-[var(--muted-foreground)] mb-3">Only scan files that changed since the last scan.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span></div> <div class="terminal-body"><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora scan</span> <span class="syntax-flag">--incremental</span></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><span class="text-[var(--accent)] font-mono text-sm">05</span> Streaming Output</h2> <p class="text-sm text-[var(--muted-foreground)] mb-3">Stream results as they come in from the LLM.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span></div> <div class="terminal-body"><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--staged</span> <span class="syntax-flag">--stream</span></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><span class="text-[var(--accent)] font-mono text-sm">06</span> GitHub Actions CI</h2> <p class="text-sm text-[var(--muted-foreground)] mb-3">Add cora to your CI pipeline.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span> <span class="terminal-title">.github/workflows/cora-review.yml</span></div> <div class="terminal-body"><pre class="whitespace-pre"><span class="syntax-highlight">name:</span> <span class="syntax-string">Code Review</span>
+
+<span class="syntax-highlight">on:</span>
+  <span class="syntax-flag">pull_request:</span>
+    <span class="syntax-flag">branches:</span> [<span class="syntax-string">main</span>]
+
+<span class="syntax-highlight">jobs:</span>
+  <span class="syntax-flag">review:</span>
+    <span class="syntax-flag">runs-on:</span> <span class="syntax-string">ubuntu-latest</span>
+    <span class="syntax-flag">steps:</span>
+      <span class="syntax-cmd">- uses:</span> <span class="syntax-string">actions/checkout@v4</span>
+      <span class="syntax-cmd">- name:</span> <span class="syntax-string">Install cora</span>
+        <span class="syntax-flag">run:</span> <span class="syntax-string">cargo install cora-cli</span>
+      <span class="syntax-cmd">- name:</span> <span class="syntax-string">Run AI code review</span>
+        <span class="syntax-flag">env:</span>
+          <!----><span class="syntax-flag">CORA_API_KEY:</span> <span class="syntax-string">${{ secrets.CORA_API_KEY }}</span><!---->
+          <span class="syntax-flag">CORA_PROVIDER:</span> <span class="syntax-string">openai</span>
+        <span class="syntax-flag">run:</span> <span class="syntax-string">cora review --base main --format sarif</span></pre></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><span class="text-[var(--accent)] font-mono text-sm">07</span> Pre-commit Hook</h2> <p class="text-sm text-[var(--muted-foreground)] mb-3">Install once, then every commit gets reviewed automatically.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span></div> <div class="terminal-body"><span class="syntax-comment"># Install the hook</span><br/> <span class="syntax-cmd">$</span> <span class="syntax-highlight">cora hook</span> <span class="syntax-string">install</span><br/><br/> <span class="syntax-comment"># Now just commit normally — cora reviews automatically</span><br/> <span class="syntax-cmd">$</span> <span class="syntax-highlight">git</span> <span class="syntax-string">commit</span> <span class="syntax-flag">-m</span> <span class="syntax-string">"fix: handle edge case in parser"</span><br/> <span class="syntax-cmd">cora pre-commit hook running...</span><br/> <span class="syntax-success">No issues found — commit allowed</span></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><span class="text-[var(--accent)] font-mono text-sm">08</span> SARIF Upload</h2> <p class="text-sm text-[var(--muted-foreground)] mb-3">Generate SARIF output and upload to GitHub Code Scanning.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span></div> <div class="terminal-body"><span class="syntax-comment"># Generate SARIF report and upload</span><br/> <span class="syntax-cmd">$</span> <span class="syntax-highlight">cora review</span> <span class="syntax-flag">--base</span> <span class="syntax-string">main</span> <span class="syntax-flag">--format</span> <span class="syntax-string">sarif</span> <span class="syntax-cmd">></span> <span class="syntax-string">results.sarif</span> <span class="syntax-cmd">&amp;&amp;</span> \\<br/>   <span class="syntax-highlight">cora upload-sarif</span> <span class="syntax-string">results.sarif</span><br/><br/> <span class="syntax-success">Uploaded 3 findings to GitHub Code Scanning</span></div></div></section></div><!--]--><!----></div></main></div><!--]--><!--]--><!----></main></div><!--]--><!--]--> <!--[-1--><!--]--><!--]-->
+			
+			<script>
+				{
+					__sveltekit_op75zz = {
+						base: new URL("..", location).pathname.slice(0, -1)
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("../_app/immutable/entry/start.CmvPVbW8.js"),
+						import("../_app/immutable/entry/app.DyiyvRxF.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 2, 8],
+							data: [null,null,null],
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>

@@ -1,0 +1,37 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/docs": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/docs/changelog": [
+		"src/routes/+layout.ts"
+	],
+	"/docs/cli-reference": [
+		"src/routes/+layout.ts"
+	],
+	"/docs/configuration": [
+		"src/routes/+layout.ts"
+	],
+	"/docs/examples": [
+		"src/routes/+layout.ts"
+	],
+	"/docs/getting-started": [
+		"src/routes/+layout.ts"
+	],
+	"/docs/installation": [
+		"src/routes/+layout.ts"
+	],
+	"/docs/providers": [
+		"src/routes/+layout.ts"
+	],
+	"/docs/roadmap": [
+		"src/routes/+layout.ts"
+	],
+	"/docs/usage": [
+		"src/routes/+layout.ts"
+	]
+}

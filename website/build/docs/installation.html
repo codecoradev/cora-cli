@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="oklch(0.13 0.01 270)" />
+		<meta name="color-scheme" content="dark" />
+
+		<title>cora — AI Code Review CLI</title>
+		<meta name="description" content="CLI-first AI code review. BYOK, zero config, pre-commit hooks. Open source, MIT license." />
+
+		<!-- Open Graph -->
+		<meta property="og:title" content="cora — AI Code Review CLI" />
+		<meta property="og:description" content="CLI-first AI code review. BYOK, zero config, pre-commit hooks. Open source, MIT license." />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://codecora.dev" />
+		<meta property="og:image" content="https://codecora.dev/og.png" />
+
+		<link href="../_app/immutable/entry/start.CmvPVbW8.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/DyVSz01m.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/Du04-Wio.js" rel="modulepreload">
+		<link href="../_app/immutable/entry/app.DyiyvRxF.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/kNaey6uv.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/xihTtKlq.js" rel="modulepreload">
+		<link href="../_app/immutable/nodes/0.BZeUAe05.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/BuBrZOIh.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/DozEvg9T.js" rel="modulepreload">
+		<link href="../_app/immutable/nodes/2.DnuVmUIJ.js" rel="modulepreload">
+		<link href="../_app/immutable/nodes/10.CyIl61W5.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/qiBCaaew.js" rel="modulepreload">
+		<!--1funsus--><!--[-1--><!--]--> <!----><script>(function setInitialMode({ defaultMode = "system", themeColors, darkClassNames = ["dark"], lightClassNames = [], defaultTheme = "", modeStorageKey = "mode-watcher-mode", themeStorageKey = "mode-watcher-theme" }) {
+	const rootEl = document.documentElement;
+	const mode = localStorage.getItem(modeStorageKey) ?? defaultMode;
+	const theme = localStorage.getItem(themeStorageKey) ?? defaultTheme;
+	const light = mode === "light" || mode === "system" && window.matchMedia("(prefers-color-scheme: light)").matches;
+	if (light) {
+		if (darkClassNames.length) rootEl.classList.remove(...darkClassNames.filter(Boolean));
+		if (lightClassNames.length) rootEl.classList.add(...lightClassNames.filter(Boolean));
+	} else {
+		if (lightClassNames.length) rootEl.classList.remove(...lightClassNames.filter(Boolean));
+		if (darkClassNames.length) rootEl.classList.add(...darkClassNames.filter(Boolean));
+	}
+	rootEl.style.colorScheme = light ? "light" : "dark";
+	if (themeColors) {
+		const themeMetaEl = document.querySelector("meta[name=\"theme-color\"]");
+		if (themeMetaEl) themeMetaEl.setAttribute("content", mode === "light" ? themeColors.light : themeColors.dark);
+	}
+	if (theme) {
+		rootEl.setAttribute("data-theme", theme);
+		localStorage.setItem(themeStorageKey, theme);
+	}
+	localStorage.setItem(modeStorageKey, mode);
+})({"defaultMode":"system","darkClassNames":["dark"],"lightClassNames":[],"defaultTheme":"","modeStorageKey":"mode-watcher-mode","themeStorageKey":"mode-watcher-theme"});</script><!----><!----><!--1bpnej--><!----><!--t7c0hb--><!----><title>Installation — cora docs</title>
+		<link href="../_app/immutable/assets/0.D7nPmqCL.css" rel="stylesheet">
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents"><!--[--><!--[0--><!--[--><!--[-1--><!--]--><!----> <div class="bg-background min-h-screen"><header class="site-header"><div class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14"><a href="/" class="font-semibold text-foreground text-lg tracking-tight flex items-center gap-2"><span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[var(--accent)] text-[var(--accent-foreground)] text-xs font-bold">C</span> cora</a> <nav class="hidden sm:flex items-center gap-6"><a href="/docs" class="site-header-link active">Docs</a> <a href="/docs/roadmap" class="site-header-link">Roadmap</a> <a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="site-header-link">GitHub</a></nav> <div class="hidden sm:flex items-center gap-3"><button class="p-2 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors" aria-label="Toggle theme"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-sun w-4 h-4 hidden dark:block"><!--[--><!----><circle cx="12" cy="12" r="4"><!----></circle><!----><!----><path d="M12 2v2"><!----></path><!----><!----><path d="M12 20v2"><!----></path><!----><!----><path d="m4.93 4.93 1.41 1.41"><!----></path><!----><!----><path d="m17.66 17.66 1.41 1.41"><!----></path><!----><!----><path d="M2 12h2"><!----></path><!----><!----><path d="M20 12h2"><!----></path><!----><!----><path d="m6.34 17.66-1.41 1.41"><!----></path><!----><!----><path d="m19.07 4.93-1.41 1.41"><!----></path><!----><!--]--><!----></svg><!----> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-moon w-4 h-4 block dark:hidden"><!--[--><!----><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"><!----></path><!----><!--]--><!----></svg><!----></button> <a href="/docs/getting-started" class="btn-primary text-[13px] px-3.5 py-1.5">Get Started</a></div> <div class="sm:hidden flex items-center gap-2"><button class="p-2 rounded-md text-[var(--muted-foreground)]" aria-label="Toggle theme"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-sun w-4 h-4 hidden dark:block"><!--[--><!----><circle cx="12" cy="12" r="4"><!----></circle><!----><!----><path d="M12 2v2"><!----></path><!----><!----><path d="M12 20v2"><!----></path><!----><!----><path d="m4.93 4.93 1.41 1.41"><!----></path><!----><!----><path d="m17.66 17.66 1.41 1.41"><!----></path><!----><!----><path d="M2 12h2"><!----></path><!----><!----><path d="M20 12h2"><!----></path><!----><!----><path d="m6.34 17.66-1.41 1.41"><!----></path><!----><!----><path d="m19.07 4.93-1.41 1.41"><!----></path><!----><!--]--><!----></svg><!----> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-moon w-4 h-4 block dark:hidden"><!--[--><!----><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"><!----></path><!----><!--]--><!----></svg><!----></button> <button class="p-2 rounded-md text-[var(--muted-foreground)]" aria-label="Menu"><!--[-1--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-menu w-5 h-5"><!--[--><!----><path d="M4 5h16"><!----></path><!----><!----><path d="M4 12h16"><!----></path><!----><!----><path d="M4 19h16"><!----></path><!----><!--]--><!----></svg><!--]--></button></div></div> <!--[-1--><!--]--></header> <main><!--[0--><!--[--><div class="min-h-screen flex bg-[var(--background)]"><aside class="docs-sidebar hidden lg:block"><div class="p-6"><a href="/" class="flex items-center gap-2 mb-8 text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 hover:text-[var(--foreground)]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg> Back to Home</a> <div class="mb-6"><a href="/docs" class="text-lg font-semibold text-[var(--accent)] no-underline -tracking-tight leading-tight">cora docs</a></div> <nav class="flex flex-col gap-1"><!--[--><a href="/docs/getting-started" class="docs-sidebar-link">Getting Started</a><a href="/docs/installation" class="docs-sidebar-link active">Installation</a><a href="/docs/usage" class="docs-sidebar-link">Usage</a><a href="/docs/configuration" class="docs-sidebar-link">Configuration</a><a href="/docs/providers" class="docs-sidebar-link">Providers</a><a href="/docs/examples" class="docs-sidebar-link">Examples</a><a href="/docs/roadmap" class="docs-sidebar-link">Roadmap</a><a href="/docs/cli-reference" class="docs-sidebar-link">CLI Reference</a><a href="/docs/changelog" class="docs-sidebar-link">Changelog</a><!--]--></nav></div></aside> <nav class="mobile-docs-nav"><a href="/" class="text-[var(--muted-foreground)]" aria-label="Back to Home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></a> <!--[--><a href="/docs/getting-started">Getting Started</a><a href="/docs/installation" class="active">Installation</a><a href="/docs/usage">Usage</a><a href="/docs/configuration">Configuration</a><a href="/docs/providers">Providers</a><a href="/docs/examples">Examples</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/cli-reference">CLI Reference</a><a href="/docs/changelog">Changelog</a><!--]--></nav> <main class="flex-1 min-w-0"><div class="max-w-3xl mx-auto px-8 py-12"><!--[--><div class="docs-content"><h1 class="scroll-reveal">Installation</h1> <div class="docs-section scroll-reveal"><h2>Prerequisites</h2> <p>cora is a Rust binary. You have two installation paths:</p> <div class="docs-term-list"><div class="text-sm text-[var(--muted-foreground)]"><span class="font-semibold text-[var(--accent)]">Via Cargo (recommended)</span> — Requires Rust 1.85 or later with Cargo installed</div> <div class="text-sm text-[var(--muted-foreground)]"><span class="font-semibold text-[var(--accent)]">Binary download</span> — No Rust required; just download and place in your PATH</div></div> <p>cora works on Linux (x86_64 and arm64), macOS (arm64), and Windows.</p></div> <div class="docs-section scroll-reveal"><h2>Install via Cargo</h2> <p>The recommended way to install cora is through Cargo:</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot-red"></span> <span class="terminal-dot-yellow"></span> <span class="terminal-dot-green"></span></div> <div class="terminal-body"><div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cargo install</span> <span class="syntax-string">cora-cli</span></div></div></div> <p>This compiles cora from source and installs it to Cargo's binary directory (typically <code>~/.cargo/bin/</code>).</p></div> <div class="docs-section scroll-reveal"><h2>Download Binary</h2> <p>Pre-built binaries are available from the <a href="https://github.com/codecoradev/cora-cli/releases" target="_blank" rel="noopener">GitHub Releases</a> page.</p> <div class="text-sm text-[var(--muted-foreground)] mb-4"><p>Supported platforms:</p> <div class="flex flex-col gap-1 mt-2"><div>Linux x86_64 (glibc)</div> <div>Linux arm64 (aarch64)</div> <div>macOS arm64 (Apple Silicon)</div> <div>Windows x86_64</div></div></div> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot-red"></span> <span class="terminal-dot-yellow"></span> <span class="terminal-dot-green"></span></div> <div class="terminal-body"><div><span class="syntax-comment"># Download and extract</span></div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">curl</span> -sL https://github.com/codecoradev/cora-cli/releases/latest/download/cora-linux-x86_64.tar.gz | <span class="syntax-highlight">tar</span> xz</div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">mv</span> cora ~/.local/bin/cora</div></div></div></div> <div class="docs-section scroll-reveal"><h2>Build from Source</h2> <p>If you prefer to build from the latest source:</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot-red"></span> <span class="terminal-dot-yellow"></span> <span class="terminal-dot-green"></span></div> <div class="terminal-body"><div><span class="syntax-cmd">$</span> <span class="syntax-highlight">git clone</span> <span class="syntax-string">https://github.com/codecoradev/cora-cli.git</span></div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cd</span> cora-cli</div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cargo build</span> <span class="syntax-flag">--release</span></div> <div><span class="syntax-comment"># Binary at target/release/cora</span></div></div></div></div> <div class="docs-section scroll-reveal"><h2>Shell Completions</h2> <p>cora provides shell completions for bash, zsh, and fish:</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot-red"></span> <span class="terminal-dot-yellow"></span> <span class="terminal-dot-green"></span></div> <div class="terminal-body"><div><span class="syntax-comment"># Bash</span></div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora completion</span> <span class="syntax-string">bash</span> > ~/.cora/completion.bash</div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">echo</span> <span class="syntax-string">'source ~/.cora/completion.bash'</span> >> ~/.bashrc</div> <div></div> <div><span class="syntax-comment"># Zsh</span></div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora completion</span> <span class="syntax-string">zsh</span> > ~/.cora/completion.zsh</div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">echo</span> <span class="syntax-string">'source ~/.cora/completion.zsh'</span> >> ~/.zshrc</div> <div></div> <div><span class="syntax-comment"># Fish</span></div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora completion</span> <span class="syntax-string">fish</span> > ~/.config/fish/completions/cora.fish</div></div></div></div> <div class="docs-section scroll-reveal"><h2>Verify Installation</h2> <p>Confirm cora is installed correctly:</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot-red"></span> <span class="terminal-dot-yellow"></span> <span class="terminal-dot-green"></span></div> <div class="terminal-body"><div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora</span> <span class="syntax-flag">--version</span></div> <div><span class="syntax-string">cora 0.x.x</span></div> <div></div> <div><span class="syntax-cmd">$</span> <span class="syntax-highlight">cora auth</span> <span class="syntax-string">status</span></div> <div><span class="syntax-string">Provider: openai</span></div> <div><span class="syntax-string">API key: configured</span></div></div></div></div> <div class="docs-section scroll-reveal"><h2>Updating</h2> <p>To update cora to the latest version:</p> <div class="docs-term-list"><div class="text-sm text-[var(--muted-foreground)]"><span class="font-semibold text-[var(--accent)]">Via Cargo:</span> <code>cargo install cora-cli --force</code></div> <div class="text-sm text-[var(--muted-foreground)]"><span class="font-semibold text-[var(--accent)]">Via Binary:</span> Download the latest release from GitHub and replace the existing binary</div></div></div></div><!--]--><!----></div></main></div><!--]--><!--]--><!----></main></div><!--]--><!--]--> <!--[-1--><!--]--><!--]-->
+			
+			<script>
+				{
+					__sveltekit_op75zz = {
+						base: new URL("..", location).pathname.slice(0, -1)
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("../_app/immutable/entry/start.CmvPVbW8.js"),
+						import("../_app/immutable/entry/app.DyiyvRxF.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 2, 10],
+							data: [null,null,null],
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>

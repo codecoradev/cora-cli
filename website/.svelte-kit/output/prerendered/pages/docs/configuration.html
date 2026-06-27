@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="oklch(0.13 0.01 270)" />
+		<meta name="color-scheme" content="dark" />
+
+		<title>cora — AI Code Review CLI</title>
+		<meta name="description" content="CLI-first AI code review. BYOK, zero config, pre-commit hooks. Open source, MIT license." />
+
+		<!-- Open Graph -->
+		<meta property="og:title" content="cora — AI Code Review CLI" />
+		<meta property="og:description" content="CLI-first AI code review. BYOK, zero config, pre-commit hooks. Open source, MIT license." />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://codecora.dev" />
+		<meta property="og:image" content="https://codecora.dev/og.png" />
+
+		<link href="../_app/immutable/entry/start.CmvPVbW8.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/DyVSz01m.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/Du04-Wio.js" rel="modulepreload">
+		<link href="../_app/immutable/entry/app.DyiyvRxF.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/kNaey6uv.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/xihTtKlq.js" rel="modulepreload">
+		<link href="../_app/immutable/nodes/0.BZeUAe05.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/BuBrZOIh.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/DozEvg9T.js" rel="modulepreload">
+		<link href="../_app/immutable/nodes/2.DnuVmUIJ.js" rel="modulepreload">
+		<link href="../_app/immutable/nodes/7.BG-S3wet.js" rel="modulepreload">
+		<link href="../_app/immutable/chunks/qiBCaaew.js" rel="modulepreload">
+		<!--1funsus--><!--[-1--><!--]--> <!----><script>(function setInitialMode({ defaultMode = "system", themeColors, darkClassNames = ["dark"], lightClassNames = [], defaultTheme = "", modeStorageKey = "mode-watcher-mode", themeStorageKey = "mode-watcher-theme" }) {
+	const rootEl = document.documentElement;
+	const mode = localStorage.getItem(modeStorageKey) ?? defaultMode;
+	const theme = localStorage.getItem(themeStorageKey) ?? defaultTheme;
+	const light = mode === "light" || mode === "system" && window.matchMedia("(prefers-color-scheme: light)").matches;
+	if (light) {
+		if (darkClassNames.length) rootEl.classList.remove(...darkClassNames.filter(Boolean));
+		if (lightClassNames.length) rootEl.classList.add(...lightClassNames.filter(Boolean));
+	} else {
+		if (lightClassNames.length) rootEl.classList.remove(...lightClassNames.filter(Boolean));
+		if (darkClassNames.length) rootEl.classList.add(...darkClassNames.filter(Boolean));
+	}
+	rootEl.style.colorScheme = light ? "light" : "dark";
+	if (themeColors) {
+		const themeMetaEl = document.querySelector("meta[name=\"theme-color\"]");
+		if (themeMetaEl) themeMetaEl.setAttribute("content", mode === "light" ? themeColors.light : themeColors.dark);
+	}
+	if (theme) {
+		rootEl.setAttribute("data-theme", theme);
+		localStorage.setItem(themeStorageKey, theme);
+	}
+	localStorage.setItem(modeStorageKey, mode);
+})({"defaultMode":"system","darkClassNames":["dark"],"lightClassNames":[],"defaultTheme":"","modeStorageKey":"mode-watcher-mode","themeStorageKey":"mode-watcher-theme"});</script><!----><!----><!--1bpnej--><!----><!--1q9ccmj--><meta name="description" content="Configure cora - config resolution, .cora.yaml, environment variables, and CLI flags."/><!----><title>Configuration — cora docs</title>
+		<link href="../_app/immutable/assets/0.D7nPmqCL.css" rel="stylesheet">
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents"><!--[--><!--[0--><!--[--><!--[-1--><!--]--><!----> <div class="bg-background min-h-screen"><header class="site-header"><div class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14"><a href="/" class="font-semibold text-foreground text-lg tracking-tight flex items-center gap-2"><span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[var(--accent)] text-[var(--accent-foreground)] text-xs font-bold">C</span> cora</a> <nav class="hidden sm:flex items-center gap-6"><a href="/docs" class="site-header-link active">Docs</a> <a href="/docs/roadmap" class="site-header-link">Roadmap</a> <a href="https://github.com/codecoradev/cora-cli" target="_blank" rel="noopener" class="site-header-link">GitHub</a></nav> <div class="hidden sm:flex items-center gap-3"><button class="p-2 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors" aria-label="Toggle theme"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-sun w-4 h-4 hidden dark:block"><!--[--><!----><circle cx="12" cy="12" r="4"><!----></circle><!----><!----><path d="M12 2v2"><!----></path><!----><!----><path d="M12 20v2"><!----></path><!----><!----><path d="m4.93 4.93 1.41 1.41"><!----></path><!----><!----><path d="m17.66 17.66 1.41 1.41"><!----></path><!----><!----><path d="M2 12h2"><!----></path><!----><!----><path d="M20 12h2"><!----></path><!----><!----><path d="m6.34 17.66-1.41 1.41"><!----></path><!----><!----><path d="m19.07 4.93-1.41 1.41"><!----></path><!----><!--]--><!----></svg><!----> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-moon w-4 h-4 block dark:hidden"><!--[--><!----><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"><!----></path><!----><!--]--><!----></svg><!----></button> <a href="/docs/getting-started" class="btn-primary text-[13px] px-3.5 py-1.5">Get Started</a></div> <div class="sm:hidden flex items-center gap-2"><button class="p-2 rounded-md text-[var(--muted-foreground)]" aria-label="Toggle theme"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-sun w-4 h-4 hidden dark:block"><!--[--><!----><circle cx="12" cy="12" r="4"><!----></circle><!----><!----><path d="M12 2v2"><!----></path><!----><!----><path d="M12 20v2"><!----></path><!----><!----><path d="m4.93 4.93 1.41 1.41"><!----></path><!----><!----><path d="m17.66 17.66 1.41 1.41"><!----></path><!----><!----><path d="M2 12h2"><!----></path><!----><!----><path d="M20 12h2"><!----></path><!----><!----><path d="m6.34 17.66-1.41 1.41"><!----></path><!----><!----><path d="m19.07 4.93-1.41 1.41"><!----></path><!----><!--]--><!----></svg><!----> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-moon w-4 h-4 block dark:hidden"><!--[--><!----><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"><!----></path><!----><!--]--><!----></svg><!----></button> <button class="p-2 rounded-md text-[var(--muted-foreground)]" aria-label="Menu"><!--[-1--><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide-icon lucide lucide-menu w-5 h-5"><!--[--><!----><path d="M4 5h16"><!----></path><!----><!----><path d="M4 12h16"><!----></path><!----><!----><path d="M4 19h16"><!----></path><!----><!--]--><!----></svg><!--]--></button></div></div> <!--[-1--><!--]--></header> <main><!--[0--><!--[--><div class="min-h-screen flex bg-[var(--background)]"><aside class="docs-sidebar hidden lg:block"><div class="p-6"><a href="/" class="flex items-center gap-2 mb-8 text-sm text-[var(--muted-foreground)] no-underline transition-colors duration-200 min-h-11 hover:text-[var(--foreground)]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg> Back to Home</a> <div class="mb-6"><a href="/docs" class="text-lg font-semibold text-[var(--accent)] no-underline -tracking-tight leading-tight">cora docs</a></div> <nav class="flex flex-col gap-1"><!--[--><a href="/docs/getting-started" class="docs-sidebar-link">Getting Started</a><a href="/docs/installation" class="docs-sidebar-link">Installation</a><a href="/docs/usage" class="docs-sidebar-link">Usage</a><a href="/docs/configuration" class="docs-sidebar-link active">Configuration</a><a href="/docs/providers" class="docs-sidebar-link">Providers</a><a href="/docs/examples" class="docs-sidebar-link">Examples</a><a href="/docs/roadmap" class="docs-sidebar-link">Roadmap</a><a href="/docs/cli-reference" class="docs-sidebar-link">CLI Reference</a><a href="/docs/changelog" class="docs-sidebar-link">Changelog</a><!--]--></nav></div></aside> <nav class="mobile-docs-nav"><a href="/" class="text-[var(--muted-foreground)]" aria-label="Back to Home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></a> <!--[--><a href="/docs/getting-started">Getting Started</a><a href="/docs/installation">Installation</a><a href="/docs/usage">Usage</a><a href="/docs/configuration" class="active">Configuration</a><a href="/docs/providers">Providers</a><a href="/docs/examples">Examples</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/cli-reference">CLI Reference</a><a href="/docs/changelog">Changelog</a><!--]--></nav> <main class="flex-1 min-w-0"><div class="max-w-3xl mx-auto px-8 py-12"><!--[--><div class="docs-content"><h1 class="scroll-reveal">Configuration</h1> <p class="scroll-reveal">cora uses a layered config system. Later sources override earlier ones.</p> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Config Resolution Order</h2> <p class="text-[var(--muted-foreground)] mb-6">Settings are resolved in this order (highest priority first):</p> <div class="flex flex-col gap-2"><!--[--><div class="docs-card accent"><div class="docs-card-number primary">1</div> <div><div class="text-sm font-semibold text-[var(--foreground)]">CLI flags</div> <div class="text-xs text-[var(--muted-foreground)] tracking-wide">--provider, --model, --base-url, etc.</div></div></div><div class="docs-card"><div class="docs-card-number muted">2</div> <div><div class="text-sm font-semibold text-[var(--foreground)]">Environment variables</div> <div class="text-xs text-[var(--muted-foreground)] tracking-wide">CORA_API_KEY, CORA_PROVIDER, CORA_MODEL, etc.</div></div></div><div class="docs-card"><div class="docs-card-number muted">3</div> <div><div class="text-sm font-semibold text-[var(--foreground)]">.cora.yaml</div> <div class="text-xs text-[var(--muted-foreground)] tracking-wide">Project root config file</div></div></div><div class="docs-card"><div class="docs-card-number muted">4</div> <div><div class="text-sm font-semibold text-[var(--foreground)]">~/.cora/config.yaml</div> <div class="text-xs text-[var(--muted-foreground)] tracking-wide">Global config (optional)</div></div></div><div class="docs-card"><div class="docs-card-number muted">5</div> <div><div class="text-sm font-semibold text-[var(--foreground)]">Built-in defaults</div> <div class="text-xs text-[var(--muted-foreground)] tracking-wide">Sensible defaults for all settings</div></div></div><!--]--></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg> .cora.yaml Example</h2> <p class="text-[var(--muted-foreground)] mb-4">Create this file in your project root. Run <code class="syntax-highlight">cora init</code> to generate it.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span> <span class="terminal-title">.cora.yaml</span></div> <div class="terminal-body"><pre class="whitespace-pre"><span class="syntax-comment"># cora project config</span>
+<span class="syntax-highlight">provider:</span>
+  <span class="syntax-flag">provider:</span> <span class="syntax-string">openai</span>
+  <span class="syntax-flag">model:</span> <span class="syntax-string">gpt-4o</span>
+  <span class="syntax-flag">base_url:</span> <span class="syntax-string">https://api.openai.com/v1</span>
+
+<span class="syntax-highlight">llm:</span>
+  <span class="syntax-flag">temperature:</span> <span class="text-[var(--foreground)]">0</span>
+  <span class="syntax-flag">max_tokens:</span> <span class="text-[var(--foreground)]">4096</span>
+  <span class="syntax-flag">timeout:</span> <span class="text-[var(--foreground)]">120</span>
+  <span class="syntax-flag">cache_ttl:</span> <span class="text-[var(--foreground)]">1440</span>
+
+<span class="syntax-highlight">review:</span>
+  <span class="syntax-flag">system_prompt:</span> <span class="syntax-string">"You are a senior code reviewer."</span>
+  <span class="syntax-comment"># system_prompt_file: ./review-prompt.md</span>
+  <span class="syntax-flag">response_format:</span> <span class="syntax-string">json_object</span>
+
+<span class="syntax-highlight">focus:</span> <span class="syntax-string">security, performance, bugs</span>
+
+<span class="syntax-highlight">hook:</span>
+  <span class="syntax-flag">mode:</span> <span class="syntax-string">warn</span>
+  <span class="syntax-flag">min_severity:</span> <span class="syntax-string">major</span>
+  <span class="syntax-flag">max_diff_size:</span> <span class="text-[var(--foreground)]">51200</span>
+
+<span class="syntax-highlight">ignore:</span>
+  <span class="syntax-flag">files:</span>
+    <span class="syntax-cmd">- "vendor/**"</span>
+    <span class="syntax-cmd">- "*.min.js"</span></pre></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg> Environment Variables</h2> <div class="glass-card p-0 overflow-hidden"><table class="compare-table"><thead><tr><th class="w-1/3">Variable</th><th>Description</th></tr></thead><tbody><tr><td><code class="syntax-highlight">CORA_API_KEY</code></td><td>API key for the active provider</td></tr><tr><td><code class="syntax-highlight">CORA_PROVIDER</code></td><td>Active provider (openai, anthropic, groq, ollama, zai)</td></tr><tr><td><code class="syntax-highlight">CORA_MODEL</code></td><td>Model name override</td></tr><tr><td><code class="syntax-highlight">CORA_BASE_URL</code></td><td>Custom API base URL</td></tr><tr><td><code class="syntax-highlight">CORA_CONFIG</code></td><td>Path to config file</td></tr><tr><td><code class="syntax-highlight">CORA_FORMAT</code></td><td>Output format (pretty, json, compact, sarif)</td></tr><tr><td><code class="syntax-highlight">CORA_NO_COLOR</code></td><td>Disable colored output</td></tr><tr><td><code class="syntax-highlight">CORA_NO_CACHE</code></td><td>Skip diff-hash review cache (same as <code class="syntax-highlight">--no-cache</code>)</td></tr><tr><td><code class="syntax-highlight">GITHUB_TOKEN</code></td><td>GitHub token for SARIF upload</td></tr><tr><td><code class="syntax-highlight">GITHUB_REPOSITORY</code></td><td>GitHub repo for SARIF upload</td></tr><tr><td><code class="syntax-highlight">GITHUB_REF</code></td><td>GitHub ref for SARIF upload</td></tr></tbody></table></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg> Provider-Specific Env Vars</h2> <p class="text-[var(--muted-foreground)] mb-4">Each provider has its own API key variable. cora checks these for auto-detection.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span> <span class="terminal-title">env vars</span></div> <div class="terminal-body"><pre class="whitespace-pre"><span class="syntax-comment"># OpenAI</span>
+<span class="syntax-flag">OPENAI_API_KEY</span>=<span class="syntax-string">sk-...</span>
+<span class="syntax-flag">OPENAI_BASE_URL</span>=<span class="syntax-string">https://api.openai.com/v1</span>
+
+<span class="syntax-comment"># Anthropic</span>
+<span class="syntax-flag">ANTHROPIC_API_KEY</span>=<span class="syntax-string">sk-ant-...</span>
+
+<span class="syntax-comment"># Groq</span>
+<span class="syntax-flag">GROQ_API_KEY</span>=<span class="syntax-string">gsk_...</span>
+
+<span class="syntax-comment"># Ollama (local, no key needed)</span>
+<span class="syntax-flag">OLLAMA_HOST</span>=<span class="syntax-string">http://localhost:11434</span>
+<span class="syntax-comment"># Optional: OLLAMA_API_KEY if your Ollama instance requires auth</span>
+<span class="syntax-flag">OLLAMA_API_KEY</span>=<span class="syntax-string">...</span>
+
+<span class="syntax-comment"># Z.AI</span>
+<span class="syntax-flag">ZAI_API_KEY</span>=<span class="syntax-string">...</span></pre></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Diff-Hash Caching</h2> <p class="text-[var(--muted-foreground)] mb-4">cora caches review results by diff hash in <code class="syntax-highlight">~/.cache/cora/reviews/</code>. If you re-review the same diff, the cached result is returned instantly.</p> <div class="glass-card p-4 mb-4"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div><div class="text-xs font-semibold text-[var(--foreground)] mb-1">Config</div> <div class="text-sm text-[var(--muted-foreground)]"><code class="syntax-highlight">llm.cache_ttl</code> — TTL in minutes (default: 1440 / 24h)</div></div> <div><div class="text-xs font-semibold text-[var(--foreground)] mb-1">CLI / Env</div> <div class="text-sm text-[var(--muted-foreground)]"><code class="syntax-highlight">--no-cache</code> or <code class="syntax-highlight">CORA_NO_CACHE=1</code> to bypass</div></div></div></div></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Custom System Prompts</h2> <p class="text-[var(--muted-foreground)] mb-4">Override the default system prompt for <code class="syntax-highlight">review</code> or <code class="syntax-highlight">scan</code> commands to match your project's coding standards and review criteria.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span> <span class="terminal-title">.cora.yaml</span></div> <div class="terminal-body"><pre class="whitespace-pre"><span class="syntax-highlight">review:</span>
+  <span class="syntax-flag">system_prompt:</span> <span class="syntax-string">"Focus on Rust idioms and error handling."</span>
+  <span class="syntax-comment"># Or load from a file:</span>
+  <span class="syntax-flag">system_prompt_file:</span> <span class="syntax-string">./prompts/review.md</span>
+
+<span class="syntax-highlight">scan:</span>
+  <span class="syntax-flag">system_prompt:</span> <span class="syntax-string">"Check for OWASP Top 10 vulnerabilities."</span>
+  <span class="syntax-flag">system_prompt_file:</span> <span class="syntax-string">./prompts/scan.md</span></pre></div></div> <p class="text-[var(--muted-foreground)] mt-3 text-sm">If both <code class="syntax-highlight">system_prompt</code> and <code class="syntax-highlight">system_prompt_file</code> are set, the file takes precedence.</p></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg> Response Format (JSON Mode)</h2> <p class="text-[var(--muted-foreground)] mb-4">Opt into structured JSON output from the LLM by setting <code class="syntax-highlight">review.response_format</code> to <code class="syntax-highlight">json_object</code>. This instructs the LLM to return valid JSON, enabling machine-readable parsing and pipeline integration.</p> <div class="docs-terminal"><div class="terminal-bar"><span class="terminal-dot terminal-dot-red"></span> <span class="terminal-dot terminal-dot-yellow"></span> <span class="terminal-dot terminal-dot-green"></span> <span class="terminal-title">.cora.yaml</span></div> <div class="terminal-body"><pre class="whitespace-pre"><span class="syntax-highlight">review:</span>
+  <span class="syntax-flag">response_format:</span> <span class="syntax-string">json_object</span></pre></div></div> <p class="text-[var(--muted-foreground)] mt-3 text-sm">Requires provider support for structured output. Works with OpenAI, Anthropic, and compatible APIs.</p></section> <section class="docs-section scroll-reveal"><h2 class="flex items-center gap-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Anti-Hallucination</h2> <p class="text-[var(--muted-foreground)] mb-4">cora uses two mechanisms to prevent the LLM from fabricating findings:</p> <div class="glass-card p-4"><ul class="text-sm text-[var(--muted-foreground)] space-y-2 list-none pl-0"><li><span class="text-[var(--accent)] font-semibold">File path injection</span> — Actual file paths are embedded in the prompt, anchoring the LLM to real files in the diff.</li> <li><span class="text-[var(--accent)] font-semibold">Post-parse filtering</span> — After parsing, any reported file paths or line numbers that don't exist in the actual diff are discarded.</li></ul></div></section></div><!--]--><!----></div></main></div><!--]--><!--]--><!----></main></div><!--]--><!--]--> <!--[-1--><!--]--><!--]-->
+			
+			<script>
+				{
+					__sveltekit_op75zz = {
+						base: new URL("..", location).pathname.slice(0, -1)
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("../_app/immutable/entry/start.CmvPVbW8.js"),
+						import("../_app/immutable/entry/app.DyiyvRxF.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 2, 7],
+							data: [null,null,null],
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>
