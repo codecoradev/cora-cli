@@ -478,6 +478,7 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
         return issues;
     }
 
+    let before = issues.len();
     issues.retain(|issue| {
         !ignore_rules.iter().any(|pattern| {
             let pattern_lower = pattern.to_lowercase();
@@ -486,6 +487,15 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
                 || issue.title.to_lowercase().contains(&pattern_lower)
         })
     });
+    let filtered = before - issues.len();
+    if filtered > 0 {
+        debug!(
+            filtered,
+            remaining = issues.len(),
+            rules = ignore_rules.len(),
+            "filtered issues via ignore rules"
+        );
+    }
 
     issues
 }
@@ -694,5 +704,84 @@ mod tests {
             1,
             "unknown lines should be kept (better safe than sorry)"
         );
+    }
+
+    #[test]
+    fn ignore_rules_filters_by_title_match() {
+        let issues = vec![
+            ReviewIssue {
+                file: "cli.rs".to_string(),
+                line: Some(236),
+                severity: Severity::Critical,
+                issue_type: Some("rule".to_string()),
+                title: "Command injection via exec/system with dynamic input".to_string(),
+                body: "Static security scanner detected...".to_string(),
+                suggested_fix: None,
+            },
+            ReviewIssue {
+                file: "main.rs".to_string(),
+                line: Some(10),
+                severity: Severity::Major,
+                issue_type: Some("security".to_string()),
+                title: "SQL injection via string concatenation".to_string(),
+                body: "...".to_string(),
+                suggested_fix: None,
+            },
+        ];
+
+        let rules = vec!["Command injection via exec/system with dynamic input".to_string()];
+        let result = apply_ignore_rules(issues, &rules);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].title, "SQL injection via string concatenation");
+    }
+
+    #[test]
+    fn ignore_rules_filters_by_issue_type_match() {
+        let issues = vec![ReviewIssue {
+            file: "test.py".to_string(),
+            line: Some(50),
+            severity: Severity::Minor,
+            issue_type: Some("style".to_string()),
+            title: "Some style issue".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let rules = vec!["style".to_string()];
+        let result = apply_ignore_rules(issues, &rules);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn ignore_rules_empty_keeps_all() {
+        let issues = vec![ReviewIssue {
+            file: "f.rs".to_string(),
+            line: Some(1),
+            severity: Severity::Critical,
+            issue_type: Some("rule".to_string()),
+            title: "Any finding".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_ignore_rules(issues, &[]);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn ignore_rules_case_insensitive() {
+        let issues = vec![ReviewIssue {
+            file: "f.rs".to_string(),
+            line: Some(1),
+            severity: Severity::Critical,
+            issue_type: Some("rule".to_string()),
+            title: "HARDCODED password or SECRET in variable".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let rules = vec!["Hardcoded Password Or Secret".to_string()];
+        let result = apply_ignore_rules(issues, &rules);
+        assert!(result.is_empty());
     }
 }
