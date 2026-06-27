@@ -156,7 +156,7 @@ pub fn get_repo_info() -> std::result::Result<(String, String, String), CoraErro
     let remote_url = repo
         .find_remote("origin")
         .ok()
-        .and_then(|r| r.url().map(std::string::ToString::to_string))
+        .and_then(|r| r.url().ok().map(std::string::ToString::to_string))
         .unwrap_or_default();
 
     let (owner, repo_name) = parse_remote_url(&remote_url);

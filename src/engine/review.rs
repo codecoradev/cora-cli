@@ -329,6 +329,14 @@ async fn review_diff_inner(
         }
     }
 
+    // Cross-validate LLM security findings about hardcoded secrets against
+    // actual diff lines. The LLM sometimes flags struct field declarations
+    // (e.g. `api_key: String`) as "hardcoded secret" even when no literal
+    // value is present. This filter removes such false positives by checking
+    // the added line at the reported file:line against the built-in
+    // sec-hardcoded-secret regex.
+    response.issues = apply_llm_secret_fp_filter(response.issues, &diff_chunks);
+
     // Apply ignore rules: filter out issues matching ignored patterns
     response.issues = apply_ignore_rules(response.issues, &config.ignore.rules);
 
@@ -362,6 +370,108 @@ async fn review_diff_inner(
     Ok(response)
 }
 
+/// Filter out LLM findings about hardcoded secrets/passwords that point to
+/// diff lines which don't actually contain a literal string assignment.
+///
+/// The LLM sometimes flags struct field declarations like `api_key: String`
+/// or `api_key: extract_api_key.clone()` as "Hardcoded password or secret in
+/// variable". These are identifiers, not hardcoded values.
+///
+/// This function cross-validates each security finding against the actual
+/// added line in the diff. If the line doesn't match the `sec-hardcoded-secret`
+/// regex (i.e. no `password/key/secret = "literal"` pattern), the finding is
+/// removed as a false positive.
+fn apply_llm_secret_fp_filter(
+    mut issues: Vec<ReviewIssue>,
+    diff_chunks: &[crate::engine::diff_parser::FileChunk],
+) -> Vec<ReviewIssue> {
+    use crate::engine::diff_parser::DiffLineType;
+
+    // Lazy-compiled regex matching the built-in sec-hardcoded-secret pattern.
+    // Only triggers for actual value assignments like `api_key = "sk-..."`.
+    static RE_SECRET_LITERAL: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r#"(?i)(?:password|api_?key|token|secret)\s*=\s*"[^"]+""#)
+            .expect("hardcoded secret regex must compile")
+    });
+
+    // Keywords that indicate an LLM finding is about hardcoded secrets.
+    static SECRET_KEYWORDS: &[&str] = &[
+        "hardcoded password",
+        "hardcoded secret",
+        "hardcoded credential",
+        "hardcoded token",
+        "hardcoded api key",
+        "hardcoded api_key",
+    ];
+
+    // Pre-compute a lookup: (file_path, new_line_no) -> line content
+    let added_lines: std::collections::HashMap<(String, u32), &str> = diff_chunks
+        .iter()
+        .flat_map(|chunk| {
+            let path = chunk
+                .new_path
+                .as_deref()
+                .or(chunk.old_path.as_deref())
+                .unwrap_or("unknown");
+            chunk.chunks.iter().flat_map(|hunk| {
+                hunk.lines
+                    .iter()
+                    .filter(|l| l.line_type == DiffLineType::Add)
+                    .filter_map(|l| {
+                        l.new_line_no
+                            .map(|ln| ((path.to_string(), ln), l.content.as_str()))
+                    })
+            })
+        })
+        .collect();
+
+    let before = issues.len();
+    issues.retain(|issue| {
+        // Only check security-type findings about secrets
+        let issue_type = issue.issue_type.as_deref().unwrap_or("");
+        let title_lower = issue.title.to_lowercase();
+
+        if issue_type != "security" {
+            return true;
+        }
+
+        let is_secret_finding = SECRET_KEYWORDS.iter().any(|kw| title_lower.contains(kw));
+        if !is_secret_finding {
+            return true;
+        }
+
+        // Look up the actual diff line
+        let line_num = issue.line.unwrap_or(0);
+        let key = (issue.file.clone(), line_num);
+        if let Some(actual_line) = added_lines.get(&key) {
+            if !RE_SECRET_LITERAL.is_match(actual_line) {
+                debug!(
+                    file = %issue.file,
+                    line = line_num,
+                    title = %issue.title,
+                    "suppressed LLM false positive: line has no hardcoded secret literal"
+                );
+                return false; // Remove this finding
+            }
+        }
+
+        // If we can't find the line (hallucinated path/line or context line),
+        // keep the finding — better safe than sorry.
+        true
+    });
+
+    let filtered = before - issues.len();
+    if filtered > 0 {
+        debug!(
+            filtered,
+            remaining = issues.len(),
+            "filtered LLM false positives for hardcoded secret findings"
+        );
+    }
+
+    issues
+}
+
 /// Filter out issues whose `issue_type` matches any ignored rule pattern.
 fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> Vec<ReviewIssue> {
     if ignore_rules.is_empty() {
@@ -389,6 +499,7 @@ fn is_valid_file_path(issue_file: &str, valid_files: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::Severity;
 
     #[test]
     fn resolve_prompt_inline_takes_priority() {
@@ -425,6 +536,163 @@ mod tests {
         assert!(
             result.is_none(),
             "system_prompt_file outside project root should be rejected"
+        );
+    }
+
+    #[test]
+    fn secret_fp_filter_removes_struct_field_declarations() {
+        use crate::engine::diff_parser::*;
+
+        // Simulate a diff with a struct field declaration (not a hardcoded secret)
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("crates/uteke-cli/src/cli.rs".to_string()),
+            language: "rs".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 230,
+                old_count: 0,
+                new_start: 234,
+                new_count: 2,
+                header: "".to_string(),
+                lines: vec![
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "    extract_api_key: Option<String>,".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(236),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "    extract_base_url: Option<String>,".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(237),
+                    },
+                ],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "crates/uteke-cli/src/cli.rs".to_string(),
+            line: Some(236),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "Hardcoded password or secret in variable".to_string(),
+            body: "Static security scanner detected...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_llm_secret_fp_filter(issues, &diff_chunks);
+        assert!(
+            result.is_empty(),
+            "struct field declaration should be filtered out"
+        );
+    }
+
+    #[test]
+    fn secret_fp_filter_keeps_actual_hardcoded_secrets() {
+        use crate::engine::diff_parser::*;
+
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("src/config.rs".to_string()),
+            language: "rs".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 10,
+                old_count: 0,
+                new_start: 15,
+                new_count: 1,
+                header: "".to_string(),
+                lines: vec![DiffLine {
+                    line_type: DiffLineType::Add,
+                    content: "    let api_key = \"sk-12345abcdef\";".to_string(),
+                    old_line_no: None,
+                    new_line_no: Some(15),
+                }],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "src/config.rs".to_string(),
+            line: Some(15),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "Hardcoded password or secret in variable".to_string(),
+            body: "API key hardcoded...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_llm_secret_fp_filter(issues, &diff_chunks);
+        assert_eq!(result.len(), 1, "actual hardcoded secret should be kept");
+    }
+
+    #[test]
+    fn secret_fp_filter_keeps_non_security_findings() {
+        use crate::engine::diff_parser::*;
+
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("src/main.rs".to_string()),
+            language: "rs".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 1,
+                old_count: 0,
+                new_start: 1,
+                new_count: 1,
+                header: "".to_string(),
+                lines: vec![DiffLine {
+                    line_type: DiffLineType::Add,
+                    content: "    api_key: String,".to_string(),
+                    old_line_no: None,
+                    new_line_no: Some(1),
+                }],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "src/main.rs".to_string(),
+            line: Some(1),
+            severity: Severity::Minor,
+            issue_type: Some("bugs".to_string()),
+            title: "Use of unwrap()".to_string(),
+            body: "This can panic".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_llm_secret_fp_filter(issues, &diff_chunks);
+        assert_eq!(result.len(), 1, "non-security findings should pass through");
+    }
+
+    #[test]
+    fn secret_fp_filter_keeps_findings_with_unknown_lines() {
+        use crate::engine::diff_parser::*;
+
+        // Empty diff — finding references a line not in the diff
+        let diff_chunks: Vec<FileChunk> = vec![];
+
+        let issues = vec![ReviewIssue {
+            file: "src/config.rs".to_string(),
+            line: Some(999),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "Hardcoded password or secret in variable".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_llm_secret_fp_filter(issues, &diff_chunks);
+        assert_eq!(
+            result.len(),
+            1,
+            "unknown lines should be kept (better safe than sorry)"
         );
     }
 }
