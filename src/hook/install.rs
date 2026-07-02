@@ -3,24 +3,43 @@ use tracing::debug;
 
 use crate::hook::template::HOOK_TEMPLATE;
 
+/// Sentinel marker identifying a cora-managed hook.
+const CORA_HOOK_SENTINEL: &str = "# cora-managed-hook";
+
 /// Install the pre-commit hook to `.git/hooks/pre-commit`.
 pub fn install_hook() -> Result<String> {
     let hooks_dir = find_git_hooks_dir()?;
     let hook_path = hooks_dir.join("pre-commit");
 
-    // Check if a hook already exists
+    // Check if a hook already exists and handle accordingly
     if hook_path.is_file() {
         let existing = std::fs::read_to_string(&hook_path)?;
-        if existing.contains("cora") {
-            // Already has cora hook — back up and overwrite
-            let backup = hooks_dir.join("pre-commit.cora.bak");
-            std::fs::copy(&hook_path, &backup)?;
-            debug!(path = %backup.display(), "backed up existing hook");
+        if existing.contains(CORA_HOOK_SENTINEL) {
+            // Already a cora-managed hook — just overwrite
+            debug!("existing hook is cora-managed, overwriting");
         } else {
-            // Different hook — back up and append cora
-            let backup = hooks_dir.join("pre-commit.pre-cora.bak");
+            // Non-cora hook — back it up and compose a wrapper
+            let backup = hooks_dir.join("pre-commit.bak");
             std::fs::copy(&hook_path, &backup)?;
-            debug!(path = %backup.display(), "backed up existing hook");
+            debug!(path = %backup.display(), "backed up existing non-cora hook");
+
+            // Build a wrapper that runs the original hook first, then cora
+            let wrapper = format!(
+                "{existing}\n\n# cora-managed-hook — the section below was added by `cora hook install`\n{HOOK_TEMPLATE}"
+            );
+            std::fs::write(&hook_path, &wrapper)
+                .with_context(|| format!("failed to write {}", hook_path.display()))?;
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let perms = std::fs::Permissions::from_mode(0o755);
+                std::fs::set_permissions(&hook_path, perms)?;
+            }
+
+            let path_str = hook_path.display().to_string();
+            debug!(path = %path_str, "installed pre-commit hook (wrapped existing)");
+            return Ok(path_str);
         }
     }
 

@@ -424,6 +424,9 @@ impl CoraFile {
             if let Some(sa) = &r.static_analysis {
                 config.static_analysis.clone_from(sa);
             }
+            if let Some(cc) = &r.context_chain {
+                config.context_chain.clone_from(cc);
+            }
         }
         if let Some(s) = &self.scan {
             if let Some(v) = &s.system_prompt {

@@ -211,13 +211,19 @@ fn snapshot_filename(snapshot: &DebtSnapshot) -> String {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     snapshot.timestamp.hash(&mut hasher);
-    for (k, v) in &snapshot.findings {
-        k.hash(&mut hasher);
-        v.hash(&mut hasher);
-    }
-    for (k, v) in &snapshot.categories {
-        k.hash(&mut hasher);
-        v.hash(&mut hasher);
+    {
+        let mut findings_sorted: Vec<_> = snapshot.findings.iter().collect();
+        findings_sorted.sort_by_key(|(k, _)| *k);
+        for (k, v) in findings_sorted {
+            k.hash(&mut hasher);
+            v.hash(&mut hasher);
+        }
+        let mut categories_sorted: Vec<_> = snapshot.categories.iter().collect();
+        categories_sorted.sort_by_key(|(k, _)| *k);
+        for (k, v) in categories_sorted {
+            k.hash(&mut hasher);
+            v.hash(&mut hasher);
+        }
     }
     let content_hash = format!("{:08x}", hasher.finish());
     format!("{date}_{short_hash}_{content_hash}.json")
@@ -418,7 +424,12 @@ pub fn aggregate(snapshots: &[DebtSnapshot]) -> DebtReport {
     } else {
         previous.iter().map(|s| s.quality_score).sum::<f64>() / previous.len() as f64
     };
-    let quality_score_change = quality_score_avg - previous_avg_quality;
+    let recent_avg_quality = if recent.is_empty() {
+        quality_score_avg
+    } else {
+        recent.iter().map(|s| s.quality_score).sum::<f64>() / recent.len() as f64
+    };
+    let quality_score_change = recent_avg_quality - previous_avg_quality;
 
     // Per-category with trend
     let mut category_reports = Vec::new();
@@ -429,12 +440,25 @@ pub fn aggregate(snapshots: &[DebtSnapshot]) -> DebtReport {
         }
     }
 
+    // Build recent category counts separately for accurate delta
+    let mut recent_categories: HashMap<String, usize> = HashMap::new();
+    for snap in recent {
+        for (cat, count) in &snap.categories {
+            *recent_categories.entry(cat.clone()).or_insert(0) += count;
+        }
+    }
+
     // Collect all unique category names
-    let mut all_cat_names: Vec<String> = all_categories.keys().cloned().collect();
+    let all_cat_names: std::collections::HashSet<&String> = all_categories
+        .keys()
+        .chain(recent_categories.keys())
+        .chain(previous_categories.keys())
+        .collect();
+    let mut all_cat_names: Vec<String> = all_cat_names.into_iter().cloned().collect();
     all_cat_names.sort();
 
     for cat_name in &all_cat_names {
-        let count = all_categories.get(cat_name).copied().unwrap_or(0);
+        let count = recent_categories.get(cat_name).copied().unwrap_or(0);
         let prev_count = previous_categories.get(cat_name).copied().unwrap_or(0);
         let change = count as i64 - prev_count as i64;
 

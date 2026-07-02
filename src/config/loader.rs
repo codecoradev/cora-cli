@@ -339,19 +339,39 @@ pub fn build_llm_config(
     let cora_base_url = std::env::var("CORA_BASE_URL").ok();
 
     let provider = cora_provider
-        .or_else(|| auto_preset.map(|p| p.name.to_string()))
+        .or_else(|| {
+            if config.provider.provider
+                != crate::config::schema::Config::default().provider.provider
+            {
+                Some(config.provider.provider.clone())
+            } else {
+                auto_preset.map(|p| p.name.to_string())
+            }
+        })
         .unwrap_or_else(|| config.provider.provider.clone());
 
     let model = cora_model
-        .or_else(|| auto_preset.map(|p| p.default_model.to_string()))
+        .or_else(|| {
+            if config.provider.model != crate::config::schema::Config::default().provider.model {
+                Some(config.provider.model.clone())
+            } else {
+                auto_preset.map(|p| p.default_model.to_string())
+            }
+        })
         .unwrap_or_else(|| config.provider.model.clone());
 
     let base_url = cora_base_url
         .or_else(|| {
-            // Check if the auto-detected preset has a custom URL override
-            auto_preset.and_then(|p| std::env::var(p.env_url).ok())
+            if config.provider.base_url
+                != crate::config::schema::Config::default().provider.base_url
+            {
+                Some(config.provider.base_url.clone())
+            } else {
+                auto_preset
+                    .and_then(|p| std::env::var(p.env_url).ok())
+                    .or_else(|| auto_preset.map(|p| p.default_base_url.to_string()))
+            }
         })
-        .or_else(|| auto_preset.map(|p| p.default_base_url.to_string()))
         .unwrap_or_else(|| config.provider.base_url.clone());
 
     Ok(LLMConfig {
