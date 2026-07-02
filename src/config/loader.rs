@@ -435,18 +435,31 @@ pub fn save_api_key(key: &str) -> std::result::Result<(), CoraError> {
     table.insert("api_key".to_string(), toml::Value::String(key.to_string()));
     let content = table.to_string();
 
-    std::fs::write(&path, content)
-        .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
-
-    debug!(path = %path.display(), "saved API key");
-
-    // Restrict permissions to owner only (0o600)
+    // Create the file with restrictive permissions from the start (0o600),
+    // avoiding the TOCTOU window between write and chmod.
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o600);
-        std::fs::set_permissions(&path, perms)?;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+        use std::io::Write;
+        file.write_all(content.as_bytes())
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
     }
+    #[cfg(not(unix))]
+    {
+        // Non-Unix platforms: write then attempt to restrict permissions.
+        // Best-effort — platform support for file permissions varies.
+        std::fs::write(&path, content)
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+    }
+
+    debug!(path = %path.display(), "saved API key");
 
     Ok(())
 }

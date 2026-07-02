@@ -372,13 +372,16 @@ fn open_editor(initial: &str) -> Result<String> {
     std::fs::write(&tmp_path, initial)
         .with_context(|| format!("Failed to write temp file: {}", tmp_path.display()))?;
 
-    let path_str = tmp_path.to_string_lossy().to_string();
-
-    // Use sh -c to handle multi-word editors properly
-    let shell_cmd = format!("{editor} '{path_str}'");
-    let status = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(&shell_cmd)
+    // Split $EDITOR into program + args to avoid shell injection via `sh -c`.
+    // Handles editors with flags like `code --wait` or `vim -p`.
+    let editor_parts: Vec<&str> = editor.split_whitespace().collect();
+    let (program, args) = match editor_parts.split_first() {
+        Some((p, a)) => (p, a),
+        None => anyhow::bail!("$EDITOR is empty"),
+    };
+    let status = std::process::Command::new(program)
+        .args(args)
+        .arg(&tmp_path)
         .status()
         .with_context(|| format!("Failed to open editor: {editor}"))?;
 

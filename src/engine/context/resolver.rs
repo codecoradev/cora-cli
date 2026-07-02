@@ -11,7 +11,7 @@
 //! Additionally, test file mapping is supported via naming conventions.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use tracing::debug;
 
@@ -26,6 +26,34 @@ const MAX_FN_LINES: usize = 50;
 const MAX_TYPE_LINES: usize = 50;
 /// Maximum lines to read per test function.
 const MAX_TEST_LINES: usize = 30;
+
+/// Safely join a relative path with a project root, verifying that the
+/// resulting path stays within the project root (prevents path traversal).
+/// Returns `None` if the resolved path escapes the project root or
+/// canonicalization fails for an existing file.
+fn safe_join(project_root: &Path, relative: &str) -> Option<PathBuf> {
+    let joined = project_root.join(relative);
+    // Canonicalize to resolve any `..` or symlinks.
+    // If the file doesn't exist yet, canonicalize just the project_root
+    // and check that the joined path starts with it as a prefix.
+    let canonical_root = std::fs::canonicalize(project_root).ok()?;
+    if joined.exists() {
+        let canonical_joined = std::fs::canonicalize(&joined).ok()?;
+        if canonical_joined.starts_with(&canonical_root) {
+            Some(canonical_joined)
+        } else {
+            None
+        }
+    } else {
+        // File doesn't exist yet; verify the joined path doesn't escape
+        // the project root by canonicalizing what we can and checking prefixes.
+        if joined.starts_with(&project_root) {
+            Some(joined)
+        } else {
+            None
+        }
+    }
+}
 
 /// Build the full context chain from extracted symbols.
 ///
@@ -137,8 +165,14 @@ fn resolve_symbols(
                 continue;
             }
 
-            // Check if the entry's file exists
-            let full_path = project_root.join(&entry.file);
+            // Check if the entry's file exists and stays within project root
+            let full_path = match safe_join(project_root, &entry.file) {
+                Some(p) => p,
+                None => {
+                    debug!(file = %entry.file, "path traversal detected, skipping");
+                    continue;
+                }
+            };
             if !full_path.exists() {
                 debug!(file = %entry.file, "resolved file does not exist, skipping");
                 continue;
@@ -248,7 +282,13 @@ fn resolve_import(
 
                 for ext in &extensions {
                     let candidate = format!("{}.{}", resolved.display(), ext);
-                    let full = project_root.join(&candidate);
+                    let full = match safe_join(project_root, &candidate) {
+                        Some(p) => p,
+                        None => {
+                            debug!(file = %candidate, "path traversal detected in JS/TS import, skipping");
+                            continue;
+                        }
+                    };
                     if full.exists() {
                         let line_end = find_definition_end(&full);
                         entries.push(ContextEntry {
@@ -624,7 +664,13 @@ fn add_test_mappings(
 
         let candidates = test_file_candidates(&sym.file);
         for candidate in candidates {
-            let full = project_root.join(&candidate);
+            let full = match safe_join(project_root, &candidate) {
+                Some(p) => p,
+                None => {
+                    debug!(file = %candidate, "path traversal detected in test resolution, skipping");
+                    continue;
+                }
+            };
             if full.exists() {
                 let line_end = find_definition_end(&full);
                 entries.push(ContextEntry {
@@ -697,7 +743,17 @@ fn test_file_candidates(source: &str) -> Vec<String> {
 
 /// Read the content for a context entry, respecting line range and caps.
 fn read_entry_content(entry: &ContextEntry, project_root: &Path) -> String {
-    let full_path = project_root.join(&entry.file);
+    let full_path = match safe_join(project_root, &entry.file) {
+        Some(p) if p.exists() => p,
+        Some(_) => {
+            debug!(file = %entry.file, "context entry file does not exist");
+            return String::new();
+        }
+        None => {
+            debug!(file = %entry.file, "path traversal detected in read_entry_content");
+            return String::new();
+        }
+    };
     let content = match std::fs::read_to_string(&full_path) {
         Ok(c) => c,
         Err(e) => {
