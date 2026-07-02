@@ -47,7 +47,7 @@ fn safe_join(project_root: &Path, relative: &str) -> Option<PathBuf> {
     } else {
         // File doesn't exist yet; verify the joined path doesn't escape
         // the project root by canonicalizing what we can and checking prefixes.
-        if joined.starts_with(&project_root) {
+        if joined.starts_with(project_root) {
             Some(joined)
         } else {
             None
