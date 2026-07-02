@@ -264,13 +264,18 @@ async fn review_diff_inner(
         Ok(resp) => resp,
         Err(e) => {
             // LLM failed — return deterministic findings only (don't silently swallow them)
-            if !rule_findings.is_empty() || !secrets_findings.is_empty() {
+            if !rule_findings.is_empty()
+                || !secrets_findings.is_empty()
+                || !security_findings.is_empty()
+            {
                 let n_rules = rule_findings.len();
                 let n_secrets = secrets_findings.len();
+                let n_security = security_findings.len();
                 debug!(
                     error = %e,
                     rule_findings = n_rules,
                     secrets_findings = n_secrets,
+                    security_findings = n_security,
                     "LLM call failed, returning deterministic findings only"
                 );
                 let mut all_deterministic =
@@ -282,7 +287,7 @@ async fn review_diff_inner(
                 let mut fallback = ReviewResponse {
                     issues: all_deterministic,
                     summary: format!(
-                        "LLM review failed: {e}. Showing {n_rules} rule + {n_secrets} secrets findings."
+                        "LLM review failed: {e}. Showing {n_rules} rule + {n_secrets} secrets + {n_security} security findings."
                     ),
                     tokens_used: None,
                     should_block: false,
