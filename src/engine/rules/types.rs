@@ -25,7 +25,7 @@ impl Default for RulesConfig {
 }
 
 /// A user-defined or built-in rule definition.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CustomRule {
     /// Unique rule identifier (e.g., `"sec-hardcoded-secret"`).
     pub id: String,
@@ -39,6 +39,26 @@ pub struct CustomRule {
     pub languages: Vec<String>,
     /// Glob patterns for file paths to exclude from this rule.
     pub exclude: Vec<String>,
+    /// Pre-compiled regex for the pattern (populated after rule assembly).
+    #[serde(skip, default)]
+    pub compiled_pattern: Option<regex::Regex>,
+}
+
+impl CustomRule {
+    /// Compile the rule's pattern into a cached regex, if not already compiled.
+    /// Returns `true` if compilation succeeded, `false` if the pattern is invalid.
+    pub fn ensure_compiled(&mut self) -> bool {
+        if self.compiled_pattern.is_some() {
+            return true;
+        }
+        match regex::Regex::new(&self.pattern) {
+            Ok(re) => {
+                self.compiled_pattern = Some(re);
+                true
+            }
+            Err(_) => false,
+        }
+    }
 }
 
 /// A single finding produced by a rule.

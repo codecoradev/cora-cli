@@ -2,6 +2,8 @@
 //!
 //! Each handler takes JSON params and returns a ToolResult.
 
+use std::sync::LazyLock;
+
 use crate::engine::diff_parser;
 use crate::engine::profiles;
 use crate::engine::rules;
@@ -9,6 +11,10 @@ use crate::engine::secrets_scanner;
 use crate::engine::security_scanner;
 
 use super::protocol::{Tool, ToolResult};
+
+/// Shared Tokio runtime for MCP tool handlers — created once, reused across calls.
+static MCP_RUNTIME: LazyLock<tokio::runtime::Runtime> =
+    LazyLock::new(|| tokio::runtime::Runtime::new().expect("Failed to create MCP tokio runtime"));
 
 /// List all available MCP tools.
 pub fn list_tools() -> Vec<Tool> {
@@ -525,32 +531,44 @@ fn handle_find_affected_tests(params: &serde_json::Value) -> ToolResult {
     let patterns = ["test", "spec", "_test", "_spec"];
     let mut affected: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    for file in &files {
-        // Strategy 1: call graph
-        let symbols_in_file: Vec<String> = {
-            let mut stmt = match conn.prepare("SELECT DISTINCT name FROM symbols WHERE file = ?1") {
-                Ok(s) => s,
-                Err(e) => return ToolResult::error(format!("DB error: {e}")),
-            };
-            let rows = match stmt.query_map(rusqlite::params![file], |row| row.get::<_, String>(0))
-            {
-                Ok(r) => r,
-                Err(e) => return ToolResult::error(format!("DB error: {e}")),
-            };
-            rows.filter_map(|r| r.ok()).collect()
+    // Batch fetch all symbols for all files in a single query
+    let all_symbols: Vec<String> = {
+        let placeholders = files.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("SELECT DISTINCT name FROM symbols WHERE file IN ({placeholders})");
+        let mut stmt = match conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(e) => return ToolResult::error(format!("DB error: {e}")),
         };
+        let params: Vec<&dyn rusqlite::types::ToSql> = files
+            .iter()
+            .map(|f| f as &dyn rusqlite::types::ToSql)
+            .collect();
+        let rows = match stmt.query_map(params.as_slice(), |row| row.get::<_, String>(0)) {
+            Ok(r) => r,
+            Err(e) => return ToolResult::error(format!("DB error: {e}")),
+        };
+        rows.filter_map(|r| r.ok()).collect()
+    };
 
-        for sym_name in &symbols_in_file {
-            if let Ok(callers) = crate::index::graph::find_callers(&conn, sym_name, 100) {
-                for caller in callers {
-                    if patterns.iter().any(|p| caller.file.contains(*p)) {
-                        affected.insert(caller.file.clone());
+    // Deduplicate and traverse call graph once
+    {
+        let mut seen_syms: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for sym_name in &all_symbols {
+            if seen_syms.insert(sym_name.clone()) {
+                if let Ok(callers) = crate::index::graph::find_callers(&conn, sym_name, 100) {
+                    for caller in callers {
+                        if patterns.iter().any(|p| caller.file.contains(*p)) {
+                            affected.insert(caller.file.clone());
+                        }
                     }
                 }
             }
         }
+    }
 
-        // Strategy 2: naming convention
+    // Strategy 2: naming convention — batch all test name candidates
+    let mut test_names: Vec<String> = Vec::new();
+    for file in &files {
         let stem = file
             .rsplit('/')
             .next()
@@ -558,25 +576,39 @@ fn handle_find_affected_tests(params: &serde_json::Value) -> ToolResult {
             .rsplit('.')
             .next()
             .unwrap_or("");
-        let test_names = [
+        test_names.extend_from_slice(&[
             format!("{stem}_test.rs"),
             format!("tests/{stem}.rs"),
             format!("{stem}_test.go"),
             format!("test_{stem}.py"),
             format!("{stem}.test.ts"),
             format!("{stem}.spec.ts"),
-        ];
-        for tn in &test_names {
-            if let Ok(mut stmt) = conn.prepare("SELECT DISTINCT path FROM files WHERE path LIKE ?1")
-            {
-                let pattern = format!("%{tn}");
-                if let Ok(rows) =
-                    stmt.query_map(rusqlite::params![pattern], |row| row.get::<_, String>(0))
-                {
-                    for row in rows.map_while(Result::ok) {
-                        affected.insert(row);
-                    }
-                }
+        ]);
+    }
+
+    // Query with a single LIKE batch
+    {
+        let sql = format!(
+            "SELECT DISTINCT path FROM files WHERE path LIKE '%' || ?1 OR {}",
+            test_names
+                .iter()
+                .enumerate()
+                .skip(1)
+                .map(|(i, _)| format!("path LIKE '%' || ?{}", i + 1))
+                .collect::<Vec<_>>()
+                .join(" OR ")
+        );
+        let mut stmt = match conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(e) => return ToolResult::error(format!("DB error: {e}")),
+        };
+        let params: Vec<&dyn rusqlite::types::ToSql> = test_names
+            .iter()
+            .map(|t| t as &dyn rusqlite::types::ToSql)
+            .collect();
+        if let Ok(rows) = stmt.query_map(params.as_slice(), |row| row.get::<_, String>(0)) {
+            for row in rows.map_while(Result::ok) {
+                affected.insert(row);
             }
         }
     }
@@ -639,13 +671,8 @@ fn handle_review_diff(params: &serde_json::Value) -> ToolResult {
         }
     };
 
-    // Run review synchronously
-    let rt = match tokio::runtime::Runtime::new() {
-        Ok(rt) => rt,
-        Err(e) => return ToolResult::error(format!("Failed to create runtime: {e}")),
-    };
-
-    let result = rt.block_on(crate::engine::review::review_diff_with_cache(
+    // Run review synchronously using the shared runtime
+    let result = MCP_RUNTIME.block_on(crate::engine::review::review_diff_with_cache(
         &config,
         &llm_config,
         diff,

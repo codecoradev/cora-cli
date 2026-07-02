@@ -842,29 +842,40 @@ async fn main() -> Result<()> {
                 std::collections::HashSet::new();
 
             // Strategy 1: Find symbols in changed files, then find callers that are in test files
-            for file in &changed {
-                // Get all symbols defined in this file
-                let symbols_in_file: Vec<String> = {
-                    let mut stmt =
-                        conn.prepare("SELECT DISTINCT name FROM symbols WHERE file = ?1")?;
-                    let rows =
-                        stmt.query_map(rusqlite::params![file], |row| row.get::<_, String>(0))?;
-                    rows.filter_map(|r| r.ok()).collect()
-                };
+            // Batch: fetch all symbols for all changed files in a single query
+            let all_symbols: Vec<String> = {
+                let placeholders: String =
+                    changed.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+                let sql =
+                    format!("SELECT DISTINCT name FROM symbols WHERE file IN ({placeholders})");
+                let mut stmt = conn.prepare(&sql)?;
+                let params: Vec<&dyn rusqlite::types::ToSql> = changed
+                    .iter()
+                    .map(|f| f as &dyn rusqlite::types::ToSql)
+                    .collect();
+                let rows = stmt.query_map(params.as_slice(), |row| row.get::<_, String>(0))?;
+                rows.filter_map(|r| r.ok()).collect()
+            };
 
-                // For each symbol, find callers
-                for sym_name in &symbols_in_file {
-                    let callers = index::graph::find_callers(&conn, sym_name, 100)?;
-                    for caller in callers {
-                        // Check if caller file looks like a test file
-                        if patterns.iter().any(|p| caller.file.contains(p.as_str())) {
-                            affected_tests.insert(caller.file.clone());
+            // Deduplicate symbols and resolve callers with a single set-based query
+            {
+                let mut seen_syms: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
+                for sym_name in all_symbols {
+                    if seen_syms.insert(sym_name.clone()) {
+                        let callers = index::graph::find_callers(&conn, &sym_name, 100)?;
+                        for caller in callers {
+                            if patterns.iter().any(|p| caller.file.contains(p.as_str())) {
+                                affected_tests.insert(caller.file.clone());
+                            }
                         }
                     }
                 }
             }
 
             // Strategy 2: Direct test file name convention (mod_test.rs, foo_test.go)
+            // Prepare statement once before the loop
+            let mut stmt = conn.prepare("SELECT DISTINCT path FROM files WHERE path LIKE ?1")?;
             for file in &changed {
                 // For Rust: src/foo.rs → tests/foo.rs or src/foo.rs → src/foo_test.rs
                 let stem = file
@@ -885,8 +896,6 @@ async fn main() -> Result<()> {
                     format!("{stem}.spec.ts"),
                 ];
                 for tp in &test_patterns {
-                    let mut stmt =
-                        conn.prepare("SELECT DISTINCT path FROM files WHERE path LIKE ?1")?;
                     let pattern = format!("%{tp}");
                     let rows =
                         stmt.query_map(rusqlite::params![pattern], |row| row.get::<_, String>(0))?;

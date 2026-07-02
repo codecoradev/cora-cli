@@ -243,18 +243,23 @@ pub fn prune_deleted(conn: &Connection, root: &Path) -> anyhow::Result<usize> {
         .filter_map(|r| r.ok())
         .collect();
 
-    for path in &paths {
-        let full = root.join(path);
-        if !full.exists() {
-            let tx = conn.unchecked_transaction()?;
+    // Batch all deletes in a single transaction instead of per-file
+    let to_prune: Vec<&String> = paths
+        .iter()
+        .filter(|path| !root.join(path).exists())
+        .collect();
+
+    if !to_prune.is_empty() {
+        let tx = conn.unchecked_transaction()?;
+        for path in &to_prune {
             tx.execute(
                 "DELETE FROM symbols WHERE file = ?1",
                 rusqlite::params![path],
             )?;
             tx.execute("DELETE FROM files WHERE path = ?1", rusqlite::params![path])?;
-            tx.commit()?;
-            deleted += 1;
         }
+        tx.commit()?;
+        deleted = to_prune.len();
     }
 
     if deleted > 0 {

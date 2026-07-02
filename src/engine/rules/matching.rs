@@ -33,10 +33,10 @@ pub fn matches_exclude(rule: &CustomRule, file_path: &str) -> bool {
 
 /// Check if a rule's regex pattern matches a line of code.
 pub fn match_rule_against_line(rule: &CustomRule, line: &str) -> bool {
-    match regex::Regex::new(&rule.pattern) {
-        Ok(re) => re.is_match(line),
-        Err(e) => {
-            debug!(rule_id = %rule.id, error = %e, "invalid regex in rule, skipping");
+    match &rule.compiled_pattern {
+        Some(re) => re.is_match(line),
+        None => {
+            debug!(rule_id = %rule.id, "regex not compiled, skipping");
             false
         }
     }
@@ -112,14 +112,17 @@ mod tests {
     use crate::engine::Severity;
 
     fn make_rule(pattern: &str, languages: &[&str], exclude: &[&str]) -> CustomRule {
-        CustomRule {
+        let mut rule = CustomRule {
             id: "test-rule".to_string(),
             pattern: pattern.to_string(),
             severity: Severity::Minor,
             message: "test".to_string(),
             languages: languages.iter().map(|s| s.to_string()).collect(),
             exclude: exclude.iter().map(|s| s.to_string()).collect(),
-        }
+            compiled_pattern: None,
+        };
+        rule.ensure_compiled();
+        rule
     }
 
     #[test]

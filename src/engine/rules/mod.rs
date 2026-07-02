@@ -32,6 +32,11 @@ pub fn run_rules(chunks: &[FileChunk], config: &RulesConfig) -> Vec<RuleFinding>
     let mut all_rules = builtin::builtin_rules();
     all_rules.extend(config.custom_rules.clone());
 
+    // Compile regex patterns once before the matching loop (Fix #41)
+    for rule in &mut all_rules {
+        rule.ensure_compiled();
+    }
+
     debug!(
         rule_count = all_rules.len(),
         "running rules against diff chunks"

@@ -2,9 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Issue severity levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
+    #[default]
     Critical,
     Major,
     Minor,
