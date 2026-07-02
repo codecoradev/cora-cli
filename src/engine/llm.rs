@@ -678,17 +678,14 @@ fn extract_stream_content(parsed: &Value) -> Option<&str> {
 /// Uses [`parse_usage_value`] to avoid serde's duplicate-field guard when a
 /// provider sends both legacy and new field names simultaneously.
 fn extract_stream_usage(parsed: &Value) -> Option<Usage> {
-    parsed
-        .get("usage")
-        .and_then(parse_usage_value)
-        .or_else(|| {
-            parsed
-                .get("choices")
-                .and_then(|c| c.get(0))
-                .and_then(|c| c.get("delta"))
-                .and_then(|d| d.get("usage"))
-                .and_then(parse_usage_value)
-        })
+    parsed.get("usage").and_then(parse_usage_value).or_else(|| {
+        parsed
+            .get("choices")
+            .and_then(|c| c.get(0))
+            .and_then(|c| c.get("delta"))
+            .and_then(|d| d.get("usage"))
+            .and_then(parse_usage_value)
+    })
 }
 
 /// Scan a batch of file contents using the LLM. Returns issues found.
