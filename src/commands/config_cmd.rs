@@ -326,6 +326,9 @@ fn print_cora_file(cora: &CoraFile) {
         if let Some(v) = llm.max_tokens {
             parts.push(format!("max_tokens={}", v));
         }
+        if let Some(ref v) = llm.max_tokens_param {
+            parts.push(format!("max_tokens_param={}", v));
+        }
         if let Some(v) = llm.timeout {
             parts.push(format!("timeout={}", v));
         }

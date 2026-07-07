@@ -54,7 +54,8 @@ struct ChatMessage {
     content: String,
 }
 
-/// Request body for /chat/completions.
+/// Request body for /chat/completions (kept for reference; unused after migration to dynamic json!).
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 struct ChatRequest {
     model: String,
@@ -285,26 +286,19 @@ async fn chat_completion(
         ));
     }
 
-    let request = ChatRequest {
-        model: config.model.clone(),
-        messages: vec![
-            ChatMessage {
-                role: "system".into(),
-                content: system_prompt.into(),
-            },
-            ChatMessage {
-                role: "user".into(),
-                content: user_message.into(),
-            },
+    let mut request = serde_json::json!({
+        "model": config.model,
+        "messages": [
+            { "role": "system", "content": system_prompt },
+            { "role": "user", "content": user_message }
         ],
-        temperature: config.temperature,
-        max_tokens: config.max_tokens,
-        response_format: if response_format == "json_object" {
-            Some(serde_json::json!({"type": "json_object"}))
-        } else {
-            None
-        },
-    };
+        "temperature": config.temperature,
+    });
+    request[config.max_tokens_param.clone()] = serde_json::json!(config.max_tokens);
+
+    if response_format == "json_object" {
+        request["response_format"] = serde_json::json!({"type": "json_object"});
+    }
 
     debug!(model = %config.model, url = %url, "sending LLM request");
 
@@ -541,12 +535,12 @@ async fn chat_completion_stream(
             { "role": "user", "content": user_message }
         ],
         "temperature": config.temperature,
-        "max_tokens": config.max_tokens,
         "stream": true,
         // Ask OpenAI-compatible providers to include token usage in the final
         // SSE chunk. Providers that don't recognise this field simply ignore it.
         "stream_options": { "include_usage": true }
     });
+    request_body[config.max_tokens_param.clone()] = serde_json::json!(config.max_tokens);
 
     if response_format == "json_object" {
         request_body["response_format"] = serde_json::json!({"type": "json_object"});
@@ -1884,5 +1878,52 @@ mod tests {
     fn preview_raw_collapses_whitespace() {
         let messy = "hello\n\t  world\n\n";
         assert_eq!(preview_raw(messy), "hello world");
+    }
+
+    // ─── max_tokens_param JSON key naming ───
+
+    #[test]
+    fn chat_request_uses_max_output_tokens() {
+        // Verify that when max_tokens_param is "max_output_tokens", the JSON
+        // body contains "max_output_tokens" (not "max_tokens") as the key.
+        let mut body = serde_json::json!({
+            "model": "gemini-pro",
+            "messages": [
+                { "role": "system", "content": "test" },
+                { "role": "user", "content": "hello" }
+            ],
+            "temperature": 0.0,
+        });
+        let param_name = "max_output_tokens";
+        body[param_name] = serde_json::json!(4096);
+
+        let serialized = serde_json::to_string(&body).unwrap();
+        assert!(
+            serialized.contains(r#""max_output_tokens":4096"#),
+            "Expected max_output_tokens key in JSON, got: {serialized}"
+        );
+        assert!(
+            !serialized.contains(r#""max_tokens":"#),
+            "Should NOT contain hardcoded max_tokens key, got: {serialized}"
+        );
+    }
+
+    #[test]
+    fn chat_request_uses_max_tokens_default() {
+        let mut body = serde_json::json!({
+            "model": "gpt-4o-mini",
+            "messages": [
+                { "role": "system", "content": "test" },
+                { "role": "user", "content": "hello" }
+            ],
+            "temperature": 0.0,
+        });
+        body["max_tokens"] = serde_json::json!(8192);
+
+        let serialized = serde_json::to_string(&body).unwrap();
+        assert!(
+            serialized.contains(r#""max_tokens":8192"#),
+            "Expected max_tokens key in JSON, got: {serialized}"
+        );
     }
 }

@@ -306,6 +306,7 @@ mod tests {
         assert_eq!(cfg.provider, "openai");
         assert_eq!(cfg.temperature, 0.0);
         assert_eq!(cfg.max_tokens, 4096);
+        assert_eq!(cfg.max_tokens_param, "max_tokens");
         assert_eq!(cfg.timeout, 600);
     }
 
@@ -423,6 +424,8 @@ pub struct LLMConfig {
     pub provider: String,
     pub temperature: f32,
     pub max_tokens: u32,
+    /// JSON parameter name for max tokens (resolved from config).
+    pub max_tokens_param: String,
     pub timeout: u64,
 }
 
@@ -435,6 +438,7 @@ impl Default for LLMConfig {
             provider: "openai".to_string(),
             temperature: 0.0,
             max_tokens: 4096,
+            max_tokens_param: "max_tokens".to_string(),
             timeout: 600,
         }
     }
