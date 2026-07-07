@@ -220,6 +220,22 @@ fn migrate_old_config() {
     }
 }
 
+/// Resolve the max tokens parameter name based on provider and config setting.
+///
+/// - If `config_value` is not `"auto"`, use it directly (explicit override).
+/// - Otherwise, detect from provider name:
+///   - `gemini`, `google`, `vertex` → `"max_output_tokens"`
+///   - Everything else → `"max_tokens"`
+pub fn resolve_max_tokens_param(provider: &str, config_value: &str) -> String {
+    match config_value {
+        v if v != "auto" => v.to_string(),
+        _ => match provider {
+            "gemini" | "google" | "vertex" => "max_output_tokens".to_string(),
+            _ => "max_tokens".to_string(),
+        },
+    }
+}
+
 /// Load the full resolved config: defaults ← global config ← .cora.yaml ← CLI overrides.
 ///
 /// `cli_provider`, `cli_model`, `cli_api_key`, and `cli_format` are `None`
@@ -374,6 +390,8 @@ pub fn build_llm_config(
         })
         .unwrap_or_else(|| config.provider.base_url.clone());
 
+    let max_tokens_param = resolve_max_tokens_param(&provider, &config.max_tokens_param);
+
     Ok(LLMConfig {
         api_key,
         base_url,
@@ -381,6 +399,7 @@ pub fn build_llm_config(
         provider,
         temperature: config.temperature,
         max_tokens: config.max_tokens,
+        max_tokens_param,
         timeout: config.timeout,
     })
 }
@@ -737,4 +756,59 @@ pub fn remove_provider_info() -> std::result::Result<(), CoraError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_max_tokens_param_auto_gemini() {
+        assert_eq!(
+            resolve_max_tokens_param("gemini", "auto"),
+            "max_output_tokens"
+        );
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_auto_google() {
+        assert_eq!(
+            resolve_max_tokens_param("google", "auto"),
+            "max_output_tokens"
+        );
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_auto_vertex() {
+        assert_eq!(
+            resolve_max_tokens_param("vertex", "auto"),
+            "max_output_tokens"
+        );
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_auto_openai() {
+        assert_eq!(resolve_max_tokens_param("openai", "auto"), "max_tokens");
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_auto_anthropic() {
+        assert_eq!(resolve_max_tokens_param("anthropic", "auto"), "max_tokens");
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_explicit_override() {
+        assert_eq!(
+            resolve_max_tokens_param("gemini", "max_tokens"),
+            "max_tokens"
+        );
+        assert_eq!(
+            resolve_max_tokens_param("openai", "max_output_tokens"),
+            "max_output_tokens"
+        );
+        assert_eq!(
+            resolve_max_tokens_param("anthropic", "max_completion_tokens"),
+            "max_completion_tokens"
+        );
+    }
 }
