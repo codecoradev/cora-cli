@@ -1,8 +1,10 @@
-name: Sync to CodeCoraDev Roadmap
+name: Sync to CodeCorraDev Roadmap
 
 on:
   issues:
     types: [opened, reopened, closed, labeled]
+  pull_request:
+    types: [closed]
   # Manual trigger for backfill
   workflow_dispatch:
 
@@ -10,59 +12,95 @@ permissions:
   issues: read
   repository-projects: read
 
-env:
-  PROJECT_NODE_ID: ${{ secrets.PROJECT_NODE_ID }}
-
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # Non-critical: project board sync should not block or create noise
+    continue-on-error: true
     steps:
-      - name: Sync issue to Project Board
+      - name: Sync issue/PR to Project Board
         env:
           GH_TOKEN: ${{ secrets.PROJECT_BOARD_TOKEN }}
+          PROJECT_NODE_ID: ${{ secrets.PROJECT_NODE_ID }}
+          STATUS_FIELD_ID: PVTSSF_lADOEUV_vs4BahYpzhVYcGc
+          DONE_OPTION_ID: 98236657
         run: |
+          set -e
+
           EVENT="${{ github.event.action }}"
-          ISSUE_NUMBER="${{ github.event.issue.number }}"
-          ISSUE_NODE_ID="${{ github.event.issue.node_id }}"
-          ISSUE_STATE="${{ github.event.issue.state }}"
+          EVENT_NAME="${{ github.event_name }}"
+          ISSUE_NUMBER="${{ github.event.issue.number || '' }}"
+          ISSUE_NODE_ID="${{ github.event.issue.node_id || '' }}"
+          ISSUE_STATE="${{ github.event.issue.state || '' }}"
+          PR_NUMBER="${{ github.event.pull_request.number || '' }}"
+          PR_NODE_ID="${{ github.event.pull_request.node_id || '' }}"
+          PR_MERGED="${{ github.event.pull_request.merged || '' }}"
+          PR_URL="${{ github.event.pull_request.html_url || '' }}"
           REPO="${{ github.repository }}"
 
           echo "::group::Event Details"
-          echo "Event: $EVENT"
-          echo "Issue: #$ISSUE_NUMBER"
-          echo "State: $ISSUE_STATE"
-          echo "Repo: $REPO"
-          echo "Project: $PROJECT_NODE_ID"
+          echo "Event name: $EVENT_NAME"
+          echo "Action:     $EVENT"
+          echo "Issue:      #$ISSUE_NUMBER (state=$ISSUE_STATE)"
+          echo "PR:         #$PR_NUMBER (merged=$PR_MERGED)"
+          echo "Repo:       $REPO"
+          echo "Project:    $PROJECT_NODE_ID"
           echo "::endgroup::"
 
+          # Skip when project secrets are not configured.
           if [ -z "$PROJECT_NODE_ID" ]; then
             echo "::warning::PROJECT_NODE_ID not set. Skipping."
             exit 0
           fi
 
-          # ─── Helpers ───
-
+          # ------------------------------------------------------------------
+          # Helper: add a content node (issue/PR) to the project if absent.
+          # Echoes the project item id (existing or newly created) to stdout.
+          # ------------------------------------------------------------------
           add_to_project() {
             local node_id="$1"
-            RESULT=$(gh api graphql \
+            local err_file
+            err_file=$(mktemp)
+            trap "rm -f '$err_file'" RETURN
+
+            local stdout_result exit_code
+            set +e
+            stdout_result=$(gh api graphql \
               -f query="
                 mutation {
                   addProjectV2ItemById(input: {projectId: \"$PROJECT_NODE_ID\", contentId: \"$node_id\"}) {
                     item { id }
                   }
-                }" 2>&1)
-            if echo "$RESULT" | grep -q '"item"'; then
-              # Extract item ID
-              ITEM_ID=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['addProjectV2ItemById']['item']['id'])" 2>/dev/null || echo "")
-              echo "✅ Added to project (item: $ITEM_ID)"
-            else
-              echo "⚠️ Add failed (may already exist): $RESULT"
+                }" 2>"$err_file")
+            exit_code=$?
+            set -e
+            local stderr_result
+            stderr_result=$(cat "$err_file")
+
+            if [ $exit_code -ne 0 ]; then
+              echo "❌ gh api failed (exit $exit_code): $stderr_result" >&2
+              return 1
             fi
+            if echo "$stdout_result" | grep -q '"errors"'; then
+              echo "❌ GraphQL error: $stdout_result $stderr_result" >&2
+              return 1
+            fi
+
+            local item_id
+            item_id=$(echo "$stdout_result" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['addProjectV2ItemById']['item']['id'])" 2>/dev/null || true)
+            if [ -n "$item_id" ]; then
+              echo "$item_id"
+              return 0
+            fi
+            echo "⚠️ Unexpected response (may already exist): $stdout_result $stderr_result" >&2
+            return 1
           }
 
-          # Find the project item ID for this issue
-          find_item_id() {
-            local issue_node_id="$1"
+          # ------------------------------------------------------------------
+          # Helper: look up an existing project item id for a content node.
+          # ------------------------------------------------------------------
+          get_item_id() {
+            local content_node_id="$1"
             gh api graphql \
               -f query="
                 query {
@@ -73,133 +111,142 @@ jobs:
                           id
                           content {
                             ... on Issue { id }
+                            ... on PullRequest { id }
                           }
                         }
                       }
                     }
                   }
-                }" 2>&1 | python3 -c "
-          import sys, json
-          try:
-              data = json.load(sys.stdin)
-              items = data['data']['node']['items']['nodes']
-              for item in items:
-                  c = item.get('content')
-                  if c and c.get('id') == '$issue_node_id':
-                      print(item['id'])
-                      break
-          except Exception:
-              pass
-          " 2>/dev/null || echo ""
+                }" 2>/dev/null \
+              | python3 -c "
+                  import sys, json
+                  data = json.load(sys.stdin)
+                  target = '$content_node_id'
+                  for n in data['data']['node']['items']['nodes']:
+                      c = n.get('content') or {}
+                      if c.get('id') == target:
+                          print(n['id'])
+                          break
+                  " 2>/dev/null
           }
 
-          # Resolve Status field ID + option ID by name
-          # Args: $1 = option name (e.g. "Todo", "Done", "In Progress")
-          set_status() {
-            local target_status="$1"
-            local item_id="$2"
-
-            if [ -z "$item_id" ]; then
-              echo "⚠️ No item ID — cannot set status"
-              return 1
-            fi
-
-            # Query field + option IDs dynamically
-            FIELD_DATA=$(gh api graphql \
-              -f query="
-                query {
-                  node(id: \"$PROJECT_NODE_ID\") {
-                    ... on ProjectV2 {
-                      fields(first: 20) {
-                        nodes {
-                          ... on ProjectV2SingleSelectField {
-                            id
-                            name
-                            options { id name }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }" 2>&1)
-
-            # Extract Status field ID and option ID
-            FIELD_INFO=$(echo "$FIELD_DATA" | python3 -c "
-          import sys, json
-          try:
-              data = json.load(sys.stdin)
-              fields = data['data']['node']['fields']['nodes']
-              for f in fields:
-                  if f.get('name') == 'Status':
-                      print(f['id'])
-                      for opt in f.get('options', []):
-                          if opt['name'] == '$target_status':
-                              print(opt['id'])
-                              break
-                      break
-          except Exception:
-              pass
-          " 2>/dev/null || echo "")
-
-            FIELD_ID=$(echo "$FIELD_INFO" | head -1)
-            OPTION_ID=$(echo "$FIELD_INFO" | tail -1)
-
-            if [ -z "$FIELD_ID" ] || [ -z "$OPTION_ID" ]; then
-              echo "⚠️ Could not resolve Status field or option '$target_status'"
-              return 1
-            fi
-
-            # Update the field
-            UPDATE_RESULT=$(gh api graphql \
+          # ------------------------------------------------------------------
+          # Helper: set Status field to Done for a project item.
+          # ------------------------------------------------------------------
+          set_done() {
+            local item_id="$1"
+            echo "Setting item $item_id → Done"
+            gh api graphql \
               -f query="
                 mutation {
                   updateProjectV2ItemFieldValue(input: {
-                    projectId: \"$PROJECT_NODE_ID\"
-                    itemId: \"$item_id\"
-                    fieldId: \"$FIELD_ID\"
-                    value: { singleSelectOptionId: \"$OPTION_ID\" }
+                    projectId: \"$PROJECT_NODE_ID\",
+                    itemId: \"$item_id\",
+                    fieldId: \"$STATUS_FIELD_ID\",
+                    value: { singleSelectOptionId: \"$DONE_OPTION_ID\" }
                   }) {
                     projectV2Item { id }
                   }
-                }" 2>&1)
-
-            if echo "$UPDATE_RESULT" | grep -q 'projectV2Item'; then
-              echo "✅ Status set to '$target_status'"
-            else
-              echo "⚠️ Status update failed: $UPDATE_RESULT"
-            fi
+                }" 2>&1
           }
 
-          # ─── Main Logic ───
+          # ==================================================================
+          # PR closed (only set Done when merged)
+          # ==================================================================
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "$PR_MERGED" = "true" ]; then
+              echo "PR #$PR_NUMBER was merged — updating linked issues to Done"
+
+              # The PR node itself is usually not in the board, but its linked
+              # issues are. Closing a PR does not auto-close issues, so we rely
+              # on "Linked pull requests" / closing keywords to find them.
+              #
+              # Step 1: query the PR for "closingIssuesReferences".
+              LINKED=$(gh api graphql \
+                -f query="
+                  query {
+                    node(id: \"$PR_NODE_ID\") {
+                      ... on PullRequest {
+                        closingIssuesReferences(first: 20) {
+                          nodes { id number }
+                        }
+                      }
+                    }
+                  }" 2>/dev/null \
+                | python3 -c "
+                    import sys, json
+                    data = json.load(sys.stdin)
+                    nodes = data['data']['node']['closingIssuesReferences']['nodes']
+                    for n in nodes:
+                        print(n['id'] + ' ' + str(n['number']))
+                  " 2>/dev/null || true)
+
+              if [ -z "$LINKED" ]; then
+                echo "No linked closing issues found for PR #$PR_NUMBER."
+                # If the PR content itself is on the board, mark it Done.
+                item_id=$(get_item_id "$PR_NODE_ID")
+                if [ -n "$item_id" ]; then
+                  set_done "$item_id"
+                fi
+              else
+                echo "$LINKED" | while read -r issue_node issue_num; do
+                  [ -z "$issue_node" ] && continue
+                  echo "Linked issue #$issue_num → marking Done"
+                  item_id=$(get_item_id "$issue_node")
+                  if [ -z "$item_id" ]; then
+                    item_id=$(add_to_project "$issue_node")
+                  fi
+                  if [ -n "$item_id" ]; then
+                    set_done "$item_id"
+                  else
+                    echo "⚠️ Could not resolve item id for issue #$issue_num"
+                  fi
+                done
+              fi
+            else
+              echo "PR #$PR_NUMBER closed without merge — no status change."
+            fi
+            exit 0
+          fi
+
+          # ==================================================================
+          # Issue events
+          # ==================================================================
+          if [ -z "$ISSUE_NODE_ID" ]; then
+            echo "No issue context (manual dispatch?). Exiting."
+            exit 0
+          fi
 
           case "$EVENT" in
             opened|reopened)
               if [ "$ISSUE_STATE" = "open" ]; then
                 echo "Adding opened/reopened issue #$ISSUE_NUMBER..."
-                add_to_project "$ISSUE_NODE_ID"
-
-                # If reopened, find existing item and set status back
-                if [ "$EVENT" = "reopened" ]; then
-                  ITEM_ID=$(find_item_id "$ISSUE_NODE_ID")
-                  set_status "In Progress" "$ITEM_ID"
+                if ! add_to_project "$ISSUE_NODE_ID" >/dev/null; then
+                  echo "::error::Failed to add issue #$ISSUE_NUMBER to project board"
+                  exit 1
                 fi
-              fi
-              ;;
-
-            closed)
-              echo "Issue #$ISSUE_NUMBER closed — setting Status to Done..."
-              ITEM_ID=$(find_item_id "$ISSUE_NODE_ID")
-              if [ -n "$ITEM_ID" ]; then
-                set_status "Done" "$ITEM_ID"
               else
-                echo "⚠️ Issue not found in project board — adding first..."
-                add_to_project "$ISSUE_NODE_ID"
-                ITEM_ID=$(find_item_id "$ISSUE_NODE_ID")
-                set_status "Done" "$ITEM_ID"
+                echo "Issue #$ISSUE_NUMBER is not open. Skipping."
               fi
               ;;
-
+            closed)
+              echo "Issue #$ISSUE_NUMBER closed — setting Status to Done"
+              item_id=$(get_item_id "$ISSUE_NODE_ID")
+              if [ -z "$item_id" ]; then
+                echo "Issue not yet on board — adding first."
+                item_id=$(add_to_project "$ISSUE_NODE_ID")
+              fi
+              if [ -n "$item_id" ]; then
+                set_done "$item_id"
+              else
+                echo "::error::Could not resolve project item for issue #$ISSUE_NUMBER"
+                exit 1
+              fi
+              ;;
             labeled)
               echo "Issue #$ISSUE_NUMBER labeled — no action needed"
+              ;;
+            *)
+              echo "Unhandled event: $EVENT. No action."
               ;;
           esac
