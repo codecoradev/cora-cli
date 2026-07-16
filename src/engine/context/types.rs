@@ -150,8 +150,15 @@ pub struct ContextChain {
 
 /// Rough token estimation: ~4 characters per token.
 /// This is a heuristic — consistent across runs, which matters more than accuracy.
+///
+/// Short non-empty content returns at least 1 so it isn't treated as
+/// zero-cost (#68 — integer division rounded 1-3 char content down to 0).
 pub fn estimate_tokens(text: &str) -> usize {
-    text.len() / 4
+    if text.is_empty() {
+        0
+    } else {
+        (text.len() / 4).max(1)
+    }
 }
 
 #[cfg(test)]
@@ -205,8 +212,8 @@ mod tests {
 
     #[test]
     fn estimate_tokens_short() {
-        // 3 chars → 0 tokens (integer division)
-        assert_eq!(estimate_tokens("abc"), 0);
+        // 3 chars → at least 1 token now (was 0 under integer division, #68)
+        assert_eq!(estimate_tokens("abc"), 1);
     }
 
     #[test]

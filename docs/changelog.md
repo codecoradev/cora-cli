@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Minor Best-Practice Items (#334)
+
+- **#87** test-file detection uses path-segment awareness (no more `latest`/`aspect`/`attestation` false matches).
+- **#66** directory glob excludes are segment-boundary aware (`src/` ≠ `mysrc/`).
+- **#88** `max_findings` cutoff sorts severity-first so truncation drops least-important findings.
+- **#30** debt snapshot save failures emit `warn!`.
+- **#68** token estimation returns ≥1 for non-empty content.
+- **#72** Java `import com.example.*` keeps the wildcard.
+- **#73** Rust `mod foo;` extracted as a dependency.
+- **#23** DB size queries `PRAGMA page_size` instead of assuming 4096.
+- **#48** `issue_type` serializes consistently; `type` kept as deserialize alias.
+- **#10** severity parsing avoids an allocation.
+
 ### Fixed — Markdown False Positives (#329)
 
 - **Findings inside Markdown fenced code blocks are now suppressed.** A `git push` inside a ` ```bash ` block in an `.md` file is no longer flagged as SQL injection. Covers all finding sources (security/secrets/rules + LLM); tracks fence state across full hunk context (Add + Context lines).

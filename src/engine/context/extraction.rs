@@ -19,6 +19,9 @@ use super::types::{ExtractedSymbol, SymbolKind};
 static RE_RUST_IMPORT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\buse\s+(crate|super|self)::([\w:]+)").unwrap());
 
+/// Rust: module declaration `mod foo;` or `mod foo {` (#73).
+static RE_RUST_MOD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bmod\s+(\w+)").unwrap());
+
 /// Rust: function call — identifier followed by `(`, possibly preceded by `::` or `.`
 static RE_RUST_FN_CALL: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?:\w+::)?\w+(?:::\w+)*\s*\(").unwrap());
@@ -58,9 +61,9 @@ static RE_GO_FN_CALL: LazyLock<Regex> =
 static RE_GO_TYPE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?:\b([A-Z]\w+)\s*\{|:\s*([A-Z]\w+))").unwrap());
 
-/// Java: `import foo.bar.*`
+/// Java: `import foo.bar.*` (also `import static foo.Bar.baz`)
 static RE_JAVA_IMPORT: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\bimport\s+([\w.]+)").unwrap());
+    LazyLock::new(|| Regex::new(r"\bimport\s+(?:static\s+)?([\w.*]+)").unwrap());
 
 /// Java: method call — `foo(` or `obj.method(`
 static RE_JAVA_FN_CALL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b(\w+)\s*\(").unwrap());
@@ -92,6 +95,14 @@ pub fn extract_symbols_from_line(line: &str, language: &str) -> Vec<SymbolKind> 
                     &mut symbols,
                     &mut seen,
                     SymbolKind::Import(cap.get(2).unwrap().as_str().to_string()),
+                );
+            }
+            // Module declarations (#73)
+            for cap in RE_RUST_MOD.captures_iter(line) {
+                add_unique(
+                    &mut symbols,
+                    &mut seen,
+                    SymbolKind::Import(cap.get(1).unwrap().as_str().to_string()),
                 );
             }
             // Function calls
@@ -389,6 +400,41 @@ mod tests {
         assert!(
             !imports.is_empty(),
             "should extract use crate::engine::scanner"
+        );
+    }
+
+    #[test]
+    fn extract_rust_module_declarations() {
+        // #73: `mod foo;` should be extracted as an import-like dependency.
+        let chunks = vec![make_file_chunk(
+            "src/main.rs",
+            "rs",
+            &[("mod engine;", 1), ("pub mod config;", 2)],
+        )];
+        let symbols = extract_symbols_from_diff(&chunks);
+        let mods: Vec<_> = symbols
+            .iter()
+            .filter(|s| matches!(&s.kind, SymbolKind::Import(p) if p == "engine" || p == "config"))
+            .collect();
+        assert_eq!(mods.len(), 2, "should extract both mod declarations");
+    }
+
+    #[test]
+    fn extract_java_wildcard_import() {
+        // #72: `import foo.bar.*` should keep the wildcard, not truncate to `foo.bar`.
+        let chunks = vec![make_file_chunk(
+            "src/App.java",
+            "java",
+            &[("import com.example.*;", 1)],
+        )];
+        let symbols = extract_symbols_from_diff(&chunks);
+        let imports: Vec<_> = symbols
+            .iter()
+            .filter(|s| matches!(&s.kind, SymbolKind::Import(p) if p.contains("*")))
+            .collect();
+        assert!(
+            !imports.is_empty(),
+            "java wildcard import should keep the '*'"
         );
     }
 

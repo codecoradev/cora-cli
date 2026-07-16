@@ -197,10 +197,16 @@ pub fn index_stats(conn: &Connection) -> anyhow::Result<IndexSummary> {
     let total_symbols: i64 =
         conn.query_row("SELECT COUNT(*) FROM symbols", [], |row| row.get(0))?;
     let total_files: i64 = conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))?;
-    let db_size: i64 = conn
-        .query_row("PRAGMA page_count", [], |row| row.get(0))
-        .unwrap_or(0)
-        * 4096; // page_size default
+    let db_size: i64 = {
+        // Use the actual page size instead of assuming 4096 bytes (#23).
+        let page_size: i64 = conn
+            .query_row("PRAGMA page_size", [], |row| row.get(0))
+            .unwrap_or(4096);
+        let page_count: i64 = conn
+            .query_row("PRAGMA page_count", [], |row| row.get(0))
+            .unwrap_or(0);
+        page_size * page_count
+    };
 
     // Symbols by kind
     let mut kind_counts: HashMap<String, usize> = HashMap::new();
