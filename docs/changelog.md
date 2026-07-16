@@ -7,41 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added — Deeper cross-file review context (token-economical)
+## [0.7.0] - 2026-07-16
 
-- **Caller/blast-radius resolution**: reviews now resolve who *calls* changed code (not just what changed code calls). `review.context_chain.include_callers` (default `true`); bounded scan, thin slices.
-- **Definition extraction** (Rust/Python/JS-TS/Go/Java-Kotlin) feeds caller resolution.
-- **Signature-only budget fallback**: injects a signature slice when the full body won't fit.
+### Highlights
+
+- **Deeper, token-economical cross-file review** — reviews now resolve **who calls changed code** (blast radius), not just what changed code calls. Bounded scanning + thin slices + signature-only fallback keep token cost low.
+- **Config validation at load time** — out-of-range values and misspelled keys fail loudly instead of being silently ignored.
+- **Markdown false positives suppressed** — findings inside fenced code blocks dropped across all finding sources.
+- **Perf + security + correctness fixes** across the pipeline (10 perf bottlenecks, 2 CVE bumps, silent-corruption & best-practice bugs).
+
+### Added
+
+- **Caller (blast-radius) resolution** — `review.context_chain.include_callers` (default `true`); gitignore-aware, bounded ≤400 files / ≤3 call-sites per symbol. New `ContextPriority::CallerSite`.
+- **Definition extraction** (Rust/Python/JS-TS/Go/Java-Kotlin) feeds caller resolution; Rust `mod foo;` and Java `import com.example.*` now extracted (#73, #72).
+- **Signature-only budget fallback** — injects a signature slice when the full body won't fit.
+- **`Config::validate()`** (#94) + **`Profile::validate()`** (#81) — reject out-of-range/unsupported values at load.
+- **`deny_unknown_fields`** on all config sections (#80).
+
+### Changed
+
+- **`CategoryAction` enum** (#57) — case-insensitive `block`/`warn`/`ignore`; typos fail loudly.
+- **Disabled quality gate never fails** (#58).
+- **`context_chain.max_context_tokens`** default 3000 → **5000**.
+- **`issue_type`** serializes consistently (#48); `type` kept as deserialize alias.
+- **`Severity::from_str_lossy`** avoids an allocation (#10).
 
 ### Fixed
 
-- `review.rs` passed `ignore.rules` instead of `ignore.files` to the context resolver (could inject `node_modules`/`target` code).
-- `context_chain.max_context_tokens` default 3000 → 5000.
-
-### Fixed — Minor Best-Practice Items (#334)
-
-- **#87** test-file detection uses path-segment awareness (no more `latest`/`aspect`/`attestation` false matches).
-- **#66** directory glob excludes are segment-boundary aware (`src/` ≠ `mysrc/`).
-- **#88** `max_findings` cutoff sorts severity-first so truncation drops least-important findings.
-- **#30** debt snapshot save failures emit `warn!`.
-- **#68** token estimation returns ≥1 for non-empty content.
-- **#72** Java `import com.example.*` keeps the wildcard.
-- **#73** Rust `mod foo;` extracted as a dependency.
-- **#23** DB size queries `PRAGMA page_size` instead of assuming 4096.
-- **#48** `issue_type` serializes consistently; `type` kept as deserialize alias.
-- **#10** severity parsing avoids an allocation.
-
-### Fixed — Markdown False Positives (#329)
-
-- **Findings inside Markdown fenced code blocks are now suppressed.** A `git push` inside a ` ```bash ` block in an `.md` file is no longer flagged as SQL injection. Covers all finding sources (security/secrets/rules + LLM); tracks fence state across full hunk context (Add + Context lines).
-
-### Fixed — Config Validation & Best Practices (#334)
-
-- **Quality gate no longer fails when disabled (#58).** `evaluate()` now forces `GateResult::Pass` when `enabled: false` instead of applying thresholds.
-- **Category actions are now validated enums (#57).** `quality_gate.categories.*.action` is a case-insensitive `CategoryAction` enum (`block`/`warn`/`ignore`); unknown values fail loudly at config load instead of silently becoming blocking.
-- **Config values are validated (#94).** `Config::validate()` rejects out-of-range/unsupported values at load: `temperature` (0.0–2.0), `max_tokens`/`timeout` (≥1), `max_tokens_param`, `response_format`, `output.format`, `hook.*`, and `provider.base_url`.
-- **Profile values are validated (#81).** Focus `weight` must be 1–10; `action`/`tone`/`detail_level` must be recognized.
-- **`deny_unknown_fields` on all config sections (#80).** Misspelled YAML keys are rejected at parse time.
+- **Markdown fenced-code-block false positives** (#329) dropped across all finding sources.
+- **Cross-file resolver** now uses `ignore.files` (not `ignore.rules`) — no longer injects `node_modules`/`target` code.
+- **Test-file detection** (#87) and **glob excludes** (#66) no longer over-match (`latest`/`aspect`/`mysrc/`).
+- **Token estimation** (#68), **DB size** (#23).
+- **Project-sync workflow** no longer fails on merged PRs using `Refs #N`.
+- **10 performance bottlenecks** (#335); **silent data-corruption bugs** (#333).
+- **Security:** `anyhow` 1.0.102 → 1.0.103, `crossbeam-epoch` 0.9.18 → 0.9.20.
 
 ## [0.6.2] - 2026-06-21
 
