@@ -7,44 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added — Deeper, token-economical cross-file review context
+## [0.7.0] - 2026-07-16
 
-- **Inbound caller (blast-radius) resolution.** Reviews now also resolve **who calls the changed code**, not just what the changed code calls. A changed function/type signature surfaces its call-sites across the repo so breaking changes can be flagged. Gated by new `review.context_chain.include_callers` (default `true`); uses gitignore-aware walking and is bounded (≤400 files, ≤3 call-sites/symbol), injecting only the call line + 1 line of context to stay cheap.
-- **Definition extraction** (`extract_definitions_from_diff`) for Rust/Python/JS-TS/Go/Java-Kotlin — detects functions/types *declared* in the diff, which feed caller resolution.
-- **Signature-only budget fallback.** When the token budget can't fit a full function/type body, a thin signature slice is injected instead of skipping the entry entirely (~3-5× more symbols under the same budget).
+### Highlights
 
-### Fixed — Cross-file context correctness & defaults
+- **Deeper, token-economical cross-file review.** Reviews now resolve **who calls the changed code** (inbound / blast-radius), not just what the changed code calls — so breaking signature/type changes can be flagged. Bounded scanning + thin slices + a signature-only budget fallback keep token cost low.
+- **Config is now validated at load time.** Out-of-range values (e.g. `temperature: 5`) and misspelled keys (`quailty_gate`) fail loudly instead of being silently ignored.
+- **Markdown false positives suppressed.** Findings inside fenced code blocks (a `git push` in a fenced `bash` block flagged as SQL injection) are now dropped across all finding sources.
+- **Performance, security, and correctness fixes** across the scan/review pipeline (10 perf bottlenecks, 2 CVE bumps, 8+ silent-corruption and best-practice bugs).
 
-- **`review.rs` passed the wrong ignore list** to the context resolver (`ignore.rules` — finding-type strings — instead of `ignore.files` globs). The resolver could inject code from `node_modules/`/`target/`. Now uses `ignore.files`.
-- **`context_chain.max_context_tokens` default raised 3000 → 5000**, and the resolver never scans gitignored build artifacts (caller scan uses the `ignore` crate).
+### Added
 
-### Fixed — Minor Best-Practice Items (#334)
+- **Inbound caller (blast-radius) resolution.** A new context-chain phase resolves call-sites of functions/types defined or modified in the diff, so breaking changes to their signatures surface their consumers. Gated by new `review.context_chain.include_callers` (default `true`); uses gitignore-aware walking and is bounded (≤400 files, ≤3 call-sites/symbol), injecting only the call line + 1 line of context. New `ContextPriority::CallerSite`.
+- **Definition extraction** (`extract_definitions_from_diff`) for Rust/Python/JS-TS/Go/Java-Kotlin — detects functions/types *declared* in the diff, feeding caller resolution. Rust `mod foo;` and Java `import com.example.*` wildcards are now extracted correctly (#73, #72).
+- **Signature-only budget fallback.** When the token budget can't fit a full function/type body, a thin signature slice (up to `{`) is injected instead of skipping the entry entirely (~3–5× more symbols under the same budget).
+- **`Config::validate()`** (#94) — rejects out-of-range/unsupported values at load: `temperature` (0.0–2.0), `max_tokens`/`timeout` (≥1), `max_tokens_param`, `response_format`, `output.format`, `hook.mode`/`on_violation`/`min_severity`, and `provider.base_url` scheme. Multiple errors are aggregated into one message.
+- **`Profile::validate()`** (#81) — focus `weight` must be 1–10, and `action`/`tone`/`detail_level` must be recognized values.
+- **`deny_unknown_fields`** on all config sections (#80) — misspelled YAML keys are rejected at parse time.
 
-- **Test-file detection no longer over-matches (#87).** `is_test_file` now uses path-segment awareness, so common words like `latest`, `aspect`, `attestation`, `protest` are no longer mistaken for test files.
-- **Directory glob excludes are segment-boundary aware (#66).** A `src/` exclude no longer catches `mysrc/` or `docs/src-guide/`.
-- **`max_findings` cutoff keeps the worst findings (#88).** Findings are sorted by severity before capping (Critical-first), so truncation drops the least important, not the highest severity.
-- **Debt snapshot save failures are surfaced (#30).** Write failures emit a `warn!`-level log instead of being swallowed silently.
-- **Token estimation no longer returns 0 for short content (#68).** Non-empty content estimates at least 1 token (was 0 under integer division).
-- **Java wildcard imports preserved (#72).** `import com.example.*` keeps the `*` instead of truncating to `com.example`.
-- **Rust module declarations extracted (#73).** `mod foo;` is now treated as a dependency symbol, matching the documented behavior.
-- **DB size uses the real SQLite page size (#23).** `index_stats` queries `PRAGMA page_size` instead of assuming 4096 bytes.
-- **`issue_type` serializes consistently (#48).** Serialized as `issue_type` (matching the field name); `type` kept as a deserialize alias.
-- **Severity parsing avoids an allocation (#10).** `from_str_lossy` uses `eq_ignore_ascii_case`.
+### Changed
 
-### Fixed — Markdown False Positives (#329)
+- **`CategoryAction` enum** (#57) — `quality_gate.categories.*.action` is now a case-insensitive enum (`block`/`warn`/`ignore`); a typo like `blok` fails loudly at config load instead of silently becoming blocking.
+- **Disabled quality gate never fails** (#58) — `evaluate()` forces `Pass` when `enabled: false`.
+- **`context_chain.max_context_tokens` default** raised 3000 → **5000**.
+- **`issue_type`** serializes consistently as `issue_type` (#48); `type` retained as a deserialize alias.
+- **`Severity::from_str_lossy`** uses `eq_ignore_ascii_case` (no allocation) (#10).
 
-- **Findings inside Markdown fenced code blocks are now suppressed.** Code blocks (\`\`\` / `~~~`) in `.md`/`.mdx`/`.markdown` files are documentation examples, not executable code. A `git push` inside a ` ```bash ` block is no longer flagged as SQL injection. The filter covers all finding sources (security/secrets/rules scanners + LLM) and uses full hunk context (Add + Context lines) to track fence state, so it works even when only the code-block body was edited.
+### Fixed
 
-### Fixed — Config Validation & Best Practices (#334)
-
-- **Quality gate no longer fails when disabled (#58).** `evaluate()` forced `GateResult::Pass` when `enabled: false`; it now short-circuits before applying thresholds so a disabled gate never blocks a merge.
-- **Category actions are now validated enums (#57).** `quality_gate.categories.*.action` accepted any string, so a typo like `blok` silently became blocking. It is now a case-insensitive `CategoryAction` enum (`block`/`warn`/`ignore`); unknown values fail loudly at config load.
-- **Config values are validated (#94).** `Config::validate()` now rejects out-of-range/unsupported values at load time: `temperature` (0.0–2.0), `max_tokens`/`timeout` (≥1), `max_tokens_param`, `response_format`, `output.format`, `hook.mode`/`on_violation`/`min_severity`, and `provider.base_url` scheme. Multiple errors are aggregated into one message.
-- **Profile values are validated (#81).** Focus area `weight` must be 1–10, and `action`/`tone`/`detail_level` must be recognized values; all built-in profiles pass.
-
-### Added — Config Safety
-
-- **`deny_unknown_fields` on all config sections (#80).** Misspelled YAML keys (e.g. `quailty_gate`, `temprature`) are now rejected at parse time instead of being silently dropped.
+- **Markdown fenced-code-block false positives** (#329) — findings inside fenced code blocks (triple-backtick / triple-tilde) in `.md`/`.mdx`/`.markdown` files are dropped across all finding sources (security/secrets/rules scanners + LLM). Fence state is tracked across full hunk context, so it works even when only the block body was edited.
+- **Cross-file resolver used the wrong ignore list** — `review.rs` passed `ignore.rules` (finding-type strings) instead of `ignore.files` (`target/**`, `node_modules/**`); the resolver could inject build-artifact code. Now uses `ignore.files`.
+- **Test-file detection over-match** (#87) — `is_test_file` is path-segment aware; `latest`, `aspect`, `attestation` are no longer mistaken for test files.
+- **Directory glob excludes over-permissive** (#66) — `src/` matches only at segment boundaries (`mysrc/` no longer caught).
+- **Token estimation** (#68) — non-empty content returns ≥1 token (was 0 under integer division).
+- **DB size** (#23) — `index_stats` queries `PRAGMA page_size` instead of assuming 4096 bytes.
+- **Project-sync workflow** — a merged PR referencing issues via `Refs #N` (not `Closes #N`) no longer fails the `sync` check.
+- **10 scan/review performance bottlenecks** (#335) — precompiled regex, batched DB queries, early cutoffs, file-content cache, single reused Tokio runtime, single-transaction prune, etc.
+- **Security:** bumped `anyhow` 1.0.102 → 1.0.103 (RUSTSEC-2026-0190) and `crossbeam-epoch` 0.9.18 → 0.9.20 (RUSTSEC-2026-0204).
+- Various silent-data-corruption bugs resolved (#333): severity sort, security-findings fallback, deterministic debt-snapshot hashing, debt-trend math, config precedence, `context_chain` merge, and hook-install composition.
 
 ## [0.6.2] - 2026-06-21
 
