@@ -13,13 +13,16 @@ pub enum Severity {
 }
 
 impl Severity {
-    /// Parse from string (case-insensitive)
+    /// Parse from string (case-insensitive, no allocation — #10)
     pub fn from_str_lossy(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "critical" => Severity::Critical,
-            "major" => Severity::Major,
-            "minor" => Severity::Minor,
-            _ => Severity::Info,
+        if s.eq_ignore_ascii_case("critical") {
+            Severity::Critical
+        } else if s.eq_ignore_ascii_case("major") {
+            Severity::Major
+        } else if s.eq_ignore_ascii_case("minor") {
+            Severity::Minor
+        } else {
+            Severity::Info
         }
     }
 
@@ -114,7 +117,7 @@ pub struct ReviewIssue {
     pub severity: Severity,
     /// Issue type/category — stored as string since LLM output varies.
     /// Common values: security, performance, bug, `best_practice`, style, suggestion
-    #[serde(rename = "type", alias = "issue_type")]
+    #[serde(alias = "type", alias = "issue_type")]
     pub issue_type: Option<String>,
     pub title: String,
     pub body: String,

@@ -73,9 +73,11 @@ fn glob_matches(pattern: &str, path: &str) -> bool {
         }
     }
 
-    // Handle "dir/" prefix patterns (directory-based exclusion)
+    // Handle "dir/" prefix patterns (directory-based exclusion). Match only at
+    // path-segment boundaries so a `src/` pattern doesn't also catch `mysrc/`
+    // or `docs/src-guide/` (#66).
     if pattern.ends_with('/') {
-        return path.starts_with(pattern) || path.contains(&pattern.to_string());
+        return path.starts_with(pattern) || dir_segment_match(pattern, path);
     }
 
     // Handle "**" glob in patterns like "tests/**"
@@ -92,6 +94,21 @@ fn glob_matches(pattern: &str, path: &str) -> bool {
 
     // Exact or prefix match
     path == pattern || path.starts_with(&format!("{pattern}/"))
+}
+
+/// True if a directory `pattern` (with trailing `/`) matches a full path
+/// segment somewhere inside `path` — e.g. `src/` matches `foo/src/bar.rs`
+/// but not `mysrc/bar.rs` (#66).
+fn dir_segment_match(pattern: &str, path: &str) -> bool {
+    let mut search_from = 0;
+    while let Some(rel) = path[search_from..].find(pattern) {
+        let abs = search_from + rel;
+        if abs == 0 || path.as_bytes().get(abs - 1) == Some(&b'/') {
+            return true;
+        }
+        search_from = abs + 1;
+    }
+    false
 }
 
 /// Default paths to exclude from rule matching (test directories, fixtures, etc.).
@@ -157,6 +174,15 @@ mod tests {
     fn not_excluded_src_dir() {
         let rule = make_rule("test", &["all"], &[]);
         assert!(!matches_exclude(&rule, "src/main.rs"));
+    }
+
+    #[test]
+    fn glob_matches_dir_at_segment_boundary_only() {
+        // #66: a `src/` exclude must not match `mysrc/` or `docs/src-guide/`.
+        assert!(glob_matches("src/", "src/main.rs"));
+        assert!(glob_matches("src/", "apps/web/src/main.rs"));
+        assert!(!glob_matches("src/", "mysrc/main.rs"));
+        assert!(!glob_matches("src/", "docs/src-guide.md"));
     }
 
     #[test]

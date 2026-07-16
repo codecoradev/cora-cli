@@ -174,17 +174,34 @@ pub fn scan_security(chunks: &[FileChunk], max_findings: usize) -> Vec<RuleFindi
     findings
 }
 
-/// Check if a file path looks like a test/spec/fixture file.
+/// Check if a file path looks like a test/spec/fixture/mock/example file.
+///
+/// Uses path-segment awareness so common words like `latest`, `aspect`,
+/// `attestation`, `protest` are not mistaken for test files (#87). A segment
+/// is any run between `/`, `_`, `-`, and `.` separators.
 fn is_test_file(path: &str) -> bool {
     let lower = path.to_lowercase();
-    lower.contains("test")
-        || lower.contains("spec")
-        || lower.contains("fixture")
-        || lower.contains("mock")
-        || lower.contains("example")
-        || lower.contains("__tests__")
-        || lower.contains(".test.")
-        || lower.contains(".spec.")
+    for seg in lower.split(['/', '_', '-', '.']) {
+        if matches!(
+            seg,
+            "test"
+                | "tests"
+                | "testing"
+                | "tested"
+                | "__tests__"
+                | "spec"
+                | "specs"
+                | "fixture"
+                | "fixtures"
+                | "mock"
+                | "mocks"
+                | "example"
+                | "examples"
+        ) {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -287,6 +304,21 @@ mod tests {
         )];
         let findings = scan_security(&chunks, 10);
         assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn is_test_file_does_not_over_match_common_words() {
+        // #87: substring matching caught false positives like 'latest', 'aspect'.
+        assert!(!is_test_file("src/latest_config.rs"));
+        assert!(!is_test_file("src/models/attestation.rs"));
+        assert!(!is_test_file("src/utils/aspect.rs"));
+        assert!(!is_test_file("src/protest.rs"));
+        assert!(!is_test_file("src/inspector.rs"));
+        // Real test files still match.
+        assert!(is_test_file("tests/auth_test.py"));
+        assert!(is_test_file("src/app.test.ts"));
+        assert!(is_test_file("src/__tests__/setup.rs"));
+        assert!(is_test_file("spec/models/user_spec.rb"));
     }
 
     #[test]

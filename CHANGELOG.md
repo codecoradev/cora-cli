@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Minor Best-Practice Items (#334)
+
+- **Test-file detection no longer over-matches (#87).** `is_test_file` now uses path-segment awareness, so common words like `latest`, `aspect`, `attestation`, `protest` are no longer mistaken for test files.
+- **Directory glob excludes are segment-boundary aware (#66).** A `src/` exclude no longer catches `mysrc/` or `docs/src-guide/`.
+- **`max_findings` cutoff keeps the worst findings (#88).** Findings are sorted by severity before capping (Critical-first), so truncation drops the least important, not the highest severity.
+- **Debt snapshot save failures are surfaced (#30).** Write failures emit a `warn!`-level log instead of being swallowed silently.
+- **Token estimation no longer returns 0 for short content (#68).** Non-empty content estimates at least 1 token (was 0 under integer division).
+- **Java wildcard imports preserved (#72).** `import com.example.*` keeps the `*` instead of truncating to `com.example`.
+- **Rust module declarations extracted (#73).** `mod foo;` is now treated as a dependency symbol, matching the documented behavior.
+- **DB size uses the real SQLite page size (#23).** `index_stats` queries `PRAGMA page_size` instead of assuming 4096 bytes.
+- **`issue_type` serializes consistently (#48).** Serialized as `issue_type` (matching the field name); `type` kept as a deserialize alias.
+- **Severity parsing avoids an allocation (#10).** `from_str_lossy` uses `eq_ignore_ascii_case`.
+
 ### Fixed — Markdown False Positives (#329)
 
 - **Findings inside Markdown fenced code blocks are now suppressed.** Code blocks (\`\`\` / `~~~`) in `.md`/`.mdx`/`.markdown` files are documentation examples, not executable code. A `git push` inside a ` ```bash ` block is no longer flagged as SQL injection. The filter covers all finding sources (security/secrets/rules scanners + LLM) and uses full hunk context (Add + Context lines) to track fence state, so it works even when only the code-block body was edited.
