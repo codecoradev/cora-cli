@@ -13,7 +13,7 @@ cora supports multiple AI providers. Use your own API key — no subscriptions t
 | OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` | `OPENAI_BASE_URL` |
 | Anthropic | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` | `ANTHROPIC_BASE_URL` |
 | Groq | `llama-3.1-8b-instant` | `GROQ_API_KEY` | `GROQ_BASE_URL` |
-| Ollama | `llama3.1` | — (local) | `OLLAMA_HOST` (default: http://localhost:11434) |
+| Ollama | `llama3.1` | — (local) | `OLLAMA_HOST` (default: `http://localhost:11434`) |
 | Z.AI | `glm-5.1` | `ZAI_API_KEY` | `ZAI_BASE_URL` |
 
 ## Auto-Detection
