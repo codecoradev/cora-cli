@@ -18,7 +18,7 @@ pub struct ContextConfig {
 
     /// Maximum number of *tokens* of additional context to inject.
     /// The budget is enforced via a rough `chars / 4` estimation.
-    /// Default: 3000 tokens ≈ 12 KB of code.
+    /// Default: 5000 tokens ≈ 20 KB of code.
     #[serde(default = "default_max_context_tokens")]
     pub max_context_tokens: usize,
 
@@ -34,6 +34,13 @@ pub struct ContextConfig {
     /// Default: true.
     #[serde(default = "default_true")]
     pub include_tests: bool,
+
+    /// Whether to resolve **callers** of functions/types defined or modified in
+    /// the diff (inbound / blast-radius context). This is the highest-value
+    /// axis for deep review — it surfaces who depends on the changed code, so
+    /// breaking signature/type changes can be flagged. Default: true.
+    #[serde(default = "default_true")]
+    pub include_callers: bool,
 }
 
 fn default_true() -> bool {
@@ -41,7 +48,7 @@ fn default_true() -> bool {
 }
 
 fn default_max_context_tokens() -> usize {
-    3000
+    5000
 }
 
 fn default_follow_depth() -> u32 {
@@ -52,9 +59,10 @@ impl Default for ContextConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            max_context_tokens: 3000,
+            max_context_tokens: 5000,
             follow_depth: 1,
             include_tests: true,
+            include_callers: true,
         }
     }
 }
@@ -95,6 +103,26 @@ pub struct ExtractedSymbol {
     pub raw: String,
 }
 
+/// Kind of a symbol *defined* (declared) in the changed lines — used for
+/// inbound caller/blast-radius resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DefinitionKind {
+    Function,
+    Type,
+}
+
+/// A function/type *defined or modified* in the changed lines. These are the
+/// symbols whose callers we want to find (blast radius).
+#[derive(Debug, Clone)]
+pub struct DefinedSymbol {
+    /// The defined symbol's name (e.g. `validate_token`, `CryptoConfig`).
+    pub name: String,
+    /// Whether it is a function/method or a type/class/struct.
+    pub kind: DefinitionKind,
+    /// The file where the definition appears.
+    pub file: String,
+}
+
 /// A resolved context entry — a (file, line range, symbol) tuple ready
 /// for reading and injection into the prompt.
 #[derive(Debug, Clone)]
@@ -119,8 +147,10 @@ pub enum ContextPriority {
     FunctionDef = 0,
     /// Type/struct definitions.
     TypeDef = 1,
-    /// Test functions — lowest priority.
+    /// Test functions — lower priority.
     Test = 2,
+    /// Callers of changed code (blast-radius) — lowest, bonus context.
+    CallerSite = 3,
 }
 
 /// Statistics from a context chain build, useful for logging / progress events.
@@ -169,9 +199,10 @@ mod tests {
     fn context_config_default() {
         let cfg = ContextConfig::default();
         assert!(cfg.enabled);
-        assert_eq!(cfg.max_context_tokens, 3000);
+        assert_eq!(cfg.max_context_tokens, 5000);
         assert_eq!(cfg.follow_depth, 1);
         assert!(cfg.include_tests);
+        assert!(cfg.include_callers);
     }
 
     #[test]

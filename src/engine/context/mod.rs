@@ -48,15 +48,17 @@ pub fn build_context_chain(
     project_root: &Path,
     ignore_patterns: &[String],
 ) -> ContextChain {
-    // Step 1: Extract symbols from changed lines
+    // Step 1: Extract outbound symbols (what changed code calls/imports)
     let symbols = extraction::extract_symbols_from_diff(chunks);
+    // Step 1b: Extract inbound definitions (what changed code defines — for callers)
+    let defs = extraction::extract_definitions_from_diff(chunks);
 
-    if symbols.is_empty() || !config.enabled {
+    if (symbols.is_empty() && defs.is_empty()) || !config.enabled {
         return ContextChain::default();
     }
 
     // Step 2: Resolve and assemble under budget
-    resolver::build_context_chain(&symbols, config, project_root, ignore_patterns)
+    resolver::build_context_chain(&symbols, &defs, config, project_root, ignore_patterns)
 }
 
 #[cfg(test)]

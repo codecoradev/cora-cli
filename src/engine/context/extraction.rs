@@ -75,6 +75,25 @@ static RE_JAVA_TYPE: LazyLock<Regex> =
 /// Maximum number of symbols to extract per file to prevent runaway extraction.
 const MAX_SYMBOLS_PER_FILE: usize = 50;
 
+// ─── Definition regexes (functions/types *declared* in changed lines) ───
+// Used for inbound caller (blast-radius) resolution.
+
+static RE_DEF_RUST_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+(\w+)").unwrap());
+static RE_DEF_RUST_TYPE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(?:pub\s+)?(?:struct|enum|trait|type)\s+(\w+)").unwrap());
+static RE_DEF_PY_FN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bdef\s+(\w+)").unwrap());
+static RE_DEF_PY_TYPE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bclass\s+(\w+)").unwrap());
+static RE_DEF_JS_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bfunction\s+\*?\s*(\w+)").unwrap());
+static RE_DEF_JS_TYPE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bclass\s+(\w+)").unwrap());
+static RE_DEF_GO_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bfunc\s+(?:\([^)]*\)\s*)?(\w+)\s*\(").unwrap());
+static RE_DEF_GO_TYPE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\btype\s+(\w+)\s+(?:struct|interface)").unwrap());
+static RE_DEF_JAVA_TYPE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(?:class|interface|enum)\s+(\w+)").unwrap());
+
 /// Extract symbols from a single line of code for a given language.
 pub fn extract_symbols_from_line(line: &str, language: &str) -> Vec<SymbolKind> {
     let mut symbols = Vec::new();
@@ -331,6 +350,85 @@ pub fn extract_symbols_from_diff(
     all_symbols
 }
 
+/// Extract function/type *definitions* declared in the added lines of a diff.
+/// These are the symbols whose **callers** (blast radius) we want to resolve.
+///
+/// Only added lines are scanned (a definition only matters if this PR
+/// introduces or modifies it). Returns deduplicated `(name, kind, file)`.
+pub fn extract_definitions_from_diff(
+    chunks: &[crate::engine::diff_parser::FileChunk],
+) -> Vec<crate::engine::context::types::DefinedSymbol> {
+    use crate::engine::context::types::{DefinedSymbol, DefinitionKind};
+    use crate::engine::diff_parser::DiffLineType;
+    let mut out = Vec::new();
+    let mut seen: HashSet<(String, String)> = HashSet::new(); // (name, file)
+
+    for file in chunks {
+        if file.is_binary || file.is_deleted {
+            continue;
+        }
+        let path = file
+            .new_path
+            .as_deref()
+            .or(file.old_path.as_deref())
+            .unwrap_or("unknown");
+        let lang = &file.language;
+
+        for hunk in &file.chunks {
+            for line in &hunk.lines {
+                if line.line_type != DiffLineType::Add {
+                    continue;
+                }
+                let content = &line.content;
+                let (fn_re, type_re): (Option<&Regex>, Option<&Regex>) = match lang.as_str() {
+                    "rs" => (Some(&RE_DEF_RUST_FN), Some(&RE_DEF_RUST_TYPE)),
+                    "py" | "pyi" => (Some(&RE_DEF_PY_FN), Some(&RE_DEF_PY_TYPE)),
+                    "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" => {
+                        (Some(&RE_DEF_JS_FN), Some(&RE_DEF_JS_TYPE))
+                    }
+                    "go" => (Some(&RE_DEF_GO_FN), Some(&RE_DEF_GO_TYPE)),
+                    "java" | "kt" | "kts" => (None, Some(&RE_DEF_JAVA_TYPE)),
+                    _ => (None, None),
+                };
+
+                let mut push = |name: &str, kind: DefinitionKind| {
+                    if name.is_empty() {
+                        return;
+                    }
+                    // Skip obvious noise / keywords that slip through.
+                    if matches!(
+                        name,
+                        "if" | "for" | "while" | "match" | "new" | "return" | "test" | "main"
+                    ) {
+                        return;
+                    }
+                    if seen.insert((name.to_string(), path.to_string())) {
+                        out.push(DefinedSymbol {
+                            name: name.to_string(),
+                            kind,
+                            file: path.to_string(),
+                        });
+                    }
+                };
+
+                if let Some(re) = fn_re {
+                    for cap in re.captures_iter(content) {
+                        push(&cap[1], DefinitionKind::Function);
+                    }
+                }
+                if let Some(re) = type_re {
+                    for cap in re.captures_iter(content) {
+                        push(&cap[1], DefinitionKind::Type);
+                    }
+                }
+            }
+        }
+    }
+
+    debug!(definitions = out.len(), "extracted definitions from diff");
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,6 +462,63 @@ mod tests {
     }
 
     // --- Rust extraction ---
+
+    #[test]
+    fn extract_definitions_rust_fn_and_type() {
+        let chunks = vec![make_file_chunk(
+            "src/lib.rs",
+            "rs",
+            &[
+                ("pub fn validate_token(token: &str) -> bool {", 1),
+                ("pub struct CryptoConfig { seed: u64 }", 2),
+            ],
+        )];
+        let defs = extract_definitions_from_diff(&chunks);
+        let names: Vec<&str> = defs.iter().map(|d| d.name.as_str()).collect();
+        assert!(
+            names.contains(&"validate_token"),
+            "should detect fn definition"
+        );
+        assert!(
+            names.contains(&"CryptoConfig"),
+            "should detect struct definition"
+        );
+    }
+
+    #[test]
+    fn extract_definitions_python() {
+        let chunks = vec![make_file_chunk(
+            "app/auth.py",
+            "py",
+            &[("def login(user):", 1), ("class User:", 2)],
+        )];
+        let defs = extract_definitions_from_diff(&chunks);
+        let names: Vec<&str> = defs.iter().map(|d| d.name.as_str()).collect();
+        assert!(names.contains(&"login"));
+        assert!(names.contains(&"User"));
+    }
+
+    #[test]
+    fn extract_definitions_go() {
+        let chunks = vec![make_file_chunk(
+            "main.go",
+            "go",
+            &[("func Parse(input string) error {", 1)],
+        )];
+        let defs = extract_definitions_from_diff(&chunks);
+        assert!(defs.iter().any(|d| d.name == "Parse"));
+    }
+
+    #[test]
+    fn extract_definitions_dedups_within_file() {
+        let chunks = vec![make_file_chunk(
+            "src/lib.rs",
+            "rs",
+            &[("fn helper() {}", 1), ("fn helper() {}", 2)],
+        )];
+        let defs = extract_definitions_from_diff(&chunks);
+        assert_eq!(defs.iter().filter(|d| d.name == "helper").count(), 1);
+    }
 
     #[test]
     fn extract_rust_function_calls() {
