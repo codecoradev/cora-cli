@@ -35,6 +35,8 @@ pub struct Config {
     pub temperature: f32,
     /// Max tokens for LLM responses.
     pub max_tokens: u32,
+    /// JSON parameter name for max tokens (e.g. "max_tokens" or "max_output_tokens").
+    pub max_tokens_param: String,
     /// HTTP timeout in seconds for LLM requests.
     pub timeout: u64,
     /// Cache TTL in minutes for review caching.
@@ -126,6 +128,7 @@ impl Default for Config {
             scan_system_prompt_file: None,
             temperature: 0.0,
             max_tokens: 4096,
+            max_tokens_param: "auto".to_string(),
             timeout: 600,
             cache_ttl: 1440, // 24h in minutes
             static_analysis: StaticAnalysisConfig::default(),
@@ -297,6 +300,11 @@ pub struct LlmSection {
     pub temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
+    /// Name of the max tokens parameter to use in API requests.
+    /// Supported values: `"auto"` (detect from provider), `"max_tokens"`,
+    /// `"max_output_tokens"`, `"max_completion_tokens"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens_param: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -448,6 +456,9 @@ impl CoraFile {
             }
             if let Some(v) = llm.cache_ttl {
                 config.cache_ttl = v;
+            }
+            if let Some(ref v) = llm.max_tokens_param {
+                config.max_tokens_param = v.clone();
             }
         }
         if let Some(re) = &self.rules_engine {
@@ -1038,6 +1049,7 @@ llm:
             llm: Some(LlmSection {
                 temperature: Some(0.7),
                 max_tokens: None,
+                max_tokens_param: None,
                 timeout: None,
                 cache_ttl: None,
             }),
@@ -1058,6 +1070,7 @@ llm:
             llm: Some(LlmSection {
                 temperature: None,
                 max_tokens: Some(2048),
+                max_tokens_param: None,
                 timeout: None,
                 cache_ttl: None,
             }),
@@ -1074,6 +1087,7 @@ llm:
             llm: Some(LlmSection {
                 temperature: None,
                 max_tokens: None,
+                max_tokens_param: None,
                 timeout: Some(300),
                 cache_ttl: None,
             }),
@@ -1090,6 +1104,7 @@ llm:
             llm: Some(LlmSection {
                 temperature: Some(1.0),
                 max_tokens: Some(16384),
+                max_tokens_param: None,
                 timeout: Some(240),
                 cache_ttl: Some(2880),
             }),
@@ -1134,6 +1149,7 @@ provider:
             llm: Some(LlmSection {
                 temperature: Some(0.5),
                 max_tokens: Some(8192),
+                max_tokens_param: None,
                 timeout: Some(60),
                 cache_ttl: None,
             }),
@@ -1277,5 +1293,56 @@ bundling:
             back.strategy,
             Some(crate::engine::bundling::GroupingStrategy::Smart)
         );
+    }
+
+    // ─── max_tokens_param ───
+
+    #[test]
+    fn config_default_max_tokens_param() {
+        let cfg = Config::default();
+        assert_eq!(cfg.max_tokens_param, "auto");
+    }
+
+    #[test]
+    fn merge_llm_max_tokens_param_explicit() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            llm: Some(LlmSection {
+                max_tokens_param: Some("max_output_tokens".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg).unwrap();
+        assert_eq!(cfg.max_tokens_param, "max_output_tokens");
+    }
+
+    #[test]
+    fn merge_llm_max_tokens_param_absent_leaves_default() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            llm: Some(LlmSection {
+                temperature: Some(0.5),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg).unwrap();
+        assert_eq!(cfg.max_tokens_param, "auto");
+    }
+
+    #[test]
+    fn llm_section_yaml_roundtrip_with_max_tokens_param() {
+        let section = LlmSection {
+            temperature: Some(0.7),
+            max_tokens: Some(8192),
+            max_tokens_param: Some("max_output_tokens".to_string()),
+            timeout: Some(300),
+            cache_ttl: Some(60),
+        };
+        let yaml = serde_yaml_ng::to_string(&section).unwrap();
+        let back: LlmSection = serde_yaml_ng::from_str(&yaml).unwrap();
+        assert_eq!(back.max_tokens_param, Some("max_output_tokens".to_string()));
+        assert_eq!(back.max_tokens, Some(8192));
     }
 }
