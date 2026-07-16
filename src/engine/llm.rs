@@ -453,7 +453,7 @@ pub async fn review_diff(
                 "{}\n\nIMPORTANT: Your response MUST contain only valid JSON. \
                 Ensure all strings use proper JSON escape sequences. \
                 Do NOT use raw backslashes in string values.",
-                &user_prompt
+                user_prompt
             );
             let (retry_raw, retry_usage) = chat_completion(
                 llm_config,

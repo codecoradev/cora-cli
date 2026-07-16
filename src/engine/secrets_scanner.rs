@@ -149,9 +149,21 @@ pub fn scan_secrets(chunks: &[FileChunk], max_findings: usize) -> Vec<RuleFindin
                                 mask_secret(matched)
                             ),
                         });
+                        if findings.len() >= max_findings {
+                            break;
+                        }
                     }
                 }
+                if findings.len() >= max_findings {
+                    break;
+                }
             }
+            if findings.len() >= max_findings {
+                break;
+            }
+        }
+        if findings.len() >= max_findings {
+            break;
         }
     }
 

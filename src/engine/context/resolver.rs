@@ -145,6 +145,9 @@ fn resolve_symbols(
     let mut entries = Vec::new();
     let mut seen_files: HashMap<String, Vec<(u32, u32)>> = HashMap::new(); // track line ranges per file
 
+    // File content cache to avoid re-reading the same files from disk
+    let mut file_cache: HashMap<std::path::PathBuf, String> = HashMap::new();
+
     for sym in symbols {
         // Determine the language from the file extension
         let lang = Path::new(&sym.file)
@@ -154,8 +157,12 @@ fn resolve_symbols(
 
         let resolved = match &sym.kind {
             SymbolKind::Import(path) => resolve_import(path, &sym.file, lang, project_root),
-            SymbolKind::FunctionCall(name) => resolve_function(name, &sym.file, lang, project_root),
-            SymbolKind::TypeRef(name) => resolve_type(name, &sym.file, lang, project_root),
+            SymbolKind::FunctionCall(name) => {
+                resolve_function(name, &sym.file, lang, project_root, &mut file_cache)
+            }
+            SymbolKind::TypeRef(name) => {
+                resolve_type(name, &sym.file, lang, project_root, &mut file_cache)
+            }
         };
 
         for entry in resolved {
@@ -344,6 +351,7 @@ fn resolve_function(
     source_file: &str,
     lang: &str,
     project_root: &Path,
+    file_cache: &mut HashMap<std::path::PathBuf, String>,
 ) -> Vec<ContextEntry> {
     let mut entries = Vec::new();
 
@@ -370,7 +378,9 @@ fn resolve_function(
                             continue;
                         }
 
-                        if let Some((start, end)) = find_fn_in_file(&path, name, "rs") {
+                        if let Some((start, end)) =
+                            find_fn_in_file_cached(&path, name, "rs", file_cache)
+                        {
                             entries.push(ContextEntry {
                                 file: rel_str,
                                 line_start: start,
@@ -397,7 +407,9 @@ fn resolve_function(
                             continue;
                         }
 
-                        if let Some((start, end)) = find_fn_in_file(&path, name, "py") {
+                        if let Some((start, end)) =
+                            find_fn_in_file_cached(&path, name, "py", file_cache)
+                        {
                             entries.push(ContextEntry {
                                 file: rel_str,
                                 line_start: start,
@@ -421,7 +433,8 @@ fn resolve_function(
                             continue;
                         }
 
-                        if let Some((start, end)) = find_fn_generic(&path, name) {
+                        if let Some((start, end)) = find_fn_generic_cached(&path, name, file_cache)
+                        {
                             entries.push(ContextEntry {
                                 file: rel_str,
                                 line_start: start,
@@ -445,6 +458,7 @@ fn resolve_type(
     source_file: &str,
     lang: &str,
     project_root: &Path,
+    file_cache: &mut HashMap<std::path::PathBuf, String>,
 ) -> Vec<ContextEntry> {
     let search_dir = Path::new(source_file).parent().unwrap_or(Path::new(""));
     let mut entries = Vec::new();
@@ -466,7 +480,8 @@ fn resolve_type(
                     continue;
                 }
 
-                if let Some((start, end)) = find_pattern_in_file(&path, &pattern) {
+                if let Some((start, end)) = find_pattern_in_file_cached(&path, &pattern, file_cache)
+                {
                     entries.push(ContextEntry {
                         file: rel_str,
                         line_start: start,
@@ -482,35 +497,66 @@ fn resolve_type(
     entries
 }
 
-/// Find a function definition in a file and return (start_line, end_line).
-fn find_fn_in_file(path: &Path, name: &str, lang: &str) -> Option<(u32, u32)> {
-    let content = std::fs::read_to_string(path).ok()?;
+/// Cached version of `find_fn_in_file` — avoids re-reading files from disk.
+fn find_fn_in_file_cached(
+    path: &Path,
+    name: &str,
+    lang: &str,
+    file_cache: &mut HashMap<PathBuf, String>,
+) -> Option<(u32, u32)> {
+    let content = get_file_cached(path, file_cache)?;
 
     let pattern = match lang {
         "rs" => format!("fn {name}"),
         "py" => format!("def {name}"),
-        _ => return find_fn_generic(path, name),
+        _ => return find_fn_generic_cached(path, name, file_cache),
     };
 
-    let max_lines = match lang {
-        "rs" => MAX_FN_LINES,
-        "py" => MAX_FN_LINES,
-        _ => MAX_FN_LINES,
-    };
-
-    find_pattern_with_body(&content, &pattern, max_lines)
+    find_pattern_with_body(&content, &pattern, MAX_FN_LINES)
 }
 
 /// Generic function search (for languages without specific patterns).
+#[allow(dead_code)]
 fn find_fn_generic(path: &Path, name: &str) -> Option<(u32, u32)> {
     let content = std::fs::read_to_string(path).ok()?;
     find_pattern_with_body(&content, &format!("fn {name}"), MAX_FN_LINES)
 }
 
+/// Cached version of `find_fn_generic`.
+fn find_fn_generic_cached(
+    path: &Path,
+    name: &str,
+    file_cache: &mut HashMap<PathBuf, String>,
+) -> Option<(u32, u32)> {
+    let content = get_file_cached(path, file_cache)?;
+    find_pattern_with_body(&content, &format!("fn {name}"), MAX_FN_LINES)
+}
+
 /// Find a pattern (like `struct Foo`) and determine its extent.
+#[allow(dead_code)]
 fn find_pattern_in_file(path: &Path, pattern: &str) -> Option<(u32, u32)> {
     let content = std::fs::read_to_string(path).ok()?;
     find_pattern_with_body(&content, pattern, MAX_TYPE_LINES)
+}
+
+/// Cached version of `find_pattern_in_file`.
+fn find_pattern_in_file_cached(
+    path: &Path,
+    pattern: &str,
+    file_cache: &mut HashMap<PathBuf, String>,
+) -> Option<(u32, u32)> {
+    let content = get_file_cached(path, file_cache)?;
+    find_pattern_with_body(&content, pattern, MAX_TYPE_LINES)
+}
+
+/// Read a file from disk, using the cache if available.
+fn get_file_cached(path: &Path, cache: &mut HashMap<PathBuf, String>) -> Option<String> {
+    if let Some(content) = cache.get(path) {
+        return Some(content.clone());
+    }
+    let content = std::fs::read_to_string(path).ok()?;
+    cache.insert(path.to_path_buf(), content.clone());
+    Some(content)
 }
 
 /// Find a pattern in content and estimate the block extent by counting braces/indents.

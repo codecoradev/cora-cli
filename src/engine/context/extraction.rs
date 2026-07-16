@@ -274,14 +274,15 @@ pub fn extract_symbols_from_diff(
                     continue;
                 }
 
+                // Early cutoff: stop processing lines for this file once cap is reached
+                if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
+                    break;
+                }
+
                 let language = &file.language;
                 let symbols = extract_symbols_from_line(&line.content, language);
 
                 for sym in symbols {
-                    if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
-                        break;
-                    }
-
                     let key = format!("{sym}");
                     if seen.insert((key, file_path.to_string())) {
                         all_symbols.push(ExtractedSymbol {
@@ -291,8 +292,17 @@ pub fn extract_symbols_from_diff(
                             raw: line.content.clone(),
                         });
                         file_symbol_count += 1;
+                        if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
+                            break;
+                        }
                     }
                 }
+                if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
+                    break;
+                }
+            }
+            if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
+                break;
             }
         }
 
