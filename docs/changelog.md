@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Config Validation & Best Practices (#334)
+
+- **Quality gate no longer fails when disabled (#58).** `evaluate()` now forces `GateResult::Pass` when `enabled: false` instead of applying thresholds.
+- **Category actions are now validated enums (#57).** `quality_gate.categories.*.action` is a case-insensitive `CategoryAction` enum (`block`/`warn`/`ignore`); unknown values fail loudly at config load instead of silently becoming blocking.
+- **Config values are validated (#94).** `Config::validate()` rejects out-of-range/unsupported values at load: `temperature` (0.0–2.0), `max_tokens`/`timeout` (≥1), `max_tokens_param`, `response_format`, `output.format`, `hook.*`, and `provider.base_url`.
+- **Profile values are validated (#81).** Focus `weight` must be 1–10; `action`/`tone`/`detail_level` must be recognized.
+- **`deny_unknown_fields` on all config sections (#80).** Misspelled YAML keys are rejected at parse time.
+
 ## [0.6.2] - 2026-06-21
 
 ### Fixed — Token Usage Tracking

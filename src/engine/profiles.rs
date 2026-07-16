@@ -124,6 +124,54 @@ pub struct InlineProfileRef {
 
 // ─── Profile operations ───
 
+impl Profile {
+    /// Validate profile values (#81): focus weights must be 1-10, actions and
+    /// review-style enums must be recognized. Unknown values fail loudly so a
+    /// typo (e.g. `weight: 15` or `action: blok`) does not silently change
+    /// review behavior.
+    pub fn validate(&self) -> Result<(), String> {
+        const VALID_ACTIONS: &[&str] = &["block", "warn", "info"];
+        const VALID_TONES: &[&str] = &["strict", "standard", "gentle"];
+        const VALID_DETAILS: &[&str] = &["minimal", "standard", "high", "exhaustive"];
+        let mut errs: Vec<String> = Vec::new();
+
+        for area in &self.focus_areas {
+            if !(1..=10).contains(&area.weight) {
+                errs.push(format!(
+                    "profile focus area '{}' weight must be 1-10, got: {}",
+                    area.id, area.weight
+                ));
+            }
+            if !VALID_ACTIONS.contains(&area.action.as_str()) {
+                errs.push(format!(
+                    "profile focus area '{}' action must be one of {:?}, got: '{}'",
+                    area.id, VALID_ACTIONS, area.action
+                ));
+            }
+        }
+
+        let style = &self.review_style;
+        if !style.tone.is_empty() && !VALID_TONES.contains(&style.tone.as_str()) {
+            errs.push(format!(
+                "profile review_style.tone must be one of {:?}, got: '{}'",
+                VALID_TONES, style.tone
+            ));
+        }
+        if !style.detail_level.is_empty() && !VALID_DETAILS.contains(&style.detail_level.as_str()) {
+            errs.push(format!(
+                "profile review_style.detail_level must be one of {:?}, got: '{}'",
+                VALID_DETAILS, style.detail_level
+            ));
+        }
+
+        if errs.is_empty() {
+            Ok(())
+        } else {
+            Err(errs.join("; "))
+        }
+    }
+}
+
 /// Load a built-in profile by name. Returns `None` if not found.
 pub fn load_builtin(name: &str) -> Option<Profile> {
     let yaml = match name {
@@ -459,5 +507,62 @@ mod tests {
         let back: Profile = serde_yaml_ng::from_str(&yaml).unwrap();
         assert_eq!(back.name, p.name);
         assert_eq!(back.focus_areas.len(), p.focus_areas.len());
+    }
+
+    // ─── #81: Profile::validate ───
+
+    #[test]
+    fn validate_accepts_all_builtins() {
+        for name in BUILTIN_PROFILES {
+            let p = load_builtin(name).unwrap_or_else(|| panic!("missing builtin {name}"));
+            assert!(p.validate().is_ok(), "builtin '{name}' failed validation");
+        }
+    }
+
+    #[test]
+    fn validate_rejects_weight_out_of_range() {
+        let p = Profile {
+            name: "test".into(),
+            focus_areas: vec![FocusArea {
+                id: "x".into(),
+                weight: 15,
+                action: "warn".into(),
+                rules: vec![],
+            }],
+            ..Default::default()
+        };
+        let err = p.validate().unwrap_err();
+        assert!(err.contains("weight"), "err: {err}");
+    }
+
+    #[test]
+    fn validate_rejects_unknown_action() {
+        let p = Profile {
+            name: "test".into(),
+            focus_areas: vec![FocusArea {
+                id: "x".into(),
+                weight: 5,
+                action: "blok".into(), // typo
+                rules: vec![],
+            }],
+            ..Default::default()
+        };
+        let err = p.validate().unwrap_err();
+        assert!(err.contains("action"), "err: {err}");
+    }
+
+    #[test]
+    fn validate_rejects_unknown_tone() {
+        let p = Profile {
+            name: "test".into(),
+            review_style: ReviewStyle {
+                tone: "angry".into(),
+                detail_level: "standard".into(),
+                suggest_fixes: true,
+                max_findings: None,
+            },
+            ..Default::default()
+        };
+        assert!(p.validate().is_err());
     }
 }
