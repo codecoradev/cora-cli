@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Deeper, token-economical cross-file review context
+
+- **Inbound caller (blast-radius) resolution.** Reviews now also resolve **who calls the changed code**, not just what the changed code calls. A changed function/type signature surfaces its call-sites across the repo so breaking changes can be flagged. Gated by new `review.context_chain.include_callers` (default `true`); uses gitignore-aware walking and is bounded (≤400 files, ≤3 call-sites/symbol), injecting only the call line + 1 line of context to stay cheap.
+- **Definition extraction** (`extract_definitions_from_diff`) for Rust/Python/JS-TS/Go/Java-Kotlin — detects functions/types *declared* in the diff, which feed caller resolution.
+- **Signature-only budget fallback.** When the token budget can't fit a full function/type body, a thin signature slice is injected instead of skipping the entry entirely (~3-5× more symbols under the same budget).
+
+### Fixed — Cross-file context correctness & defaults
+
+- **`review.rs` passed the wrong ignore list** to the context resolver (`ignore.rules` — finding-type strings — instead of `ignore.files` globs). The resolver could inject code from `node_modules/`/`target/`. Now uses `ignore.files`.
+- **`context_chain.max_context_tokens` default raised 3000 → 5000**, and the resolver never scans gitignored build artifacts (caller scan uses the `ignore` crate).
+
 ### Fixed — Minor Best-Practice Items (#334)
 
 - **Test-file detection no longer over-matches (#87).** `is_test_file` now uses path-segment awareness, so common words like `latest`, `aspect`, `attestation`, `protest` are no longer mistaken for test files.

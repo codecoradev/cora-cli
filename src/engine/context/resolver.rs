@@ -13,11 +13,12 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use regex::Regex;
 use tracing::debug;
 
 use super::types::{
-    ContextChain, ContextConfig, ContextEntry, ContextPriority, ContextStats, ExtractedSymbol,
-    SymbolKind, estimate_tokens,
+    ContextChain, ContextConfig, ContextEntry, ContextPriority, ContextStats, DefinedSymbol,
+    DefinitionKind, ExtractedSymbol, SymbolKind, estimate_tokens,
 };
 
 /// Maximum lines to read per symbol definition (prevents reading huge functions).
@@ -26,6 +27,16 @@ const MAX_FN_LINES: usize = 50;
 const MAX_TYPE_LINES: usize = 50;
 /// Maximum lines to read per test function.
 const MAX_TEST_LINES: usize = 30;
+/// Lines to read per caller (blast-radius) call-site: the call line + context.
+const MAX_CALLER_LINES: usize = 4;
+/// Maximum number of source files to scan when resolving callers.
+const MAX_CALLER_FILES_SCAN: usize = 400;
+/// Maximum call-sites injected per changed symbol (keeps callers token-cheap).
+const MAX_CALLERS_PER_SYMBOL: usize = 3;
+/// Source extensions scanned for caller resolution.
+const CALLER_SCAN_EXTS: &[&str] = &[
+    "rs", "py", "pyi", "ts", "tsx", "js", "jsx", "mjs", "cjs", "go", "java", "kt", "kts",
+];
 
 /// Safely join a relative path with a project root, verifying that the
 /// resulting path stays within the project root (prevents path traversal).
@@ -60,11 +71,12 @@ fn safe_join(project_root: &Path, relative: &str) -> Option<PathBuf> {
 /// This is the main entry point: extract → resolve → read → budget → assemble.
 pub fn build_context_chain(
     symbols: &[ExtractedSymbol],
+    defs: &[DefinedSymbol],
     config: &ContextConfig,
     project_root: &Path,
     ignore_patterns: &[String],
 ) -> ContextChain {
-    if !config.enabled || symbols.is_empty() {
+    if !config.enabled || (symbols.is_empty() && defs.is_empty()) {
         return ContextChain::default();
     }
 
@@ -73,7 +85,7 @@ pub fn build_context_chain(
         ..Default::default()
     };
 
-    // Phase 1: Resolve symbols to file locations
+    // Phase 1: Resolve outbound symbols to file locations (what changed code calls)
     let mut entries = resolve_symbols(symbols, config, project_root, ignore_patterns, &mut stats);
 
     // Phase 2: Add test file mappings
@@ -81,21 +93,36 @@ pub fn build_context_chain(
         add_test_mappings(symbols, project_root, &mut entries, &mut stats);
     }
 
-    // Sort by priority (FunctionDef first, Test last)
+    // Phase 3: Resolve inbound callers (blast radius — who calls changed code)
+    entries.extend(resolve_callers(defs, config, project_root, ignore_patterns));
+
+    // Sort by priority (FunctionDef first, CallerSite last)
     entries.sort_by_key(|e| e.priority);
 
-    // Phase 3: Read file content under budget
+    // Phase 4: Read file content under budget
     let mut budget = config.max_context_tokens;
     let mut parts = Vec::new();
 
     for entry in &entries {
         let content = read_entry_content(entry, project_root);
-        if content.is_empty() {
-            continue;
-        }
-
         let tokens = estimate_tokens(&content);
+
         if tokens > budget {
+            // Tier 3: signature-only fallback — inject a thin slice instead of
+            // skipping the entry entirely. Keeps high-value defs under budget.
+            if let Some(sig) = signature_only(entry, project_root) {
+                let sig_tokens = estimate_tokens(&sig);
+                if sig_tokens > 0 && sig_tokens <= budget {
+                    budget -= sig_tokens;
+                    stats.entries_read += 1;
+                    stats.estimated_tokens += sig_tokens;
+                    parts.push(format!(
+                        "--- {}:{}-{} ({}, signature only) ---\n{}",
+                        entry.file, entry.line_start, entry.line_end, entry.label, sig
+                    ));
+                    continue;
+                }
+            }
             stats.budget_hit = true;
             debug!(
                 entry = %entry.label,
@@ -103,6 +130,10 @@ pub fn build_context_chain(
                 remaining_budget = budget,
                 "skipping context entry (budget exhausted)"
             );
+            continue;
+        }
+
+        if content.is_empty() {
             continue;
         }
 
@@ -678,6 +709,141 @@ fn find_go_package_file(dir: &Path, import_path: &str) -> Option<ContextEntry> {
 }
 
 /// Check if a file path matches any ignore pattern.
+/// Resolve **callers** (blast radius) of functions/types defined in the diff.
+///
+/// This is the inbound counterpart to outbound symbol resolution: instead of
+/// "what does the changed code call", it answers "who calls the changed code" —
+/// the most valuable context for flagging breaking signature/type changes.
+///
+/// Uses gitignore-aware walking (the `ignore` crate) so build artifacts are
+/// never scanned, and is bounded by [`MAX_CALLER_FILES_SCAN`] files and
+/// [`MAX_CALLERS_PER_SYMBOL`] call-sites per symbol. Caller slices are tiny
+/// (the call line + 1 line of context) to stay token-economical.
+fn resolve_callers(
+    defs: &[DefinedSymbol],
+    config: &ContextConfig,
+    project_root: &Path,
+    ignore_patterns: &[String],
+) -> Vec<ContextEntry> {
+    if !config.include_callers || defs.is_empty() {
+        return Vec::new();
+    }
+
+    // Precompile a matcher per definition. Skip names that are too short/noisy.
+    let matchers: Vec<(&DefinedSymbol, Regex)> = defs
+        .iter()
+        .filter_map(|d| {
+            if d.name.len() < 2 {
+                return None;
+            }
+            let pattern = match d.kind {
+                DefinitionKind::Function => format!(r"\b{}\s*\(", regex::escape(&d.name)),
+                DefinitionKind::Type => format!(r"\b{}\b", regex::escape(&d.name)),
+            };
+            Regex::new(&pattern).ok().map(|r| (d, r))
+        })
+        .collect();
+    if matchers.is_empty() {
+        return Vec::new();
+    }
+
+    let walker = ignore::WalkBuilder::new(project_root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    let mut entries = Vec::new();
+    let mut files_scanned = 0usize;
+
+    for dent in walker {
+        if files_scanned >= MAX_CALLER_FILES_SCAN {
+            break;
+        }
+        let dent = match dent {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        if !dent.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            continue;
+        }
+        let path = dent.path();
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if !CALLER_SCAN_EXTS.contains(&ext) {
+            continue;
+        }
+
+        let rel = match path.strip_prefix(project_root) {
+            Ok(r) => r.to_string_lossy().replace('\\', "/").to_string(),
+            Err(_) => continue,
+        };
+        if is_ignored(&rel, ignore_patterns) {
+            continue;
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        files_scanned += 1;
+
+        for (def, re) in &matchers {
+            // The defining file is not a "caller" of its own symbol.
+            if def.file == rel {
+                continue;
+            }
+            let mut hits = 0usize;
+            for (idx, line) in content.lines().enumerate() {
+                if hits >= MAX_CALLERS_PER_SYMBOL {
+                    break;
+                }
+                if re.is_match(line) {
+                    let ln = (idx + 1) as u32;
+                    let label = match def.kind {
+                        DefinitionKind::Function => format!("caller of fn {}", def.name),
+                        DefinitionKind::Type => format!("usage of {}", def.name),
+                    };
+                    entries.push(ContextEntry {
+                        file: rel.clone(),
+                        line_start: ln.saturating_sub(1).max(1),
+                        line_end: ln + 1,
+                        label,
+                        priority: ContextPriority::CallerSite,
+                    });
+                    hits += 1;
+                }
+            }
+        }
+    }
+
+    debug!(
+        callers_found = entries.len(),
+        files_scanned, "resolved callers"
+    );
+    entries
+}
+
+/// Extract just the signature (not the full body) of a definition, for the
+/// budget-aware fallback. Reads up to the opening `{` or a few lines.
+fn signature_only(entry: &ContextEntry, project_root: &Path) -> Option<String> {
+    let full = safe_join(project_root, &entry.file).filter(|p| p.exists())?;
+    let content = std::fs::read_to_string(&full).ok()?;
+    let start = entry.line_start.saturating_sub(1) as usize;
+    let mut sig: Vec<&str> = Vec::new();
+    for line in content.lines().skip(start).take(8) {
+        sig.push(line);
+        if line.contains('{') || sig.len() >= 4 {
+            break;
+        }
+    }
+    if sig.is_empty() {
+        None
+    } else {
+        Some(sig.join("\n"))
+    }
+}
+
 fn is_ignored(file: &str, patterns: &[String]) -> bool {
     for pattern in patterns {
         // Simple glob-like matching: check if file contains the pattern
@@ -825,6 +991,7 @@ fn read_entry_content(entry: &ContextEntry, project_root: &Path) -> String {
         ContextPriority::FunctionDef => MAX_FN_LINES,
         ContextPriority::TypeDef => MAX_TYPE_LINES,
         ContextPriority::Test => MAX_TEST_LINES,
+        ContextPriority::CallerSite => MAX_CALLER_LINES,
     };
 
     if result.lines().count() > max_lines {
@@ -964,14 +1131,14 @@ mod tests {
             enabled: false,
             ..Default::default()
         };
-        let chain = build_context_chain(&[], &config, Path::new("/tmp"), &[]);
+        let chain = build_context_chain(&[], &[], &config, Path::new("/tmp"), &[]);
         assert!(chain.text.is_empty());
     }
 
     #[test]
     fn empty_symbols_returns_empty() {
         let config = ContextConfig::default();
-        let chain = build_context_chain(&[], &config, Path::new("/tmp"), &[]);
+        let chain = build_context_chain(&[], &[], &config, Path::new("/tmp"), &[]);
         assert!(chain.text.is_empty());
     }
 
@@ -983,6 +1150,7 @@ mod tests {
             max_context_tokens: 5, // very small
             follow_depth: 1,
             include_tests: false,
+            include_callers: false,
         };
 
         let symbols = vec![ExtractedSymbol {
@@ -992,7 +1160,7 @@ mod tests {
             raw: "some_func()".to_string(),
         }];
 
-        let chain = build_context_chain(&symbols, &config, Path::new("/tmp"), &[]);
+        let chain = build_context_chain(&symbols, &[], &config, Path::new("/tmp"), &[]);
         // Even if resolution finds nothing, the chain should be empty
         assert!(chain.text.is_empty() || chain.stats.budget_hit);
     }
@@ -1006,6 +1174,7 @@ mod tests {
             max_context_tokens: 100,
             follow_depth: 1,
             include_tests: false,
+            include_callers: false,
         };
 
         let symbols = vec![ExtractedSymbol {
@@ -1015,9 +1184,94 @@ mod tests {
             raw: "use crate::engine::scanner;".to_string(),
         }];
 
-        let chain = build_context_chain(&symbols, &config, Path::new("/tmp"), &[]);
+        let chain = build_context_chain(&symbols, &[], &config, Path::new("/tmp"), &[]);
         // With a nonexistent project root, nothing should resolve
         assert!(chain.text.is_empty());
         assert_eq!(chain.stats.symbols_extracted, 1);
+    }
+
+    // ─── caller (blast-radius) resolution ───
+
+    #[test]
+    fn resolve_callers_finds_call_site() {
+        use crate::engine::context::types::{DefinedSymbol, DefinitionKind};
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(
+            root.join("src/caller.rs"),
+            "fn caller() {\n    validate_token(t);\n}\n",
+        )
+        .unwrap();
+
+        let defs = vec![DefinedSymbol {
+            name: "validate_token".to_string(),
+            kind: DefinitionKind::Function,
+            file: "src/auth.rs".to_string(),
+        }];
+        let entries = resolve_callers(&defs, &ContextConfig::default(), root, &[]);
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.file == "src/caller.rs" && e.label.contains("validate_token")),
+            "should resolve the caller site: {entries:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_callers_skips_defining_file_and_respects_disable() {
+        use crate::engine::context::types::{DefinedSymbol, DefinitionKind};
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        // The defining file itself contains the call — it must not self-report.
+        std::fs::write(
+            root.join("src/auth.rs"),
+            "fn auth() { validate_token(t); }\n",
+        )
+        .unwrap();
+
+        let defs = vec![DefinedSymbol {
+            name: "validate_token".to_string(),
+            kind: DefinitionKind::Function,
+            file: "src/auth.rs".to_string(),
+        }];
+
+        // include_callers = true but only the defining file matches → no entries.
+        let entries = resolve_callers(&defs, &ContextConfig::default(), root, &[]);
+        assert!(
+            entries.is_empty(),
+            "defining file must not be its own caller"
+        );
+
+        // include_callers = false → no entries regardless.
+        let cfg = ContextConfig {
+            include_callers: false,
+            ..Default::default()
+        };
+        assert!(resolve_callers(&defs, &cfg, root, &[]).is_empty());
+    }
+
+    // ─── signature-only fallback ───
+
+    #[test]
+    fn signature_only_returns_header_without_body() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(
+            root.join("big.rs"),
+            "pub fn big(x: i32) -> i32 {\n    let y = 1;\n    y + x\n}\n",
+        )
+        .unwrap();
+        let entry = ContextEntry {
+            file: "big.rs".to_string(),
+            line_start: 1,
+            line_end: 4,
+            label: "fn big".to_string(),
+            priority: ContextPriority::FunctionDef,
+        };
+        let sig = signature_only(&entry, root).expect("signature should be extracted");
+        assert!(sig.contains("pub fn big"), "sig: {sig}");
+        assert!(!sig.contains("y + x"), "body must not be included: {sig}");
     }
 }

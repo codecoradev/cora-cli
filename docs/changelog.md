@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Deeper cross-file review context (token-economical)
+
+- **Caller/blast-radius resolution**: reviews now resolve who *calls* changed code (not just what changed code calls). `review.context_chain.include_callers` (default `true`); bounded scan, thin slices.
+- **Definition extraction** (Rust/Python/JS-TS/Go/Java-Kotlin) feeds caller resolution.
+- **Signature-only budget fallback**: injects a signature slice when the full body won't fit.
+
+### Fixed
+
+- `review.rs` passed `ignore.rules` instead of `ignore.files` to the context resolver (could inject `node_modules`/`target` code).
+- `context_chain.max_context_tokens` default 3000 → 5000.
+
 ### Fixed — Minor Best-Practice Items (#334)
 
 - **#87** test-file detection uses path-segment awareness (no more `latest`/`aspect`/`attestation` false matches).

@@ -185,11 +185,13 @@ async fn review_diff_inner(
     };
 
     // Build context chain (cross-file dependency extraction)
+    // NOTE: pass ignore.files (e.g. target/**, node_modules/**) so the resolver
+    // never injects build-artifact code — not ignore.rules (finding-type strings).
     let context_chain = crate::engine::context::build_context_chain(
         &diff_chunks,
         &config.context_chain,
         std::env::current_dir().unwrap_or_default().as_path(),
-        &config.ignore.rules,
+        &config.ignore.files,
     );
 
     let final_context = if !context_chain.text.is_empty() {
