@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Markdown False Positives (#329)
+
+- **Findings inside Markdown fenced code blocks are now suppressed.** A `git push` inside a ` ```bash ` block in an `.md` file is no longer flagged as SQL injection. Covers all finding sources (security/secrets/rules + LLM); tracks fence state across full hunk context (Add + Context lines).
+
 ### Fixed — Config Validation & Best Practices (#334)
 
 - **Quality gate no longer fails when disabled (#58).** `evaluate()` now forces `GateResult::Pass` when `enabled: false` instead of applying thresholds.

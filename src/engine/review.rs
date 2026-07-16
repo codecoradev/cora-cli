@@ -292,6 +292,7 @@ async fn review_diff_inner(
                     tokens_used: None,
                     should_block: false,
                 };
+                fallback.issues = apply_markdown_code_block_filter(fallback.issues, &diff_chunks);
                 fallback.issues = apply_ignore_rules(fallback.issues, &config.ignore.rules);
                 let min_sev = config.hook.min_severity_level();
                 fallback.should_block = fallback
@@ -341,6 +342,11 @@ async fn review_diff_inner(
     // the added line at the reported file:line against the built-in
     // sec-hardcoded-secret regex.
     response.issues = apply_llm_secret_fp_filter(response.issues, &diff_chunks);
+
+    // Drop findings inside Markdown fenced code blocks (#329). Code blocks in
+    // `.md` files are documentation examples, not executable code — a `git push`
+    // inside a ```bash block is not SQL injection.
+    response.issues = apply_markdown_code_block_filter(response.issues, &diff_chunks);
 
     // Apply ignore rules: filter out issues matching ignored patterns
     response.issues = apply_ignore_rules(response.issues, &config.ignore.rules);
@@ -471,6 +477,67 @@ fn apply_llm_secret_fp_filter(
             filtered,
             remaining = issues.len(),
             "filtered LLM false positives for hardcoded secret findings"
+        );
+    }
+
+    issues
+}
+
+/// Drop findings located inside Markdown fenced code blocks (#329).
+///
+/// Code blocks in `.md`/`.mdx`/`.markdown` files are documentation examples,
+/// not executable code — e.g. a `git push` inside a ```bash block must not be
+/// flagged as SQL injection. Findings without a resolvable line, or in files
+/// without any code block, are kept unchanged (safe default).
+fn apply_markdown_code_block_filter(
+    mut issues: Vec<ReviewIssue>,
+    diff_chunks: &[crate::engine::diff_parser::FileChunk],
+) -> Vec<ReviewIssue> {
+    use crate::engine::markdown::{is_markdown, lines_inside_code_blocks};
+    use std::collections::HashSet;
+
+    // Build file path -> set of code-block line numbers, for markdown files only.
+    let mut code_block_lines: std::collections::HashMap<String, HashSet<u32>> =
+        std::collections::HashMap::new();
+    for chunk in diff_chunks {
+        let path = chunk
+            .new_path
+            .as_deref()
+            .or(chunk.old_path.as_deref())
+            .unwrap_or("");
+        if !is_markdown(path) {
+            continue;
+        }
+        let set = lines_inside_code_blocks(chunk);
+        if !set.is_empty() {
+            code_block_lines
+                .entry(path.to_string())
+                .or_default()
+                .extend(set);
+        }
+    }
+
+    if code_block_lines.is_empty() {
+        return issues; // no markdown code blocks in this diff — fast path
+    }
+
+    let before = issues.len();
+    issues.retain(|issue| {
+        let Some(ln) = issue.line else {
+            return true; // keep findings without a concrete line number
+        };
+        match code_block_lines.get(&issue.file) {
+            Some(lines) => !lines.contains(&ln), // drop if inside a code block
+            None => true,
+        }
+    });
+
+    let dropped = before - issues.len();
+    if dropped > 0 {
+        debug!(
+            dropped,
+            remaining = issues.len(),
+            "removed markdown code-block false positives"
         );
     }
 
@@ -788,5 +855,179 @@ mod tests {
         let rules = vec!["Hardcoded Password Or Secret".to_string()];
         let result = apply_ignore_rules(issues, &rules);
         assert!(result.is_empty());
+    }
+
+    // ─── #329: markdown fenced code-block false positives ───
+
+    #[test]
+    fn markdown_fp_filter_drops_finding_inside_code_block() {
+        use crate::engine::diff_parser::*;
+
+        // The exact #329 scenario: a `git push` inside a ```bash block in a
+        // markdown doc, flagged as SQL injection.
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("AGENT.md".to_string()),
+            language: "markdown".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 1,
+                old_count: 1,
+                new_start: 1,
+                new_count: 4,
+                header: String::new(),
+                lines: vec![
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "```bash".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(167),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "git push origin vX.Y.Z".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(168),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "```".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(169),
+                    },
+                ],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "AGENT.md".to_string(),
+            line: Some(168),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "SQL injection via string concatenation".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_markdown_code_block_filter(issues, &diff_chunks);
+        assert!(
+            result.is_empty(),
+            "finding inside a markdown code block must be dropped"
+        );
+    }
+
+    #[test]
+    fn markdown_fp_filter_keeps_finding_outside_code_block() {
+        use crate::engine::diff_parser::*;
+
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("doc.md".to_string()),
+            language: "markdown".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 1,
+                old_count: 1,
+                new_start: 1,
+                new_count: 3,
+                header: String::new(),
+                lines: vec![
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "```bash".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(1),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "echo hi".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(2),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "```".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(3),
+                    },
+                ],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        // Finding on line 5 (outside the block, in prose) must survive.
+        let issues = vec![ReviewIssue {
+            file: "doc.md".to_string(),
+            line: Some(5),
+            severity: Severity::Minor,
+            issue_type: Some("style".to_string()),
+            title: "typo".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_markdown_code_block_filter(issues, &diff_chunks);
+        assert_eq!(result.len(), 1, "finding outside a code block must be kept");
+    }
+
+    #[test]
+    fn markdown_fp_filter_keeps_findings_in_non_markdown_files() {
+        use crate::engine::diff_parser::*;
+
+        // A real .py file is never treated as markdown, even if it has ``` text.
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("src/app.py".to_string()),
+            language: "python".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 1,
+                old_count: 1,
+                new_start: 1,
+                new_count: 2,
+                header: String::new(),
+                lines: vec![DiffLine {
+                    line_type: DiffLineType::Add,
+                    content: "eval(request.body.code)".to_string(),
+                    old_line_no: None,
+                    new_line_no: Some(42),
+                }],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "src/app.py".to_string(),
+            line: Some(42),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "eval injection".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_markdown_code_block_filter(issues, &diff_chunks);
+        assert_eq!(result.len(), 1, "non-markdown files are unaffected");
+    }
+
+    #[test]
+    fn markdown_fp_filter_keeps_findings_without_line_number() {
+        // Findings with no resolvable line are kept (safe default).
+        let issues = vec![ReviewIssue {
+            file: "doc.md".to_string(),
+            line: None,
+            severity: Severity::Info,
+            issue_type: None,
+            title: "vague".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_markdown_code_block_filter(issues, &[]);
+        assert_eq!(result.len(), 1);
     }
 }
