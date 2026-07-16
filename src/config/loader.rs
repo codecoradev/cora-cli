@@ -299,6 +299,10 @@ pub fn load_config(
         config.output.color = false;
     }
 
+    // #94: validate semantic constraints after all sources are merged so typos
+    // and out-of-range values fail loudly at load instead of at runtime.
+    config.validate()?;
+
     Ok(config)
 }
 
