@@ -35,6 +35,8 @@ pub struct Config {
     pub temperature: f32,
     /// Max tokens for LLM responses.
     pub max_tokens: u32,
+    /// JSON parameter name for max tokens (e.g. "max_tokens" or "max_output_tokens").
+    pub max_tokens_param: String,
     /// HTTP timeout in seconds for LLM requests.
     pub timeout: u64,
     /// Cache TTL in minutes for review caching.
@@ -126,6 +128,7 @@ impl Default for Config {
             scan_system_prompt_file: None,
             temperature: 0.0,
             max_tokens: 4096,
+            max_tokens_param: "auto".to_string(),
             timeout: 600,
             cache_ttl: 1440, // 24h in minutes
             static_analysis: StaticAnalysisConfig::default(),
@@ -145,8 +148,121 @@ impl HookConfig {
     }
 }
 
+impl Config {
+    /// Validate semantic constraints on resolved config values (#94).
+    ///
+    /// Catches typos and out-of-range values that would otherwise propagate
+    /// silently to runtime (e.g. `temperature: 5.0`, an unsupported output
+    /// format, or a misspelled `max_tokens_param`). Called after merging all
+    /// config sources in `loader::load_config`.
+    pub fn validate(&self) -> std::result::Result<(), CoraError> {
+        let mut errs: Vec<String> = Vec::new();
+
+        // ── provider ──
+        if self.provider.provider.trim().is_empty() {
+            errs.push("provider.provider must not be empty".into());
+        }
+        let base = self.provider.base_url.trim();
+        let valid_scheme = base.is_empty()
+            || base.starts_with("http://")
+            || base.starts_with("https://")
+            || base.starts_with("ws://")
+            || base.starts_with("unix:");
+        if !valid_scheme {
+            errs.push(format!(
+                "provider.base_url must be an http(s) URL, got: {}",
+                self.provider.base_url
+            ));
+        }
+
+        // ── llm ──
+        if !(0.0..=2.0).contains(&self.temperature) {
+            errs.push(format!(
+                "llm.temperature must be between 0.0 and 2.0, got: {}",
+                self.temperature
+            ));
+        }
+        if self.max_tokens == 0 {
+            errs.push("llm.max_tokens must be at least 1".into());
+        }
+        if self.timeout == 0 {
+            errs.push("llm.timeout must be at least 1 second".into());
+        }
+        const VALID_TOKEN_PARAMS: &[&str] = &[
+            "auto",
+            "max_tokens",
+            "max_output_tokens",
+            "max_completion_tokens",
+        ];
+        if !VALID_TOKEN_PARAMS.contains(&self.max_tokens_param.as_str()) {
+            errs.push(format!(
+                "llm.max_tokens_param must be one of {:?}, got: {}",
+                VALID_TOKEN_PARAMS, self.max_tokens_param
+            ));
+        }
+
+        // ── response format ──
+        const VALID_RESPONSE_FORMATS: &[&str] = &["none", "json_object"];
+        if !VALID_RESPONSE_FORMATS.contains(&self.response_format.as_str()) {
+            errs.push(format!(
+                "review.response_format must be one of {:?}, got: {}",
+                VALID_RESPONSE_FORMATS, self.response_format
+            ));
+        }
+
+        // ── output ──
+        const VALID_OUTPUT_FORMATS: &[&str] = &["pretty", "json", "compact", "sarif"];
+        if !VALID_OUTPUT_FORMATS.contains(&self.output.format.as_str()) {
+            errs.push(format!(
+                "output.format must be one of {:?}, got: {}",
+                VALID_OUTPUT_FORMATS, self.output.format
+            ));
+        }
+
+        // ── hook ──
+        const VALID_HOOK_MODES: &[&str] = &["warn", "block"];
+        if !VALID_HOOK_MODES.contains(&self.hook.mode.as_str()) {
+            errs.push(format!(
+                "hook.mode must be one of {:?}, got: {}",
+                VALID_HOOK_MODES, self.hook.mode
+            ));
+        }
+        const VALID_VIOLATION: &[&str] = &["warn", "disallow"];
+        if !VALID_VIOLATION.contains(&self.hook.on_violation.as_str()) {
+            errs.push(format!(
+                "hook.on_violation must be one of {:?}, got: {}",
+                VALID_VIOLATION, self.hook.on_violation
+            ));
+        }
+        const VALID_SEVERITIES: &[&str] = &["critical", "major", "minor", "info"];
+        if !VALID_SEVERITIES.contains(&self.hook.min_severity.to_lowercase().as_str()) {
+            errs.push(format!(
+                "hook.min_severity must be one of {:?}, got: {}",
+                VALID_SEVERITIES, self.hook.min_severity
+            ));
+        }
+
+        // ── profile (#81) ──
+        if let Some(profile) = &self.profile {
+            if let Err(pe) = profile.validate() {
+                errs.push(pe);
+            }
+        }
+
+        if errs.is_empty() {
+            Ok(())
+        } else {
+            Err(CoraError::ConfigParse(format!(
+                "invalid configuration:\n  - {}",
+                errs.join("\n  - ")
+            )))
+        }
+    }
+}
+
 /// Serde-compatible schema for the `.cora.yaml` configuration file.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CoraFile {
     #[serde(
         default,
@@ -187,6 +303,7 @@ pub struct CoraFile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ProviderSection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
@@ -220,6 +337,7 @@ where
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct IgnoreSection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub files: Option<Vec<String>>,
@@ -228,6 +346,7 @@ pub struct IgnoreSection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct HookSection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
@@ -240,6 +359,7 @@ pub struct HookSection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct OutputSection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
@@ -249,6 +369,7 @@ pub struct OutputSection {
 
 /// Review-specific configuration section.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ReviewSection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<String>,
@@ -283,6 +404,7 @@ fn is_default<T: Default + PartialEq>(val: &T) -> bool {
 
 /// Scan-specific configuration section.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ScanSection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_prompt: Option<String>,
@@ -292,11 +414,17 @@ pub struct ScanSection {
 
 /// LLM-specific configuration section (temperature, `max_tokens`, timeout, `cache_ttl`).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct LlmSection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
+    /// Name of the max tokens parameter to use in API requests.
+    /// Supported values: `"auto"` (detect from provider), `"max_tokens"`,
+    /// `"max_output_tokens"`, `"max_completion_tokens"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens_param: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -309,6 +437,7 @@ fn default_max_findings() -> usize {
 
 /// Rule engine configuration section for `.cora.yaml`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RulesSection {
     #[serde(default, skip_serializing_if = "is_default")]
     pub enabled: bool,
@@ -320,6 +449,7 @@ pub struct RulesSection {
 
 /// File bundling configuration section for `.cora.yaml`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct BundlingSection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_chars_per_group: Option<usize>,
@@ -424,6 +554,9 @@ impl CoraFile {
             if let Some(sa) = &r.static_analysis {
                 config.static_analysis.clone_from(sa);
             }
+            if let Some(cc) = &r.context_chain {
+                config.context_chain.clone_from(cc);
+            }
         }
         if let Some(s) = &self.scan {
             if let Some(v) = &s.system_prompt {
@@ -445,6 +578,9 @@ impl CoraFile {
             }
             if let Some(v) = llm.cache_ttl {
                 config.cache_ttl = v;
+            }
+            if let Some(ref v) = llm.max_tokens_param {
+                config.max_tokens_param = v.clone();
             }
         }
         if let Some(re) = &self.rules_engine {
@@ -1035,6 +1171,7 @@ llm:
             llm: Some(LlmSection {
                 temperature: Some(0.7),
                 max_tokens: None,
+                max_tokens_param: None,
                 timeout: None,
                 cache_ttl: None,
             }),
@@ -1055,6 +1192,7 @@ llm:
             llm: Some(LlmSection {
                 temperature: None,
                 max_tokens: Some(2048),
+                max_tokens_param: None,
                 timeout: None,
                 cache_ttl: None,
             }),
@@ -1071,6 +1209,7 @@ llm:
             llm: Some(LlmSection {
                 temperature: None,
                 max_tokens: None,
+                max_tokens_param: None,
                 timeout: Some(300),
                 cache_ttl: None,
             }),
@@ -1087,6 +1226,7 @@ llm:
             llm: Some(LlmSection {
                 temperature: Some(1.0),
                 max_tokens: Some(16384),
+                max_tokens_param: None,
                 timeout: Some(240),
                 cache_ttl: Some(2880),
             }),
@@ -1131,6 +1271,7 @@ provider:
             llm: Some(LlmSection {
                 temperature: Some(0.5),
                 max_tokens: Some(8192),
+                max_tokens_param: None,
                 timeout: Some(60),
                 cache_ttl: None,
             }),
@@ -1274,5 +1415,132 @@ bundling:
             back.strategy,
             Some(crate::engine::bundling::GroupingStrategy::Smart)
         );
+    }
+
+    // ─── max_tokens_param ───
+
+    #[test]
+    fn config_default_max_tokens_param() {
+        let cfg = Config::default();
+        assert_eq!(cfg.max_tokens_param, "auto");
+    }
+
+    #[test]
+    fn merge_llm_max_tokens_param_explicit() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            llm: Some(LlmSection {
+                max_tokens_param: Some("max_output_tokens".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg).unwrap();
+        assert_eq!(cfg.max_tokens_param, "max_output_tokens");
+    }
+
+    #[test]
+    fn merge_llm_max_tokens_param_absent_leaves_default() {
+        let mut cfg = Config::default();
+        let cora = CoraFile {
+            llm: Some(LlmSection {
+                temperature: Some(0.5),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        cora.merge_into(&mut cfg).unwrap();
+        assert_eq!(cfg.max_tokens_param, "auto");
+    }
+
+    #[test]
+    fn llm_section_yaml_roundtrip_with_max_tokens_param() {
+        let section = LlmSection {
+            temperature: Some(0.7),
+            max_tokens: Some(8192),
+            max_tokens_param: Some("max_output_tokens".to_string()),
+            timeout: Some(300),
+            cache_ttl: Some(60),
+        };
+        let yaml = serde_yaml_ng::to_string(&section).unwrap();
+        let back: LlmSection = serde_yaml_ng::from_str(&yaml).unwrap();
+        assert_eq!(back.max_tokens_param, Some("max_output_tokens".to_string()));
+        assert_eq!(back.max_tokens, Some(8192));
+    }
+
+    // ─── #94: Config::validate ───
+
+    #[test]
+    fn validate_accepts_default_config() {
+        assert!(Config::default().validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_out_of_range_temperature() {
+        let cfg = Config {
+            temperature: 5.0,
+            ..Default::default()
+        };
+        let err = cfg.validate().unwrap_err().to_string();
+        assert!(err.contains("temperature"), "err: {err}");
+    }
+
+    #[test]
+    fn validate_rejects_invalid_output_format() {
+        let mut cfg = Config::default();
+        cfg.output.format = "prety".to_string(); // typo
+        let err = cfg.validate().unwrap_err().to_string();
+        assert!(err.contains("output.format"), "err: {err}");
+    }
+
+    #[test]
+    fn validate_rejects_invalid_max_tokens_param() {
+        let cfg = Config {
+            max_tokens_param: "tokens".to_string(),
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_invalid_base_url() {
+        let mut cfg = Config::default();
+        cfg.provider.base_url = "api.openai.com".to_string(); // missing scheme
+        let err = cfg.validate().unwrap_err().to_string();
+        assert!(err.contains("base_url"), "err: {err}");
+    }
+
+    #[test]
+    fn validate_aggregates_multiple_errors() {
+        let cfg = Config {
+            temperature: 9.0,
+            timeout: 0,
+            ..Default::default()
+        };
+        let err = cfg.validate().unwrap_err().to_string();
+        assert!(err.contains("temperature"), "err: {err}");
+        assert!(err.contains("timeout"), "err: {err}");
+    }
+
+    // ─── #80: deny_unknown_fields ───
+
+    #[test]
+    fn deny_unknown_fields_rejects_top_level_typo() {
+        let yaml = "\nquailty_gate:\n  enabled: true\n";
+        let result = CoraFile::from_str(yaml);
+        assert!(result.is_err(), "misspelled top-level key must be rejected");
+    }
+
+    #[test]
+    fn deny_unknown_fields_rejects_section_typo() {
+        let yaml = "\nllm:\n  temprature: 0.5\n";
+        let result = CoraFile::from_str(yaml);
+        assert!(result.is_err(), "misspelled section key must be rejected");
+    }
+
+    #[test]
+    fn deny_unknown_fields_allows_valid_keys() {
+        let yaml = "\nllm:\n  temperature: 0.5\n  max_tokens: 8192\n";
+        assert!(CoraFile::from_str(yaml).is_ok());
     }
 }

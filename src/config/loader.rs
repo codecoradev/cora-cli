@@ -220,6 +220,22 @@ fn migrate_old_config() {
     }
 }
 
+/// Resolve the max tokens parameter name based on provider and config setting.
+///
+/// - If `config_value` is not `"auto"`, use it directly (explicit override).
+/// - Otherwise, detect from provider name:
+///   - `gemini`, `google`, `vertex` → `"max_output_tokens"`
+///   - Everything else → `"max_tokens"`
+pub fn resolve_max_tokens_param(provider: &str, config_value: &str) -> String {
+    match config_value {
+        v if v != "auto" => v.to_string(),
+        _ => match provider {
+            "gemini" | "google" | "vertex" => "max_output_tokens".to_string(),
+            _ => "max_tokens".to_string(),
+        },
+    }
+}
+
 /// Load the full resolved config: defaults ← global config ← .cora.yaml ← CLI overrides.
 ///
 /// `cli_provider`, `cli_model`, `cli_api_key`, and `cli_format` are `None`
@@ -283,6 +299,10 @@ pub fn load_config(
         config.output.color = false;
     }
 
+    // #94: validate semantic constraints after all sources are merged so typos
+    // and out-of-range values fail loudly at load instead of at runtime.
+    config.validate()?;
+
     Ok(config)
 }
 
@@ -339,20 +359,42 @@ pub fn build_llm_config(
     let cora_base_url = std::env::var("CORA_BASE_URL").ok();
 
     let provider = cora_provider
-        .or_else(|| auto_preset.map(|p| p.name.to_string()))
+        .or_else(|| {
+            if config.provider.provider
+                != crate::config::schema::Config::default().provider.provider
+            {
+                Some(config.provider.provider.clone())
+            } else {
+                auto_preset.map(|p| p.name.to_string())
+            }
+        })
         .unwrap_or_else(|| config.provider.provider.clone());
 
     let model = cora_model
-        .or_else(|| auto_preset.map(|p| p.default_model.to_string()))
+        .or_else(|| {
+            if config.provider.model != crate::config::schema::Config::default().provider.model {
+                Some(config.provider.model.clone())
+            } else {
+                auto_preset.map(|p| p.default_model.to_string())
+            }
+        })
         .unwrap_or_else(|| config.provider.model.clone());
 
     let base_url = cora_base_url
         .or_else(|| {
-            // Check if the auto-detected preset has a custom URL override
-            auto_preset.and_then(|p| std::env::var(p.env_url).ok())
+            if config.provider.base_url
+                != crate::config::schema::Config::default().provider.base_url
+            {
+                Some(config.provider.base_url.clone())
+            } else {
+                auto_preset
+                    .and_then(|p| std::env::var(p.env_url).ok())
+                    .or_else(|| auto_preset.map(|p| p.default_base_url.to_string()))
+            }
         })
-        .or_else(|| auto_preset.map(|p| p.default_base_url.to_string()))
         .unwrap_or_else(|| config.provider.base_url.clone());
+
+    let max_tokens_param = resolve_max_tokens_param(&provider, &config.max_tokens_param);
 
     Ok(LLMConfig {
         api_key,
@@ -361,6 +403,7 @@ pub fn build_llm_config(
         provider,
         temperature: config.temperature,
         max_tokens: config.max_tokens,
+        max_tokens_param,
         timeout: config.timeout,
     })
 }
@@ -435,18 +478,31 @@ pub fn save_api_key(key: &str) -> std::result::Result<(), CoraError> {
     table.insert("api_key".to_string(), toml::Value::String(key.to_string()));
     let content = table.to_string();
 
-    std::fs::write(&path, content)
-        .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
-
-    debug!(path = %path.display(), "saved API key");
-
-    // Restrict permissions to owner only (0o600)
+    // Create the file with restrictive permissions from the start (0o600),
+    // avoiding the TOCTOU window between write and chmod.
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o600);
-        std::fs::set_permissions(&path, perms)?;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+        use std::io::Write;
+        file.write_all(content.as_bytes())
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
     }
+    #[cfg(not(unix))]
+    {
+        // Non-Unix platforms: write then attempt to restrict permissions.
+        // Best-effort — platform support for file permissions varies.
+        std::fs::write(&path, content)
+            .map_err(|e| CoraError::AuthError(format!("{}: {}", path.display(), e)))?;
+    }
+
+    debug!(path = %path.display(), "saved API key");
 
     Ok(())
 }
@@ -704,4 +760,59 @@ pub fn remove_provider_info() -> std::result::Result<(), CoraError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_max_tokens_param_auto_gemini() {
+        assert_eq!(
+            resolve_max_tokens_param("gemini", "auto"),
+            "max_output_tokens"
+        );
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_auto_google() {
+        assert_eq!(
+            resolve_max_tokens_param("google", "auto"),
+            "max_output_tokens"
+        );
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_auto_vertex() {
+        assert_eq!(
+            resolve_max_tokens_param("vertex", "auto"),
+            "max_output_tokens"
+        );
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_auto_openai() {
+        assert_eq!(resolve_max_tokens_param("openai", "auto"), "max_tokens");
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_auto_anthropic() {
+        assert_eq!(resolve_max_tokens_param("anthropic", "auto"), "max_tokens");
+    }
+
+    #[test]
+    fn resolve_max_tokens_param_explicit_override() {
+        assert_eq!(
+            resolve_max_tokens_param("gemini", "max_tokens"),
+            "max_tokens"
+        );
+        assert_eq!(
+            resolve_max_tokens_param("openai", "max_output_tokens"),
+            "max_output_tokens"
+        );
+        assert_eq!(
+            resolve_max_tokens_param("anthropic", "max_completion_tokens"),
+            "max_completion_tokens"
+        );
+    }
 }

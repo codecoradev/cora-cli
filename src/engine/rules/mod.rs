@@ -8,7 +8,17 @@ use tracing::debug;
 
 use crate::engine::diff_parser::{DiffLineType, FileChunk, parse_diff};
 use crate::engine::rules::types::{RuleFinding, RulesConfig};
-use crate::engine::types::ReviewIssue;
+use crate::engine::types::{ReviewIssue, Severity};
+
+/// Map severity to a numeric rank for sorting (Critical=4, Major=3, Minor=2, Info=1).
+fn severity_rank(sev: Severity) -> u8 {
+    match sev {
+        Severity::Critical => 4,
+        Severity::Major => 3,
+        Severity::Minor => 2,
+        Severity::Info => 1,
+    }
+}
 
 /// Run all rules (built-in + custom) against parsed diff chunks.
 ///
@@ -21,6 +31,11 @@ pub fn run_rules(chunks: &[FileChunk], config: &RulesConfig) -> Vec<RuleFinding>
 
     let mut all_rules = builtin::builtin_rules();
     all_rules.extend(config.custom_rules.clone());
+
+    // Compile regex patterns once before the matching loop (Fix #41)
+    for rule in &mut all_rules {
+        rule.ensure_compiled();
+    }
 
     debug!(
         rule_count = all_rules.len(),
@@ -79,10 +94,12 @@ pub fn run_rules(chunks: &[FileChunk], config: &RulesConfig) -> Vec<RuleFinding>
         }
     }
 
-    // Sort by severity (Critical first) then by file + line
+    // Sort by severity descending (Critical first) then by file + line
     findings.sort_by(|a, b| {
-        a.severity
-            .cmp(&b.severity)
+        let rank_a = severity_rank(a.severity);
+        let rank_b = severity_rank(b.severity);
+        rank_b
+            .cmp(&rank_a)
             .then_with(|| a.file.cmp(&b.file))
             .then_with(|| a.line.cmp(&b.line))
     });

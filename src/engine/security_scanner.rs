@@ -63,7 +63,10 @@ pub static PATTERNS: &[SecurityPattern] = &[
     SecurityPattern {
         id: "injection/exec",
         name: "Command injection via exec/system with dynamic input",
-        regex: r"(?i)(?:exec|system|popen|subprocess\.(?:call|run))\s*\(",
+        // Only flag when there's a dynamic input signal on the same line
+        // (f-string, format(), string concat with +, shell=True, or raw user input).
+        // subprocess.run(["cmd", "arg"]) with literal list is safe and should not trigger.
+        regex: r#"(?i)(?:exec|system|popen|subprocess\.(?:call|run))\s*\((?:[^)]*(?:f"|f'|format\(|\.format\(|shell\s*=\s*True|\+\s*(?:req|request|input|params|data|user|query)|%s|%\(.*\)))"#,
         severity: Severity::Critical,
     },
     // ── Auth issues ──
@@ -171,17 +174,34 @@ pub fn scan_security(chunks: &[FileChunk], max_findings: usize) -> Vec<RuleFindi
     findings
 }
 
-/// Check if a file path looks like a test/spec/fixture file.
+/// Check if a file path looks like a test/spec/fixture/mock/example file.
+///
+/// Uses path-segment awareness so common words like `latest`, `aspect`,
+/// `attestation`, `protest` are not mistaken for test files (#87). A segment
+/// is any run between `/`, `_`, `-`, and `.` separators.
 fn is_test_file(path: &str) -> bool {
     let lower = path.to_lowercase();
-    lower.contains("test")
-        || lower.contains("spec")
-        || lower.contains("fixture")
-        || lower.contains("mock")
-        || lower.contains("example")
-        || lower.contains("__tests__")
-        || lower.contains(".test.")
-        || lower.contains(".spec.")
+    for seg in lower.split(['/', '_', '-', '.']) {
+        if matches!(
+            seg,
+            "test"
+                | "tests"
+                | "testing"
+                | "tested"
+                | "__tests__"
+                | "spec"
+                | "specs"
+                | "fixture"
+                | "fixtures"
+                | "mock"
+                | "mocks"
+                | "example"
+                | "examples"
+        ) {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -287,6 +307,21 @@ mod tests {
     }
 
     #[test]
+    fn is_test_file_does_not_over_match_common_words() {
+        // #87: substring matching caught false positives like 'latest', 'aspect'.
+        assert!(!is_test_file("src/latest_config.rs"));
+        assert!(!is_test_file("src/models/attestation.rs"));
+        assert!(!is_test_file("src/utils/aspect.rs"));
+        assert!(!is_test_file("src/protest.rs"));
+        assert!(!is_test_file("src/inspector.rs"));
+        // Real test files still match.
+        assert!(is_test_file("tests/auth_test.py"));
+        assert!(is_test_file("src/app.test.ts"));
+        assert!(is_test_file("src/__tests__/setup.rs"));
+        assert!(is_test_file("spec/models/user_spec.rb"));
+    }
+
+    #[test]
     fn empty_diff_no_findings() {
         let findings = scan_security(&[], 10);
         assert!(findings.is_empty());
@@ -311,5 +346,58 @@ mod tests {
         let findings = scan_security(&chunks, 10);
         // Critical (hardcoded-secret) should come before Minor (debug)
         assert!(findings[0].severity >= findings[findings.len() - 1].severity);
+    }
+
+    #[test]
+    fn subprocess_run_with_literal_list_no_false_positive() {
+        let chunks = vec![make_chunk(
+            "src/provider.py",
+            &["cmd = [self._bin, 'recall', query]", "subprocess.run(cmd)"],
+        )];
+        let findings = scan_security(&chunks, 10);
+        let exec_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.rule_id == "injection/exec")
+            .collect();
+        assert!(
+            exec_findings.is_empty(),
+            "subprocess.run(cmd) with controlled list should not trigger"
+        );
+    }
+
+    #[test]
+    fn subprocess_run_with_fstring_triggers() {
+        let chunks = vec![make_chunk(
+            "src/handler.py",
+            &["subprocess.run(f'cat {user_input}')"],
+        )];
+        let findings = scan_security(&chunks, 10);
+        let exec_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.rule_id == "injection/exec")
+            .collect();
+        assert_eq!(
+            exec_findings.len(),
+            1,
+            "subprocess.run with f-string should trigger"
+        );
+    }
+
+    #[test]
+    fn subprocess_run_with_shell_true_triggers() {
+        let chunks = vec![make_chunk(
+            "src/handler.py",
+            &["subprocess.run(cmd, shell=True)"],
+        )];
+        let findings = scan_security(&chunks, 10);
+        let exec_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.rule_id == "injection/exec")
+            .collect();
+        assert_eq!(
+            exec_findings.len(),
+            1,
+            "subprocess.run with shell=True should trigger"
+        );
     }
 }

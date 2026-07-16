@@ -185,11 +185,13 @@ async fn review_diff_inner(
     };
 
     // Build context chain (cross-file dependency extraction)
+    // NOTE: pass ignore.files (e.g. target/**, node_modules/**) so the resolver
+    // never injects build-artifact code — not ignore.rules (finding-type strings).
     let context_chain = crate::engine::context::build_context_chain(
         &diff_chunks,
         &config.context_chain,
         std::env::current_dir().unwrap_or_default().as_path(),
-        &config.ignore.rules,
+        &config.ignore.files,
     );
 
     let final_context = if !context_chain.text.is_empty() {
@@ -264,13 +266,18 @@ async fn review_diff_inner(
         Ok(resp) => resp,
         Err(e) => {
             // LLM failed — return deterministic findings only (don't silently swallow them)
-            if !rule_findings.is_empty() || !secrets_findings.is_empty() {
+            if !rule_findings.is_empty()
+                || !secrets_findings.is_empty()
+                || !security_findings.is_empty()
+            {
                 let n_rules = rule_findings.len();
                 let n_secrets = secrets_findings.len();
+                let n_security = security_findings.len();
                 debug!(
                     error = %e,
                     rule_findings = n_rules,
                     secrets_findings = n_secrets,
+                    security_findings = n_security,
                     "LLM call failed, returning deterministic findings only"
                 );
                 let mut all_deterministic =
@@ -282,11 +289,12 @@ async fn review_diff_inner(
                 let mut fallback = ReviewResponse {
                     issues: all_deterministic,
                     summary: format!(
-                        "LLM review failed: {e}. Showing {n_rules} rule + {n_secrets} secrets findings."
+                        "LLM review failed: {e}. Showing {n_rules} rule + {n_secrets} secrets + {n_security} security findings."
                     ),
                     tokens_used: None,
                     should_block: false,
                 };
+                fallback.issues = apply_markdown_code_block_filter(fallback.issues, &diff_chunks);
                 fallback.issues = apply_ignore_rules(fallback.issues, &config.ignore.rules);
                 let min_sev = config.hook.min_severity_level();
                 fallback.should_block = fallback
@@ -329,6 +337,19 @@ async fn review_diff_inner(
         }
     }
 
+    // Cross-validate LLM security findings about hardcoded secrets against
+    // actual diff lines. The LLM sometimes flags struct field declarations
+    // (e.g. `api_key: String`) as "hardcoded secret" even when no literal
+    // value is present. This filter removes such false positives by checking
+    // the added line at the reported file:line against the built-in
+    // sec-hardcoded-secret regex.
+    response.issues = apply_llm_secret_fp_filter(response.issues, &diff_chunks);
+
+    // Drop findings inside Markdown fenced code blocks (#329). Code blocks in
+    // `.md` files are documentation examples, not executable code — a `git push`
+    // inside a ```bash block is not SQL injection.
+    response.issues = apply_markdown_code_block_filter(response.issues, &diff_chunks);
+
     // Apply ignore rules: filter out issues matching ignored patterns
     response.issues = apply_ignore_rules(response.issues, &config.ignore.rules);
 
@@ -362,12 +383,176 @@ async fn review_diff_inner(
     Ok(response)
 }
 
+/// Filter out LLM findings about hardcoded secrets/passwords that point to
+/// diff lines which don't actually contain a literal string assignment.
+///
+/// The LLM sometimes flags struct field declarations like `api_key: String`
+/// or `api_key: extract_api_key.clone()` as "Hardcoded password or secret in
+/// variable". These are identifiers, not hardcoded values.
+///
+/// This function cross-validates each security finding against the actual
+/// added line in the diff. If the line doesn't match the `sec-hardcoded-secret`
+/// regex (i.e. no `password/key/secret = "literal"` pattern), the finding is
+/// removed as a false positive.
+fn apply_llm_secret_fp_filter(
+    mut issues: Vec<ReviewIssue>,
+    diff_chunks: &[crate::engine::diff_parser::FileChunk],
+) -> Vec<ReviewIssue> {
+    use crate::engine::diff_parser::DiffLineType;
+
+    // Lazy-compiled regex matching the built-in sec-hardcoded-secret pattern.
+    // Only triggers for actual value assignments like `api_key = "sk-..."`.
+    static RE_SECRET_LITERAL: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r#"(?i)(?:password|api_?key|token|secret)\s*=\s*"[^"]+""#)
+            .expect("hardcoded secret regex must compile")
+    });
+
+    // Keywords that indicate an LLM finding is about hardcoded secrets.
+    static SECRET_KEYWORDS: &[&str] = &[
+        "hardcoded password",
+        "hardcoded secret",
+        "hardcoded credential",
+        "hardcoded token",
+        "hardcoded api key",
+        "hardcoded api_key",
+    ];
+
+    // Pre-compute a lookup: (file_path, new_line_no) -> line content
+    let added_lines: std::collections::HashMap<(String, u32), &str> = diff_chunks
+        .iter()
+        .flat_map(|chunk| {
+            let path = chunk
+                .new_path
+                .as_deref()
+                .or(chunk.old_path.as_deref())
+                .unwrap_or("unknown");
+            chunk.chunks.iter().flat_map(|hunk| {
+                hunk.lines
+                    .iter()
+                    .filter(|l| l.line_type == DiffLineType::Add)
+                    .filter_map(|l| {
+                        l.new_line_no
+                            .map(|ln| ((path.to_string(), ln), l.content.as_str()))
+                    })
+            })
+        })
+        .collect();
+
+    let before = issues.len();
+    issues.retain(|issue| {
+        // Only check security-type findings about secrets
+        let issue_type = issue.issue_type.as_deref().unwrap_or("");
+        let title_lower = issue.title.to_lowercase();
+
+        if issue_type != "security" {
+            return true;
+        }
+
+        let is_secret_finding = SECRET_KEYWORDS.iter().any(|kw| title_lower.contains(kw));
+        if !is_secret_finding {
+            return true;
+        }
+
+        // Look up the actual diff line
+        let line_num = issue.line.unwrap_or(0);
+        let key = (issue.file.clone(), line_num);
+        if let Some(actual_line) = added_lines.get(&key) {
+            if !RE_SECRET_LITERAL.is_match(actual_line) {
+                debug!(
+                    file = %issue.file,
+                    line = line_num,
+                    title = %issue.title,
+                    "suppressed LLM false positive: line has no hardcoded secret literal"
+                );
+                return false; // Remove this finding
+            }
+        }
+
+        // If we can't find the line (hallucinated path/line or context line),
+        // keep the finding — better safe than sorry.
+        true
+    });
+
+    let filtered = before - issues.len();
+    if filtered > 0 {
+        debug!(
+            filtered,
+            remaining = issues.len(),
+            "filtered LLM false positives for hardcoded secret findings"
+        );
+    }
+
+    issues
+}
+
+/// Drop findings located inside Markdown fenced code blocks (#329).
+///
+/// Code blocks in `.md`/`.mdx`/`.markdown` files are documentation examples,
+/// not executable code — e.g. a `git push` inside a ```bash block must not be
+/// flagged as SQL injection. Findings without a resolvable line, or in files
+/// without any code block, are kept unchanged (safe default).
+fn apply_markdown_code_block_filter(
+    mut issues: Vec<ReviewIssue>,
+    diff_chunks: &[crate::engine::diff_parser::FileChunk],
+) -> Vec<ReviewIssue> {
+    use crate::engine::markdown::{is_markdown, lines_inside_code_blocks};
+    use std::collections::HashSet;
+
+    // Build file path -> set of code-block line numbers, for markdown files only.
+    let mut code_block_lines: std::collections::HashMap<String, HashSet<u32>> =
+        std::collections::HashMap::new();
+    for chunk in diff_chunks {
+        let path = chunk
+            .new_path
+            .as_deref()
+            .or(chunk.old_path.as_deref())
+            .unwrap_or("");
+        if !is_markdown(path) {
+            continue;
+        }
+        let set = lines_inside_code_blocks(chunk);
+        if !set.is_empty() {
+            code_block_lines
+                .entry(path.to_string())
+                .or_default()
+                .extend(set);
+        }
+    }
+
+    if code_block_lines.is_empty() {
+        return issues; // no markdown code blocks in this diff — fast path
+    }
+
+    let before = issues.len();
+    issues.retain(|issue| {
+        let Some(ln) = issue.line else {
+            return true; // keep findings without a concrete line number
+        };
+        match code_block_lines.get(&issue.file) {
+            Some(lines) => !lines.contains(&ln), // drop if inside a code block
+            None => true,
+        }
+    });
+
+    let dropped = before - issues.len();
+    if dropped > 0 {
+        debug!(
+            dropped,
+            remaining = issues.len(),
+            "removed markdown code-block false positives"
+        );
+    }
+
+    issues
+}
+
 /// Filter out issues whose `issue_type` matches any ignored rule pattern.
 fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> Vec<ReviewIssue> {
     if ignore_rules.is_empty() {
         return issues;
     }
 
+    let before = issues.len();
     issues.retain(|issue| {
         !ignore_rules.iter().any(|pattern| {
             let pattern_lower = pattern.to_lowercase();
@@ -376,6 +561,15 @@ fn apply_ignore_rules(mut issues: Vec<ReviewIssue>, ignore_rules: &[String]) -> 
                 || issue.title.to_lowercase().contains(&pattern_lower)
         })
     });
+    let filtered = before - issues.len();
+    if filtered > 0 {
+        debug!(
+            filtered,
+            remaining = issues.len(),
+            rules = ignore_rules.len(),
+            "filtered issues via ignore rules"
+        );
+    }
 
     issues
 }
@@ -389,6 +583,7 @@ fn is_valid_file_path(issue_file: &str, valid_files: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::Severity;
 
     #[test]
     fn resolve_prompt_inline_takes_priority() {
@@ -426,5 +621,415 @@ mod tests {
             result.is_none(),
             "system_prompt_file outside project root should be rejected"
         );
+    }
+
+    #[test]
+    fn secret_fp_filter_removes_struct_field_declarations() {
+        use crate::engine::diff_parser::*;
+
+        // Simulate a diff with a struct field declaration (not a hardcoded secret)
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("crates/uteke-cli/src/cli.rs".to_string()),
+            language: "rs".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 230,
+                old_count: 0,
+                new_start: 234,
+                new_count: 2,
+                header: "".to_string(),
+                lines: vec![
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "    extract_api_key: Option<String>,".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(236),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "    extract_base_url: Option<String>,".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(237),
+                    },
+                ],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "crates/uteke-cli/src/cli.rs".to_string(),
+            line: Some(236),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "Hardcoded password or secret in variable".to_string(),
+            body: "Static security scanner detected...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_llm_secret_fp_filter(issues, &diff_chunks);
+        assert!(
+            result.is_empty(),
+            "struct field declaration should be filtered out"
+        );
+    }
+
+    #[test]
+    fn secret_fp_filter_keeps_actual_hardcoded_secrets() {
+        use crate::engine::diff_parser::*;
+
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("src/config.rs".to_string()),
+            language: "rs".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 10,
+                old_count: 0,
+                new_start: 15,
+                new_count: 1,
+                header: "".to_string(),
+                lines: vec![DiffLine {
+                    line_type: DiffLineType::Add,
+                    content: "    let api_key = \"sk-12345abcdef\";".to_string(),
+                    old_line_no: None,
+                    new_line_no: Some(15),
+                }],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "src/config.rs".to_string(),
+            line: Some(15),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "Hardcoded password or secret in variable".to_string(),
+            body: "API key hardcoded...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_llm_secret_fp_filter(issues, &diff_chunks);
+        assert_eq!(result.len(), 1, "actual hardcoded secret should be kept");
+    }
+
+    #[test]
+    fn secret_fp_filter_keeps_non_security_findings() {
+        use crate::engine::diff_parser::*;
+
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("src/main.rs".to_string()),
+            language: "rs".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 1,
+                old_count: 0,
+                new_start: 1,
+                new_count: 1,
+                header: "".to_string(),
+                lines: vec![DiffLine {
+                    line_type: DiffLineType::Add,
+                    content: "    api_key: String,".to_string(),
+                    old_line_no: None,
+                    new_line_no: Some(1),
+                }],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "src/main.rs".to_string(),
+            line: Some(1),
+            severity: Severity::Minor,
+            issue_type: Some("bugs".to_string()),
+            title: "Use of unwrap()".to_string(),
+            body: "This can panic".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_llm_secret_fp_filter(issues, &diff_chunks);
+        assert_eq!(result.len(), 1, "non-security findings should pass through");
+    }
+
+    #[test]
+    fn secret_fp_filter_keeps_findings_with_unknown_lines() {
+        use crate::engine::diff_parser::*;
+
+        // Empty diff — finding references a line not in the diff
+        let diff_chunks: Vec<FileChunk> = vec![];
+
+        let issues = vec![ReviewIssue {
+            file: "src/config.rs".to_string(),
+            line: Some(999),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "Hardcoded password or secret in variable".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_llm_secret_fp_filter(issues, &diff_chunks);
+        assert_eq!(
+            result.len(),
+            1,
+            "unknown lines should be kept (better safe than sorry)"
+        );
+    }
+
+    #[test]
+    fn ignore_rules_filters_by_title_match() {
+        let issues = vec![
+            ReviewIssue {
+                file: "cli.rs".to_string(),
+                line: Some(236),
+                severity: Severity::Critical,
+                issue_type: Some("rule".to_string()),
+                title: "Command injection via exec/system with dynamic input".to_string(),
+                body: "Static security scanner detected...".to_string(),
+                suggested_fix: None,
+            },
+            ReviewIssue {
+                file: "main.rs".to_string(),
+                line: Some(10),
+                severity: Severity::Major,
+                issue_type: Some("security".to_string()),
+                title: "SQL injection via string concatenation".to_string(),
+                body: "...".to_string(),
+                suggested_fix: None,
+            },
+        ];
+
+        let rules = vec!["Command injection via exec/system with dynamic input".to_string()];
+        let result = apply_ignore_rules(issues, &rules);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].title, "SQL injection via string concatenation");
+    }
+
+    #[test]
+    fn ignore_rules_filters_by_issue_type_match() {
+        let issues = vec![ReviewIssue {
+            file: "test.py".to_string(),
+            line: Some(50),
+            severity: Severity::Minor,
+            issue_type: Some("style".to_string()),
+            title: "Some style issue".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let rules = vec!["style".to_string()];
+        let result = apply_ignore_rules(issues, &rules);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn ignore_rules_empty_keeps_all() {
+        let issues = vec![ReviewIssue {
+            file: "f.rs".to_string(),
+            line: Some(1),
+            severity: Severity::Critical,
+            issue_type: Some("rule".to_string()),
+            title: "Any finding".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_ignore_rules(issues, &[]);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn ignore_rules_case_insensitive() {
+        let issues = vec![ReviewIssue {
+            file: "f.rs".to_string(),
+            line: Some(1),
+            severity: Severity::Critical,
+            issue_type: Some("rule".to_string()),
+            title: "HARDCODED password or SECRET in variable".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let rules = vec!["Hardcoded Password Or Secret".to_string()];
+        let result = apply_ignore_rules(issues, &rules);
+        assert!(result.is_empty());
+    }
+
+    // ─── #329: markdown fenced code-block false positives ───
+
+    #[test]
+    fn markdown_fp_filter_drops_finding_inside_code_block() {
+        use crate::engine::diff_parser::*;
+
+        // The exact #329 scenario: a `git push` inside a ```bash block in a
+        // markdown doc, flagged as SQL injection.
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("AGENT.md".to_string()),
+            language: "markdown".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 1,
+                old_count: 1,
+                new_start: 1,
+                new_count: 4,
+                header: String::new(),
+                lines: vec![
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "```bash".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(167),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "git push origin vX.Y.Z".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(168),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "```".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(169),
+                    },
+                ],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "AGENT.md".to_string(),
+            line: Some(168),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "SQL injection via string concatenation".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_markdown_code_block_filter(issues, &diff_chunks);
+        assert!(
+            result.is_empty(),
+            "finding inside a markdown code block must be dropped"
+        );
+    }
+
+    #[test]
+    fn markdown_fp_filter_keeps_finding_outside_code_block() {
+        use crate::engine::diff_parser::*;
+
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("doc.md".to_string()),
+            language: "markdown".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 1,
+                old_count: 1,
+                new_start: 1,
+                new_count: 3,
+                header: String::new(),
+                lines: vec![
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "```bash".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(1),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "echo hi".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(2),
+                    },
+                    DiffLine {
+                        line_type: DiffLineType::Add,
+                        content: "```".to_string(),
+                        old_line_no: None,
+                        new_line_no: Some(3),
+                    },
+                ],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        // Finding on line 5 (outside the block, in prose) must survive.
+        let issues = vec![ReviewIssue {
+            file: "doc.md".to_string(),
+            line: Some(5),
+            severity: Severity::Minor,
+            issue_type: Some("style".to_string()),
+            title: "typo".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_markdown_code_block_filter(issues, &diff_chunks);
+        assert_eq!(result.len(), 1, "finding outside a code block must be kept");
+    }
+
+    #[test]
+    fn markdown_fp_filter_keeps_findings_in_non_markdown_files() {
+        use crate::engine::diff_parser::*;
+
+        // A real .py file is never treated as markdown, even if it has ``` text.
+        let diff_chunks = vec![FileChunk {
+            old_path: None,
+            new_path: Some("src/app.py".to_string()),
+            language: "python".to_string(),
+            chunks: vec![DiffHunk {
+                old_start: 1,
+                old_count: 1,
+                new_start: 1,
+                new_count: 2,
+                header: String::new(),
+                lines: vec![DiffLine {
+                    line_type: DiffLineType::Add,
+                    content: "eval(request.body.code)".to_string(),
+                    old_line_no: None,
+                    new_line_no: Some(42),
+                }],
+            }],
+            is_binary: false,
+            is_deleted: false,
+            is_new: false,
+        }];
+
+        let issues = vec![ReviewIssue {
+            file: "src/app.py".to_string(),
+            line: Some(42),
+            severity: Severity::Critical,
+            issue_type: Some("security".to_string()),
+            title: "eval injection".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_markdown_code_block_filter(issues, &diff_chunks);
+        assert_eq!(result.len(), 1, "non-markdown files are unaffected");
+    }
+
+    #[test]
+    fn markdown_fp_filter_keeps_findings_without_line_number() {
+        // Findings with no resolvable line are kept (safe default).
+        let issues = vec![ReviewIssue {
+            file: "doc.md".to_string(),
+            line: None,
+            severity: Severity::Info,
+            issue_type: None,
+            title: "vague".to_string(),
+            body: "...".to_string(),
+            suggested_fix: None,
+        }];
+
+        let result = apply_markdown_code_block_filter(issues, &[]);
+        assert_eq!(result.len(), 1);
     }
 }

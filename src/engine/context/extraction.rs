@@ -19,6 +19,9 @@ use super::types::{ExtractedSymbol, SymbolKind};
 static RE_RUST_IMPORT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\buse\s+(crate|super|self)::([\w:]+)").unwrap());
 
+/// Rust: module declaration `mod foo;` or `mod foo {` (#73).
+static RE_RUST_MOD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bmod\s+(\w+)").unwrap());
+
 /// Rust: function call — identifier followed by `(`, possibly preceded by `::` or `.`
 static RE_RUST_FN_CALL: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?:\w+::)?\w+(?:::\w+)*\s*\(").unwrap());
@@ -58,9 +61,9 @@ static RE_GO_FN_CALL: LazyLock<Regex> =
 static RE_GO_TYPE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?:\b([A-Z]\w+)\s*\{|:\s*([A-Z]\w+))").unwrap());
 
-/// Java: `import foo.bar.*`
+/// Java: `import foo.bar.*` (also `import static foo.Bar.baz`)
 static RE_JAVA_IMPORT: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\bimport\s+([\w.]+)").unwrap());
+    LazyLock::new(|| Regex::new(r"\bimport\s+(?:static\s+)?([\w.*]+)").unwrap());
 
 /// Java: method call — `foo(` or `obj.method(`
 static RE_JAVA_FN_CALL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b(\w+)\s*\(").unwrap());
@@ -71,6 +74,25 @@ static RE_JAVA_TYPE: LazyLock<Regex> =
 
 /// Maximum number of symbols to extract per file to prevent runaway extraction.
 const MAX_SYMBOLS_PER_FILE: usize = 50;
+
+// ─── Definition regexes (functions/types *declared* in changed lines) ───
+// Used for inbound caller (blast-radius) resolution.
+
+static RE_DEF_RUST_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+(\w+)").unwrap());
+static RE_DEF_RUST_TYPE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(?:pub\s+)?(?:struct|enum|trait|type)\s+(\w+)").unwrap());
+static RE_DEF_PY_FN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bdef\s+(\w+)").unwrap());
+static RE_DEF_PY_TYPE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bclass\s+(\w+)").unwrap());
+static RE_DEF_JS_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bfunction\s+\*?\s*(\w+)").unwrap());
+static RE_DEF_JS_TYPE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bclass\s+(\w+)").unwrap());
+static RE_DEF_GO_FN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bfunc\s+(?:\([^)]*\)\s*)?(\w+)\s*\(").unwrap());
+static RE_DEF_GO_TYPE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\btype\s+(\w+)\s+(?:struct|interface)").unwrap());
+static RE_DEF_JAVA_TYPE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(?:class|interface|enum)\s+(\w+)").unwrap());
 
 /// Extract symbols from a single line of code for a given language.
 pub fn extract_symbols_from_line(line: &str, language: &str) -> Vec<SymbolKind> {
@@ -92,6 +114,14 @@ pub fn extract_symbols_from_line(line: &str, language: &str) -> Vec<SymbolKind> 
                     &mut symbols,
                     &mut seen,
                     SymbolKind::Import(cap.get(2).unwrap().as_str().to_string()),
+                );
+            }
+            // Module declarations (#73)
+            for cap in RE_RUST_MOD.captures_iter(line) {
+                add_unique(
+                    &mut symbols,
+                    &mut seen,
+                    SymbolKind::Import(cap.get(1).unwrap().as_str().to_string()),
                 );
             }
             // Function calls
@@ -274,14 +304,15 @@ pub fn extract_symbols_from_diff(
                     continue;
                 }
 
+                // Early cutoff: stop processing lines for this file once cap is reached
+                if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
+                    break;
+                }
+
                 let language = &file.language;
                 let symbols = extract_symbols_from_line(&line.content, language);
 
                 for sym in symbols {
-                    if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
-                        break;
-                    }
-
                     let key = format!("{sym}");
                     if seen.insert((key, file_path.to_string())) {
                         all_symbols.push(ExtractedSymbol {
@@ -291,8 +322,17 @@ pub fn extract_symbols_from_diff(
                             raw: line.content.clone(),
                         });
                         file_symbol_count += 1;
+                        if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
+                            break;
+                        }
                     }
                 }
+                if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
+                    break;
+                }
+            }
+            if file_symbol_count >= MAX_SYMBOLS_PER_FILE {
+                break;
             }
         }
 
@@ -308,6 +348,85 @@ pub fn extract_symbols_from_diff(
         "total symbols extracted from diff"
     );
     all_symbols
+}
+
+/// Extract function/type *definitions* declared in the added lines of a diff.
+/// These are the symbols whose **callers** (blast radius) we want to resolve.
+///
+/// Only added lines are scanned (a definition only matters if this PR
+/// introduces or modifies it). Returns deduplicated `(name, kind, file)`.
+pub fn extract_definitions_from_diff(
+    chunks: &[crate::engine::diff_parser::FileChunk],
+) -> Vec<crate::engine::context::types::DefinedSymbol> {
+    use crate::engine::context::types::{DefinedSymbol, DefinitionKind};
+    use crate::engine::diff_parser::DiffLineType;
+    let mut out = Vec::new();
+    let mut seen: HashSet<(String, String)> = HashSet::new(); // (name, file)
+
+    for file in chunks {
+        if file.is_binary || file.is_deleted {
+            continue;
+        }
+        let path = file
+            .new_path
+            .as_deref()
+            .or(file.old_path.as_deref())
+            .unwrap_or("unknown");
+        let lang = &file.language;
+
+        for hunk in &file.chunks {
+            for line in &hunk.lines {
+                if line.line_type != DiffLineType::Add {
+                    continue;
+                }
+                let content = &line.content;
+                let (fn_re, type_re): (Option<&Regex>, Option<&Regex>) = match lang.as_str() {
+                    "rs" => (Some(&RE_DEF_RUST_FN), Some(&RE_DEF_RUST_TYPE)),
+                    "py" | "pyi" => (Some(&RE_DEF_PY_FN), Some(&RE_DEF_PY_TYPE)),
+                    "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" => {
+                        (Some(&RE_DEF_JS_FN), Some(&RE_DEF_JS_TYPE))
+                    }
+                    "go" => (Some(&RE_DEF_GO_FN), Some(&RE_DEF_GO_TYPE)),
+                    "java" | "kt" | "kts" => (None, Some(&RE_DEF_JAVA_TYPE)),
+                    _ => (None, None),
+                };
+
+                let mut push = |name: &str, kind: DefinitionKind| {
+                    if name.is_empty() {
+                        return;
+                    }
+                    // Skip obvious noise / keywords that slip through.
+                    if matches!(
+                        name,
+                        "if" | "for" | "while" | "match" | "new" | "return" | "test" | "main"
+                    ) {
+                        return;
+                    }
+                    if seen.insert((name.to_string(), path.to_string())) {
+                        out.push(DefinedSymbol {
+                            name: name.to_string(),
+                            kind,
+                            file: path.to_string(),
+                        });
+                    }
+                };
+
+                if let Some(re) = fn_re {
+                    for cap in re.captures_iter(content) {
+                        push(&cap[1], DefinitionKind::Function);
+                    }
+                }
+                if let Some(re) = type_re {
+                    for cap in re.captures_iter(content) {
+                        push(&cap[1], DefinitionKind::Type);
+                    }
+                }
+            }
+        }
+    }
+
+    debug!(definitions = out.len(), "extracted definitions from diff");
+    out
 }
 
 #[cfg(test)]
@@ -345,6 +464,63 @@ mod tests {
     // --- Rust extraction ---
 
     #[test]
+    fn extract_definitions_rust_fn_and_type() {
+        let chunks = vec![make_file_chunk(
+            "src/lib.rs",
+            "rs",
+            &[
+                ("pub fn validate_token(token: &str) -> bool {", 1),
+                ("pub struct CryptoConfig { seed: u64 }", 2),
+            ],
+        )];
+        let defs = extract_definitions_from_diff(&chunks);
+        let names: Vec<&str> = defs.iter().map(|d| d.name.as_str()).collect();
+        assert!(
+            names.contains(&"validate_token"),
+            "should detect fn definition"
+        );
+        assert!(
+            names.contains(&"CryptoConfig"),
+            "should detect struct definition"
+        );
+    }
+
+    #[test]
+    fn extract_definitions_python() {
+        let chunks = vec![make_file_chunk(
+            "app/auth.py",
+            "py",
+            &[("def login(user):", 1), ("class User:", 2)],
+        )];
+        let defs = extract_definitions_from_diff(&chunks);
+        let names: Vec<&str> = defs.iter().map(|d| d.name.as_str()).collect();
+        assert!(names.contains(&"login"));
+        assert!(names.contains(&"User"));
+    }
+
+    #[test]
+    fn extract_definitions_go() {
+        let chunks = vec![make_file_chunk(
+            "main.go",
+            "go",
+            &[("func Parse(input string) error {", 1)],
+        )];
+        let defs = extract_definitions_from_diff(&chunks);
+        assert!(defs.iter().any(|d| d.name == "Parse"));
+    }
+
+    #[test]
+    fn extract_definitions_dedups_within_file() {
+        let chunks = vec![make_file_chunk(
+            "src/lib.rs",
+            "rs",
+            &[("fn helper() {}", 1), ("fn helper() {}", 2)],
+        )];
+        let defs = extract_definitions_from_diff(&chunks);
+        assert_eq!(defs.iter().filter(|d| d.name == "helper").count(), 1);
+    }
+
+    #[test]
     fn extract_rust_function_calls() {
         let chunks = vec![make_file_chunk(
             "src/main.rs",
@@ -379,6 +555,41 @@ mod tests {
         assert!(
             !imports.is_empty(),
             "should extract use crate::engine::scanner"
+        );
+    }
+
+    #[test]
+    fn extract_rust_module_declarations() {
+        // #73: `mod foo;` should be extracted as an import-like dependency.
+        let chunks = vec![make_file_chunk(
+            "src/main.rs",
+            "rs",
+            &[("mod engine;", 1), ("pub mod config;", 2)],
+        )];
+        let symbols = extract_symbols_from_diff(&chunks);
+        let mods: Vec<_> = symbols
+            .iter()
+            .filter(|s| matches!(&s.kind, SymbolKind::Import(p) if p == "engine" || p == "config"))
+            .collect();
+        assert_eq!(mods.len(), 2, "should extract both mod declarations");
+    }
+
+    #[test]
+    fn extract_java_wildcard_import() {
+        // #72: `import foo.bar.*` should keep the wildcard, not truncate to `foo.bar`.
+        let chunks = vec![make_file_chunk(
+            "src/App.java",
+            "java",
+            &[("import com.example.*;", 1)],
+        )];
+        let symbols = extract_symbols_from_diff(&chunks);
+        let imports: Vec<_> = symbols
+            .iter()
+            .filter(|s| matches!(&s.kind, SymbolKind::Import(p) if p.contains("*")))
+            .collect();
+        assert!(
+            !imports.is_empty(),
+            "java wildcard import should keep the '*'"
         );
     }
 

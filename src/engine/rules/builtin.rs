@@ -14,6 +14,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Possible hardcoded secret/credential detected. Use environment variables or a secrets manager.".to_string(),
             languages: vec!["all".to_string()],
             exclude: vec!["rules/".to_string(), "tests/".to_string(), "test/".to_string()],
+            ..Default::default()
         },
         CustomRule {
             id: "sec-sql-concat".to_string(),
@@ -23,6 +24,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Possible SQL injection via string concatenation in query. Use parameterized queries.".to_string(),
             languages: vec!["all".to_string()],
             exclude: vec!["rules/".to_string(), "tests/".to_string(), "test/".to_string()],
+            ..Default::default()
         },
         CustomRule {
             id: "sec-hardcoded-url".to_string(),
@@ -32,6 +34,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Insecure HTTP URL detected (not https). Use HTTPS for all external connections.".to_string(),
             languages: vec!["all".to_string()],
             exclude: vec!["rules/".to_string(), "tests/".to_string(), "test/".to_string()],
+            ..Default::default()
         },
         CustomRule {
             id: "sec-tls-disabled".to_string(),
@@ -40,6 +43,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "TLS verification disabled. This allows man-in-the-middle attacks.".to_string(),
             languages: vec!["rs".to_string(), "py".to_string(), "go".to_string()],
             exclude: vec!["rules/".to_string(), "tests/".to_string(), "test/".to_string()],
+            ..Default::default()
         },
         // --- Bugs ---
         CustomRule {
@@ -49,6 +53,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Use of `.unwrap()` can panic in production. Handle the error properly.".to_string(),
             languages: vec!["rs".to_string()],
             exclude: vec!["tests/".to_string(), "test/".to_string()],
+            ..Default::default()
         },
         CustomRule {
             id: "bug-expect".to_string(),
@@ -58,6 +63,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Use of `.expect()` can panic in production. Consider proper error handling.".to_string(),
             languages: vec!["rs".to_string()],
             exclude: vec!["tests/".to_string(), "test/".to_string()],
+            ..Default::default()
         },
         CustomRule {
             id: "bug-println".to_string(),
@@ -66,6 +72,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Debug output macro found. Remove `println!`/`dbg!`/`print!` before merging.".to_string(),
             languages: vec!["rs".to_string()],
             exclude: vec!["tests/".to_string(), "test/".to_string()],
+            ..Default::default()
         },
         CustomRule {
             id: "bug-todo".to_string(),
@@ -74,6 +81,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "TODO/FIXME/HACK/XXX comment found. Consider resolving before merge.".to_string(),
             languages: vec!["all".to_string()],
             exclude: vec![],
+            ..Default::default()
         },
         CustomRule {
             id: "bug-console-log".to_string(),
@@ -82,6 +90,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Console logging statement found. Remove before merging to production.".to_string(),
             languages: vec!["js".to_string(), "ts".to_string()],
             exclude: vec!["tests/".to_string(), "test/".to_string()],
+            ..Default::default()
         },
         CustomRule {
             id: "bug-hardcoded-port".to_string(),
@@ -90,6 +99,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Hardcoded port number detected. Consider using environment variables or config.".to_string(),
             languages: vec!["all".to_string()],
             exclude: vec![],
+            ..Default::default()
         },
         // --- Quality ---
         CustomRule {
@@ -99,6 +109,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Error result discarded with `let _ =`. Consider handling the error explicitly.".to_string(),
             languages: vec!["all".to_string()],
             exclude: vec![],
+            ..Default::default()
         },
         CustomRule {
             id: "qual-clone".to_string(),
@@ -107,6 +118,7 @@ pub fn builtin_rules() -> Vec<CustomRule> {
             message: "Use of `.clone()` detected. Consider borrowing or ownership transfer.".to_string(),
             languages: vec!["rs".to_string()],
             exclude: vec![],
+            ..Default::default()
         },
     ]
 }

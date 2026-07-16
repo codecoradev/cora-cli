@@ -26,6 +26,8 @@ Settings are resolved in this order (highest priority first):
 5. **Auto-detect** — Provider-specific env vars (`OPENAI_API_KEY`, `ZAI_API_KEY`, etc.)
 6. **Built-in defaults** — Sensible defaults for all settings
 
+After all sources are merged, **config values are validated at load time**: out-of-range values (e.g. `temperature: 5`), unsupported formats (`output.format: prety`), and misspelled keys (`quailty_gate`, `temprature`) fail loudly with a clear message instead of being silently ignored. This applies to `temperature` (0.0–2.0), `max_tokens`/`timeout` (≥1), `max_tokens_param`, `response_format`, `output.format`, `hook.mode`/`on_violation`/`min_severity`, `provider.base_url`, and profile `weight`/`action`/`tone`/`detail_level`.
+
 ### API Key Resolution
 
 1. `--api-key` flag (one-shot)
@@ -152,6 +154,35 @@ cora uses two mechanisms to prevent the LLM from fabricating findings:
 - **File path injection** — Actual file paths are embedded in the prompt, anchoring the LLM to real files in the diff.
 - **Post-parse filtering** — After parsing, any reported file paths or line numbers that don't exist in the actual diff are discarded.
 
+## Cross-File Review Context
+
+To review a change accurately, cora injects **cross-file context** alongside the diff — it doesn't review the diff in isolation. This is deterministic (no extra LLM calls) and bounded by a token budget so cost stays predictable.
+
+Two axes are resolved:
+
+- **Outbound** — what the changed code *calls/imports* (function/type definitions the diff references).
+- **Inbound (blast radius)** — *who calls the changed code*. If a PR modifies a function signature or type, its call-sites across the repo are surfaced so breaking changes can be flagged.
+
+When the budget can't fit a full definition, a thin **signature slice** is injected instead of skipping it, so more symbols fit under the same budget.
+
+```yaml
+review:
+  context_chain:
+    enabled: true               # master switch for cross-file context
+    max_context_tokens: 5000    # budget (~4 chars/token) for injected context
+    follow_depth: 1             # outbound resolution depth (1 = direct refs only)
+    include_tests: true         # resolve test files via naming convention
+    include_callers: true       # resolve callers of changed code (blast radius)
+```
+
+| Field | Default | Notes |
+|-------|---------|-------|
+| `enabled` | `true` | Disable to review the diff only. |
+| `max_context_tokens` | `5000` | Approx. 20 KB of code injected. |
+| `follow_depth` | `1` | Outbound recursion depth (`1` = direct references). |
+| `include_tests` | `true` | Map changed source to its test files. |
+| `include_callers` | `true` | Inbound caller resolution. Scans source files (gitignore-aware — `target/`, `node_modules/` are never scanned), bounded to ≤400 files and ≤3 call-sites per symbol. |
+
 ## Quality Gate
 
 Quality gate evaluates review findings against configurable thresholds to produce a **PASS/FAIL** result. This is useful for CI enforcement — block merges when code quality drops below your standards.
@@ -190,6 +221,8 @@ quality_gate:
    - **block** — exceed threshold = gate FAIL (exit code 2)
    - **warn** — report but don't fail gate
    - **ignore** — skip entirely
+
+   Actions are validated enums — case-insensitive (`block`, `Block`, `BLOCK` all work), and an unknown value (e.g. `blok`) fails at config load instead of silently becoming blocking. A disabled gate (`enabled: false`) never fails.
 4. Overall gate status: **PASSED** or **FAILED**
 
 ### CLI Output

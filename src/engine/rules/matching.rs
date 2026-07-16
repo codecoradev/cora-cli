@@ -33,10 +33,10 @@ pub fn matches_exclude(rule: &CustomRule, file_path: &str) -> bool {
 
 /// Check if a rule's regex pattern matches a line of code.
 pub fn match_rule_against_line(rule: &CustomRule, line: &str) -> bool {
-    match regex::Regex::new(&rule.pattern) {
-        Ok(re) => re.is_match(line),
-        Err(e) => {
-            debug!(rule_id = %rule.id, error = %e, "invalid regex in rule, skipping");
+    match &rule.compiled_pattern {
+        Some(re) => re.is_match(line),
+        None => {
+            debug!(rule_id = %rule.id, "regex not compiled, skipping");
             false
         }
     }
@@ -73,9 +73,11 @@ fn glob_matches(pattern: &str, path: &str) -> bool {
         }
     }
 
-    // Handle "dir/" prefix patterns (directory-based exclusion)
+    // Handle "dir/" prefix patterns (directory-based exclusion). Match only at
+    // path-segment boundaries so a `src/` pattern doesn't also catch `mysrc/`
+    // or `docs/src-guide/` (#66).
     if pattern.ends_with('/') {
-        return path.starts_with(pattern) || path.contains(&pattern.to_string());
+        return path.starts_with(pattern) || dir_segment_match(pattern, path);
     }
 
     // Handle "**" glob in patterns like "tests/**"
@@ -92,6 +94,21 @@ fn glob_matches(pattern: &str, path: &str) -> bool {
 
     // Exact or prefix match
     path == pattern || path.starts_with(&format!("{pattern}/"))
+}
+
+/// True if a directory `pattern` (with trailing `/`) matches a full path
+/// segment somewhere inside `path` — e.g. `src/` matches `foo/src/bar.rs`
+/// but not `mysrc/bar.rs` (#66).
+fn dir_segment_match(pattern: &str, path: &str) -> bool {
+    let mut search_from = 0;
+    while let Some(rel) = path[search_from..].find(pattern) {
+        let abs = search_from + rel;
+        if abs == 0 || path.as_bytes().get(abs - 1) == Some(&b'/') {
+            return true;
+        }
+        search_from = abs + 1;
+    }
+    false
 }
 
 /// Default paths to exclude from rule matching (test directories, fixtures, etc.).
@@ -112,14 +129,17 @@ mod tests {
     use crate::engine::Severity;
 
     fn make_rule(pattern: &str, languages: &[&str], exclude: &[&str]) -> CustomRule {
-        CustomRule {
+        let mut rule = CustomRule {
             id: "test-rule".to_string(),
             pattern: pattern.to_string(),
             severity: Severity::Minor,
             message: "test".to_string(),
             languages: languages.iter().map(|s| s.to_string()).collect(),
             exclude: exclude.iter().map(|s| s.to_string()).collect(),
-        }
+            compiled_pattern: None,
+        };
+        rule.ensure_compiled();
+        rule
     }
 
     #[test]
@@ -154,6 +174,15 @@ mod tests {
     fn not_excluded_src_dir() {
         let rule = make_rule("test", &["all"], &[]);
         assert!(!matches_exclude(&rule, "src/main.rs"));
+    }
+
+    #[test]
+    fn glob_matches_dir_at_segment_boundary_only() {
+        // #66: a `src/` exclude must not match `mysrc/` or `docs/src-guide/`.
+        assert!(glob_matches("src/", "src/main.rs"));
+        assert!(glob_matches("src/", "apps/web/src/main.rs"));
+        assert!(!glob_matches("src/", "mysrc/main.rs"));
+        assert!(!glob_matches("src/", "docs/src-guide.md"));
     }
 
     #[test]

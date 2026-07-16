@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-16
+
+### Highlights
+
+- **Deeper, token-economical cross-file review.** Reviews now resolve **who calls the changed code** (inbound / blast-radius), not just what the changed code calls — so breaking signature/type changes can be flagged. Bounded scanning + thin slices + a signature-only budget fallback keep token cost low.
+- **Config is now validated at load time.** Out-of-range values (e.g. `temperature: 5`) and misspelled keys (`quailty_gate`) fail loudly instead of being silently ignored.
+- **Markdown false positives suppressed.** Findings inside fenced code blocks (a `git push` in a fenced `bash` block flagged as SQL injection) are now dropped across all finding sources.
+- **Performance, security, and correctness fixes** across the scan/review pipeline (10 perf bottlenecks, 2 CVE bumps, 8+ silent-corruption and best-practice bugs).
+
+### Added
+
+- **Inbound caller (blast-radius) resolution.** A new context-chain phase resolves call-sites of functions/types defined or modified in the diff, so breaking changes to their signatures surface their consumers. Gated by new `review.context_chain.include_callers` (default `true`); uses gitignore-aware walking and is bounded (≤400 files, ≤3 call-sites/symbol), injecting only the call line + 1 line of context. New `ContextPriority::CallerSite`.
+- **Definition extraction** (`extract_definitions_from_diff`) for Rust/Python/JS-TS/Go/Java-Kotlin — detects functions/types *declared* in the diff, feeding caller resolution. Rust `mod foo;` and Java `import com.example.*` wildcards are now extracted correctly (#73, #72).
+- **Signature-only budget fallback.** When the token budget can't fit a full function/type body, a thin signature slice (up to `{`) is injected instead of skipping the entry entirely (~3–5× more symbols under the same budget).
+- **`Config::validate()`** (#94) — rejects out-of-range/unsupported values at load: `temperature` (0.0–2.0), `max_tokens`/`timeout` (≥1), `max_tokens_param`, `response_format`, `output.format`, `hook.mode`/`on_violation`/`min_severity`, and `provider.base_url` scheme. Multiple errors are aggregated into one message.
+- **`Profile::validate()`** (#81) — focus `weight` must be 1–10, and `action`/`tone`/`detail_level` must be recognized values.
+- **`deny_unknown_fields`** on all config sections (#80) — misspelled YAML keys are rejected at parse time.
+
+### Changed
+
+- **`CategoryAction` enum** (#57) — `quality_gate.categories.*.action` is now a case-insensitive enum (`block`/`warn`/`ignore`); a typo like `blok` fails loudly at config load instead of silently becoming blocking.
+- **Disabled quality gate never fails** (#58) — `evaluate()` forces `Pass` when `enabled: false`.
+- **`context_chain.max_context_tokens` default** raised 3000 → **5000**.
+- **`issue_type`** serializes consistently as `issue_type` (#48); `type` retained as a deserialize alias.
+- **`Severity::from_str_lossy`** uses `eq_ignore_ascii_case` (no allocation) (#10).
+
+### Fixed
+
+- **Markdown fenced-code-block false positives** (#329) — findings inside fenced code blocks (triple-backtick / triple-tilde) in `.md`/`.mdx`/`.markdown` files are dropped across all finding sources (security/secrets/rules scanners + LLM). Fence state is tracked across full hunk context, so it works even when only the block body was edited.
+- **Cross-file resolver used the wrong ignore list** — `review.rs` passed `ignore.rules` (finding-type strings) instead of `ignore.files` (`target/**`, `node_modules/**`); the resolver could inject build-artifact code. Now uses `ignore.files`.
+- **Test-file detection over-match** (#87) — `is_test_file` is path-segment aware; `latest`, `aspect`, `attestation` are no longer mistaken for test files.
+- **Directory glob excludes over-permissive** (#66) — `src/` matches only at segment boundaries (`mysrc/` no longer caught).
+- **Token estimation** (#68) — non-empty content returns ≥1 token (was 0 under integer division).
+- **DB size** (#23) — `index_stats` queries `PRAGMA page_size` instead of assuming 4096 bytes.
+- **Project-sync workflow** — a merged PR referencing issues via `Refs #N` (not `Closes #N`) no longer fails the `sync` check.
+- **10 scan/review performance bottlenecks** (#335) — precompiled regex, batched DB queries, early cutoffs, file-content cache, single reused Tokio runtime, single-transaction prune, etc.
+- **Security:** bumped `anyhow` 1.0.102 → 1.0.103 (RUSTSEC-2026-0190) and `crossbeam-epoch` 0.9.18 → 0.9.20 (RUSTSEC-2026-0204).
+- Various silent-data-corruption bugs resolved (#333): severity sort, security-findings fallback, deterministic debt-snapshot hashing, debt-trend math, config precedence, `context_chain` merge, and hook-install composition.
+
 ## [0.6.2] - 2026-06-21
 
 ### Fixed — Token Usage Tracking

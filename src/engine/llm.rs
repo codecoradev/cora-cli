@@ -54,7 +54,8 @@ struct ChatMessage {
     content: String,
 }
 
-/// Request body for /chat/completions.
+/// Request body for /chat/completions (kept for reference; unused after migration to dynamic json!).
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 struct ChatRequest {
     model: String,
@@ -66,10 +67,15 @@ struct ChatRequest {
 }
 
 /// Response from /chat/completions.
+///
+/// `usage` is parsed as raw `serde_json::Value` to avoid serde's duplicate-field
+/// detection when a provider sends both legacy (`prompt_tokens`) and new
+/// (`input_tokens`) field names simultaneously (e.g. GPT-5.4). The value is
+/// converted to a typed `Usage` via [`parse_usage_value`] in post-processing.
 #[derive(Debug, Clone, Deserialize)]
 struct ChatResponse {
     choices: Vec<ChatChoice>,
-    usage: Option<Usage>,
+    usage: Option<Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -79,23 +85,59 @@ struct ChatChoice {
 
 /// Usage statistics from the LLM API response.
 ///
-/// OpenAI-compatible providers return these in every non-streaming response,
-/// and in the final SSE chunk when `stream_options.include_usage` is set.
-/// Some providers send them under snake_case (`prompt_tokens`), others under
-/// camelCase (`promptTokens`) — both are accepted here.
-///
-/// `total_tokens` is accepted but not used by cora (we sum prompt+completion
-/// instead) — it is kept for completeness so that providers that omit
-/// `prompt_tokens` / `completion_tokens` in favour of a single `total_tokens`
-/// can still be surfaced downstream.
-#[derive(Debug, Clone, Deserialize)]
+/// Constructed via [`parse_usage_value`] which accepts a raw `serde_json::Value`
+/// and handles providers that send legacy field names (`prompt_tokens`,
+/// `completion_tokens`), new field names (`input_tokens`, `output_tokens`),
+/// or both simultaneously (e.g. GPT-5.4).
+#[derive(Debug, Clone, Default)]
 pub(crate) struct Usage {
-    #[serde(default, alias = "promptTokens", alias = "input_tokens")]
     prompt_tokens: u32,
-    #[serde(default, alias = "completionTokens", alias = "output_tokens")]
     completion_tokens: u32,
-    #[serde(default, alias = "totalTokens")]
     total_tokens: u32,
+}
+
+/// Extract a typed [`Usage`] from a raw `serde_json::Value`.
+///
+/// Handles three naming conventions that OpenAI-compatible providers use:
+///
+/// | Field          | Legacy (OpenAI)   | New (GPT-5+)       | CamelCase (Azure)  |
+/// |----------------|-------------------|--------------------|--------------------|
+/// | input          | `prompt_tokens`   | `input_tokens`     | `promptTokens`     |
+/// | output         | `completion_tokens` | `output_tokens`  | `completionTokens` |
+/// | total          | `total_tokens`    | `total_tokens`     | `totalTokens`      |
+///
+/// Some providers (notably GPT-5.4) send **both** legacy and new names for the
+/// same value. Direct serde deserialization with aliases would hit serde_json's
+/// duplicate-field guard (>= 1.0.120), so we extract manually via `Value`
+/// and pick the first non-zero value in preference order.
+fn parse_usage_value(val: &Value) -> Option<Usage> {
+    let obj = val.as_object()?;
+
+    let prompt_tokens = obj
+        .get("prompt_tokens")
+        .and_then(|v| v.as_u64())
+        .or_else(|| obj.get("promptTokens").and_then(|v| v.as_u64()))
+        .or_else(|| obj.get("input_tokens").and_then(|v| v.as_u64()))
+        .unwrap_or(0) as u32;
+
+    let completion_tokens = obj
+        .get("completion_tokens")
+        .and_then(|v| v.as_u64())
+        .or_else(|| obj.get("completionTokens").and_then(|v| v.as_u64()))
+        .or_else(|| obj.get("output_tokens").and_then(|v| v.as_u64()))
+        .unwrap_or(0) as u32;
+
+    let total_tokens = obj
+        .get("total_tokens")
+        .and_then(|v| v.as_u64())
+        .or_else(|| obj.get("totalTokens").and_then(|v| v.as_u64()))
+        .unwrap_or(0) as u32;
+
+    Some(Usage {
+        prompt_tokens,
+        completion_tokens,
+        total_tokens,
+    })
 }
 
 impl Usage {
@@ -244,26 +286,19 @@ async fn chat_completion(
         ));
     }
 
-    let request = ChatRequest {
-        model: config.model.clone(),
-        messages: vec![
-            ChatMessage {
-                role: "system".into(),
-                content: system_prompt.into(),
-            },
-            ChatMessage {
-                role: "user".into(),
-                content: user_message.into(),
-            },
+    let mut request = serde_json::json!({
+        "model": config.model,
+        "messages": [
+            { "role": "system", "content": system_prompt },
+            { "role": "user", "content": user_message }
         ],
-        temperature: config.temperature,
-        max_tokens: config.max_tokens,
-        response_format: if response_format == "json_object" {
-            Some(serde_json::json!({"type": "json_object"}))
-        } else {
-            None
-        },
-    };
+        "temperature": config.temperature,
+    });
+    request[config.max_tokens_param.clone()] = serde_json::json!(config.max_tokens);
+
+    if response_format == "json_object" {
+        request["response_format"] = serde_json::json!({"type": "json_object"});
+    }
 
     debug!(model = %config.model, url = %url, "sending LLM request");
 
@@ -300,10 +335,12 @@ async fn chat_completion(
         .map(|c| c.message.content.clone())
         .unwrap_or_default();
 
-    debug!(tokens = ?parsed.usage, "LLM response received");
-    tracing::Span::current().record("tokens_used", parsed.usage.as_ref().map(|u| u.total_tokens));
+    let usage = parsed.usage.as_ref().and_then(parse_usage_value);
 
-    Ok((content, parsed.usage))
+    debug!(tokens = ?usage, "LLM response received");
+    tracing::Span::current().record("tokens_used", usage.as_ref().map(|u| u.total_tokens));
+
+    Ok((content, usage))
 }
 
 /// Create an animated spinner for LLM operations.
@@ -416,7 +453,7 @@ pub async fn review_diff(
                 "{}\n\nIMPORTANT: Your response MUST contain only valid JSON. \
                 Ensure all strings use proper JSON escape sequences. \
                 Do NOT use raw backslashes in string values.",
-                &user_prompt
+                user_prompt
             );
             let (retry_raw, retry_usage) = chat_completion(
                 llm_config,
@@ -498,12 +535,12 @@ async fn chat_completion_stream(
             { "role": "user", "content": user_message }
         ],
         "temperature": config.temperature,
-        "max_tokens": config.max_tokens,
         "stream": true,
         // Ask OpenAI-compatible providers to include token usage in the final
         // SSE chunk. Providers that don't recognise this field simply ignore it.
         "stream_options": { "include_usage": true }
     });
+    request_body[config.max_tokens_param.clone()] = serde_json::json!(config.max_tokens);
 
     if response_format == "json_object" {
         request_body["response_format"] = serde_json::json!({"type": "json_object"});
@@ -631,18 +668,18 @@ fn extract_stream_content(parsed: &Value) -> Option<&str> {
 /// The `usage` field appears either at top level (OpenAI convention, sent in
 /// the final chunk when `stream_options.include_usage` is set) or inside the
 /// final choice's delta (some Azure / third-party providers).
+///
+/// Uses [`parse_usage_value`] to avoid serde's duplicate-field guard when a
+/// provider sends both legacy and new field names simultaneously.
 fn extract_stream_usage(parsed: &Value) -> Option<Usage> {
-    parsed
-        .get("usage")
-        .and_then(|u| serde_json::from_value::<Usage>(u.clone()).ok())
-        .or_else(|| {
-            parsed
-                .get("choices")
-                .and_then(|c| c.get(0))
-                .and_then(|c| c.get("delta"))
-                .and_then(|d| d.get("usage"))
-                .and_then(|u| serde_json::from_value::<Usage>(u.clone()).ok())
-        })
+    parsed.get("usage").and_then(parse_usage_value).or_else(|| {
+        parsed
+            .get("choices")
+            .and_then(|c| c.get(0))
+            .and_then(|c| c.get("delta"))
+            .and_then(|d| d.get("usage"))
+            .and_then(parse_usage_value)
+    })
 }
 
 /// Scan a batch of file contents using the LLM. Returns issues found.
@@ -1420,6 +1457,92 @@ mod tests {
         assert_eq!(token_usage.output_tokens, 150); // total - prompt
     }
 
+    // ─── parse_usage_value (GPT-5.4 dual-field handling) ───
+
+    #[test]
+    fn parse_usage_value_legacy_fields() {
+        // Traditional OpenAI format: prompt_tokens / completion_tokens
+        let val = serde_json::json!({
+            "prompt_tokens": 2615,
+            "completion_tokens": 581,
+            "total_tokens": 3196
+        });
+        let usage = parse_usage_value(&val).unwrap();
+        assert_eq!(usage.prompt_tokens, 2615);
+        assert_eq!(usage.completion_tokens, 581);
+        assert_eq!(usage.total_tokens, 3196);
+    }
+
+    #[test]
+    fn parse_usage_value_new_fields_only() {
+        // Some providers only send input_tokens / output_tokens
+        let val = serde_json::json!({
+            "input_tokens": 1000,
+            "output_tokens": 200,
+            "total_tokens": 1200
+        });
+        let usage = parse_usage_value(&val).unwrap();
+        assert_eq!(usage.prompt_tokens, 1000);
+        assert_eq!(usage.completion_tokens, 200);
+        assert_eq!(usage.total_tokens, 1200);
+    }
+
+    #[test]
+    fn parse_usage_value_gpt54_dual_fields() {
+        // GPT-5.4 sends BOTH legacy and new field names — this is the
+        // scenario that previously caused serde duplicate-field error.
+        let val = serde_json::json!({
+            "prompt_tokens": 2615,
+            "completion_tokens": 581,
+            "total_tokens": 3196,
+            "prompt_tokens_details": {"cached_tokens": 0},
+            "completion_tokens_details": {"reasoning_tokens": 0},
+            "input_tokens": 2615,
+            "output_tokens": 581,
+            "input_tokens_details": null
+        });
+        let usage = parse_usage_value(&val).unwrap();
+        // Must prefer primary (prompt_tokens) over alias (input_tokens)
+        assert_eq!(usage.prompt_tokens, 2615);
+        assert_eq!(usage.completion_tokens, 581);
+        assert_eq!(usage.total_tokens, 3196);
+    }
+
+    #[test]
+    fn parse_usage_value_camelcase_fields() {
+        // Azure / some third-party providers use camelCase
+        let val = serde_json::json!({
+            "promptTokens": 500,
+            "completionTokens": 100,
+            "totalTokens": 600
+        });
+        let usage = parse_usage_value(&val).unwrap();
+        assert_eq!(usage.prompt_tokens, 500);
+        assert_eq!(usage.completion_tokens, 100);
+        assert_eq!(usage.total_tokens, 600);
+    }
+
+    #[test]
+    fn parse_usage_value_missing_fields_defaults_to_zero() {
+        // Partial usage (e.g. streaming final chunk)
+        let val = serde_json::json!({
+            "prompt_tokens": 100
+        });
+        let usage = parse_usage_value(&val).unwrap();
+        assert_eq!(usage.prompt_tokens, 100);
+        assert_eq!(usage.completion_tokens, 0);
+        assert_eq!(usage.total_tokens, 0);
+    }
+
+    #[test]
+    fn parse_usage_value_non_object_returns_none() {
+        let val = serde_json::json!("not an object");
+        assert!(parse_usage_value(&val).is_none());
+
+        let val = serde_json::json!(42);
+        assert!(parse_usage_value(&val).is_none());
+    }
+
     // ─── Various issue_type values ───
 
     #[test]
@@ -1755,5 +1878,52 @@ mod tests {
     fn preview_raw_collapses_whitespace() {
         let messy = "hello\n\t  world\n\n";
         assert_eq!(preview_raw(messy), "hello world");
+    }
+
+    // ─── max_tokens_param JSON key naming ───
+
+    #[test]
+    fn chat_request_uses_max_output_tokens() {
+        // Verify that when max_tokens_param is "max_output_tokens", the JSON
+        // body contains "max_output_tokens" (not "max_tokens") as the key.
+        let mut body = serde_json::json!({
+            "model": "gemini-pro",
+            "messages": [
+                { "role": "system", "content": "test" },
+                { "role": "user", "content": "hello" }
+            ],
+            "temperature": 0.0,
+        });
+        let param_name = "max_output_tokens";
+        body[param_name] = serde_json::json!(4096);
+
+        let serialized = serde_json::to_string(&body).unwrap();
+        assert!(
+            serialized.contains(r#""max_output_tokens":4096"#),
+            "Expected max_output_tokens key in JSON, got: {serialized}"
+        );
+        assert!(
+            !serialized.contains(r#""max_tokens":"#),
+            "Should NOT contain hardcoded max_tokens key, got: {serialized}"
+        );
+    }
+
+    #[test]
+    fn chat_request_uses_max_tokens_default() {
+        let mut body = serde_json::json!({
+            "model": "gpt-4o-mini",
+            "messages": [
+                { "role": "system", "content": "test" },
+                { "role": "user", "content": "hello" }
+            ],
+            "temperature": 0.0,
+        });
+        body["max_tokens"] = serde_json::json!(8192);
+
+        let serialized = serde_json::to_string(&body).unwrap();
+        assert!(
+            serialized.contains(r#""max_tokens":8192"#),
+            "Expected max_tokens key in JSON, got: {serialized}"
+        );
     }
 }

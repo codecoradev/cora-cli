@@ -197,10 +197,16 @@ pub fn index_stats(conn: &Connection) -> anyhow::Result<IndexSummary> {
     let total_symbols: i64 =
         conn.query_row("SELECT COUNT(*) FROM symbols", [], |row| row.get(0))?;
     let total_files: i64 = conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))?;
-    let db_size: i64 = conn
-        .query_row("PRAGMA page_count", [], |row| row.get(0))
-        .unwrap_or(0)
-        * 4096; // page_size default
+    let db_size: i64 = {
+        // Use the actual page size instead of assuming 4096 bytes (#23).
+        let page_size: i64 = conn
+            .query_row("PRAGMA page_size", [], |row| row.get(0))
+            .unwrap_or(4096);
+        let page_count: i64 = conn
+            .query_row("PRAGMA page_count", [], |row| row.get(0))
+            .unwrap_or(0);
+        page_size * page_count
+    };
 
     // Symbols by kind
     let mut kind_counts: HashMap<String, usize> = HashMap::new();
@@ -243,18 +249,23 @@ pub fn prune_deleted(conn: &Connection, root: &Path) -> anyhow::Result<usize> {
         .filter_map(|r| r.ok())
         .collect();
 
-    for path in &paths {
-        let full = root.join(path);
-        if !full.exists() {
-            let tx = conn.unchecked_transaction()?;
+    // Batch all deletes in a single transaction instead of per-file
+    let to_prune: Vec<&String> = paths
+        .iter()
+        .filter(|path| !root.join(path).exists())
+        .collect();
+
+    if !to_prune.is_empty() {
+        let tx = conn.unchecked_transaction()?;
+        for path in &to_prune {
             tx.execute(
                 "DELETE FROM symbols WHERE file = ?1",
                 rusqlite::params![path],
             )?;
             tx.execute("DELETE FROM files WHERE path = ?1", rusqlite::params![path])?;
-            tx.commit()?;
-            deleted += 1;
         }
+        tx.commit()?;
+        deleted = to_prune.len();
     }
 
     if deleted > 0 {

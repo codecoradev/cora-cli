@@ -419,29 +419,32 @@ fn detect_function_entry(line: &str, language: &str) -> Option<String> {
 
     match language {
         "rs" => {
-            // pub fn name( or fn name(
-            let re = regex::Regex::new(r"(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*[(<]").unwrap();
-            re.captures(trimmed)
+            static RE: LazyLock<Regex> =
+                LazyLock::new(|| Regex::new(r"(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*[(<]").unwrap());
+            RE.captures(trimmed)
                 .map(|c| c.get(1).unwrap().as_str().to_string())
         }
         "go" => {
-            let re = regex::Regex::new(r"func\s+(?:\([^)]+\)\s+)?(\w+)\s*\(").unwrap();
-            re.captures(trimmed)
+            static RE: LazyLock<Regex> =
+                LazyLock::new(|| Regex::new(r"func\s+(?:\([^)]+\)\s+)?(\w+)\s*\(").unwrap());
+            RE.captures(trimmed)
                 .map(|c| c.get(1).unwrap().as_str().to_string())
         }
         "c" | "cpp" | "h" | "hpp" => {
-            let re = regex::Regex::new(r"[\w:*]+\s+(\w+)\s*\([^;]*\)\s*\{").unwrap();
-            re.captures(trimmed)
+            static RE: LazyLock<Regex> =
+                LazyLock::new(|| Regex::new(r"[\w:*]+\s+(\w+)\s*\([^;]*\)\s*\{").unwrap());
+            RE.captures(trimmed)
                 .map(|c| c.get(1).unwrap().as_str().to_string())
         }
         "java" | "kt" => {
-            let re = regex::Regex::new(r"\b(\w+)\s*\([^)]*\)\s*\{").unwrap();
-            re.captures(trimmed)
+            static RE: LazyLock<Regex> =
+                LazyLock::new(|| Regex::new(r"\b(\w+)\s*\([^)]*\)\s*\{").unwrap());
+            RE.captures(trimmed)
                 .map(|c| c.get(1).unwrap().as_str().to_string())
         }
         "py" => {
-            let re = regex::Regex::new(r"def\s+(\w+)").unwrap();
-            re.captures(trimmed)
+            static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"def\s+(\w+)").unwrap());
+            RE.captures(trimmed)
                 .map(|c| c.get(1).unwrap().as_str().to_string())
         }
         _ => None,

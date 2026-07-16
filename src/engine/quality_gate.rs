@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 /// Quality gate configuration — parsed from `.cora.yaml` under `quality_gate`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QualityGateConfig {
     /// Enable quality gate evaluation.
     #[serde(default)]
@@ -26,6 +27,7 @@ pub struct QualityGateConfig {
 
 /// Global threshold configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ThresholdConfig {
     /// Max critical issues allowed (default: 0).
     #[serde(default = "default_max_critical")]
@@ -67,20 +69,62 @@ impl Default for ThresholdConfig {
     }
 }
 
+/// Per-category gate action.
+///
+/// Deserialized case-insensitively from `.cora.yaml` so that `block`,
+/// `Block`, and `BLOCK` are all accepted — but an unknown value like `blok`
+/// fails loudly at config load instead of silently becoming blocking (#57).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CategoryAction {
+    Block,
+    #[default]
+    Warn,
+    Ignore,
+}
+
+impl CategoryAction {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CategoryAction::Block => "block",
+            CategoryAction::Warn => "warn",
+            CategoryAction::Ignore => "ignore",
+        }
+    }
+
+    /// Parse case-insensitively. Returns `None` for unknown values.
+    pub fn from_str_lossy(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "block" => Some(Self::Block),
+            "warn" => Some(Self::Warn),
+            "ignore" => Some(Self::Ignore),
+            _ => None,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for CategoryAction {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str_lossy(&s)
+            .ok_or_else(|| serde::de::Error::unknown_variant(&s, &["block", "warn", "ignore"]))
+    }
+}
+
 /// Per-category gate configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CategoryConfig {
-    /// Action: "block" (fail CI), "warn" (comment only), "ignore" (skip).
-    #[serde(default = "default_category_action")]
-    pub action: String,
+    /// Action: `block` (fail CI), `warn` (comment only), `ignore` (skip).
+    #[serde(default)]
+    pub action: CategoryAction,
 
     /// Max findings allowed in this category.
     #[serde(default = "default_disabled")]
     pub max_findings: usize,
-}
-
-fn default_category_action() -> String {
-    "warn".to_string()
 }
 
 /// Result of quality gate evaluation.
@@ -131,7 +175,7 @@ pub struct CheckResult {
     /// Did it pass?
     pub passed: bool,
     /// Category action (for category checks).
-    pub action: Option<String>,
+    pub action: Option<CategoryAction>,
 }
 
 /// Counts of findings by severity.
@@ -212,7 +256,7 @@ pub fn evaluate(issues: &[ReviewIssue], config: &QualityGateConfig) -> GateResul
 
     // Evaluate per-category overrides
     for (category, cat_config) in &config.categories {
-        if cat_config.action == "ignore" {
+        if cat_config.action == CategoryAction::Ignore {
             continue;
         }
         let cat_count = category_counts.get(category).copied().unwrap_or(0);
@@ -221,15 +265,21 @@ pub fn evaluate(issues: &[ReviewIssue], config: &QualityGateConfig) -> GateResul
             threshold: cat_config.max_findings,
             actual: cat_count,
             passed: cat_count <= cat_config.max_findings,
-            action: Some(cat_config.action.clone()),
+            action: Some(cat_config.action),
         });
     }
 
     // Determine overall status:
-    // FAIL if any "block" category or global threshold is exceeded
-    let status = if checks
+    // #58: A disabled gate must never FAIL. Counts and checks are still
+    // produced for reporting, but a disabled gate forces PASS.
+    // Otherwise FAIL if any "block" category or global threshold is exceeded.
+    // Global thresholds have action None (always fail when exceeded);
+    // "warn" categories never fail the gate.
+    let status = if !config.enabled {
+        GateStatus::Pass
+    } else if checks
         .iter()
-        .any(|c| !c.passed && c.action.as_deref() != Some("warn"))
+        .any(|c| !c.passed && c.action != Some(CategoryAction::Warn))
     {
         GateStatus::Fail
     } else {
@@ -286,8 +336,7 @@ pub fn format_gate_output(result: &GateResult) -> String {
             };
             let action_label = check
                 .action
-                .as_deref()
-                .map(|a| format!(" ({})", a.dimmed()))
+                .map(|a| format!(" ({})", a.as_str().dimmed()))
                 .unwrap_or_default();
             out.push_str(&format!(
                 "  {} {:<20} → {} found   {}{}\n",
@@ -377,7 +426,7 @@ mod tests {
         categories.insert(
             "performance".to_string(),
             CategoryConfig {
-                action: "block".to_string(),
+                action: CategoryAction::Block,
                 max_findings: 0,
             },
         );
@@ -397,7 +446,7 @@ mod tests {
         categories.insert(
             "performance".to_string(),
             CategoryConfig {
-                action: "warn".to_string(),
+                action: CategoryAction::Warn,
                 max_findings: 0,
             },
         );
@@ -418,7 +467,7 @@ mod tests {
         categories.insert(
             "style".to_string(),
             CategoryConfig {
-                action: "ignore".to_string(),
+                action: CategoryAction::Ignore,
                 max_findings: 0,
             },
         );
@@ -508,5 +557,48 @@ mod tests {
             .unwrap();
         assert!(!major_check.passed);
         assert_eq!(major_check.actual, 2);
+    }
+
+    // ─── #58: disabled gate must never fail ───
+
+    #[test]
+    fn gate_disabled_never_fails_even_with_critical() {
+        let issues = vec![
+            make_issue(Severity::Critical, "security"),
+            make_issue(Severity::Critical, "bug"),
+        ];
+        let config = QualityGateConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        let result = evaluate(&issues, &config);
+        assert_eq!(result.status, GateStatus::Pass);
+        // No threshold checks are produced when disabled.
+        assert!(!result.checks.is_empty());
+        // total_findings still reflects input for reporting.
+        assert_eq!(result.total_findings, 2);
+        // Counts are still computed for reporting even when the gate is off.
+        assert_eq!(result.severity_counts.critical, 2);
+    }
+
+    // ─── #57: CategoryAction case-insensitive enum ───
+
+    #[test]
+    fn category_action_deserializes_case_insensitive() {
+        let yaml = "action: BLOCK\nmax_findings: 0";
+        let cc: CategoryConfig = serde_yaml_ng::from_str(yaml).unwrap();
+        assert_eq!(cc.action, CategoryAction::Block);
+
+        let yaml2 = "action: Warn";
+        let cc2: CategoryConfig = serde_yaml_ng::from_str(yaml2).unwrap();
+        assert_eq!(cc2.action, CategoryAction::Warn);
+    }
+
+    #[test]
+    fn category_action_unknown_value_errors() {
+        let yaml = "action: blok\nmax_findings: 0";
+        let result: Result<CategoryConfig, _> = serde_yaml_ng::from_str(yaml);
+        // A typo must fail loudly, not silently become blocking.
+        assert!(result.is_err());
     }
 }

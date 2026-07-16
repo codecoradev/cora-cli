@@ -1,6 +1,6 @@
 [package]
 name = "cora-cli"
-version = "0.6.2"
+version = "0.7.0"
 edition = "2024"
 description = "CLI-first AI code review — BYOK, diff/scan/branch, pre-commit hooks"
 license = "MIT"
@@ -27,7 +27,7 @@ serde_json = "1"
 serde_yaml_ng = "0.10"
 
 # Git operations
-git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"] }
 
 # Terminal output
 colored = "3"
