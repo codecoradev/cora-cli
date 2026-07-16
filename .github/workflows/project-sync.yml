@@ -121,8 +121,10 @@ jobs:
               | python3 -c "
                   import sys, json
                   data = json.load(sys.stdin)
+                  node = (data.get('data') or {}).get('node') or {}
+                  items = (node.get('items') or {}).get('nodes') or []
                   target = '$content_node_id'
-                  for n in data['data']['node']['items']['nodes']:
+                  for n in items:
                       c = n.get('content') or {}
                       if c.get('id') == target:
                           print(n['id'])
@@ -176,17 +178,21 @@ jobs:
                 | python3 -c "
                     import sys, json
                     data = json.load(sys.stdin)
-                    nodes = data['data']['node']['closingIssuesReferences']['nodes']
+                    node = (data.get('data') or {}).get('node') or {}
+                    nodes = (node.get('closingIssuesReferences') or {}).get('nodes') or []
                     for n in nodes:
                         print(n['id'] + ' ' + str(n['number']))
                   " 2>/dev/null || true)
 
               if [ -z "$LINKED" ]; then
                 echo "No linked closing issues found for PR #$PR_NUMBER."
-                # If the PR content itself is on the board, mark it Done.
-                item_id=$(get_item_id "$PR_NODE_ID")
+                # A merged PR that references issues via "Refs #N" (rather than
+                # a closing keyword) legitimately has no closing references —
+                # this is not an error. Best-effort: mark the PR itself Done if
+                # it happens to be on the board.
+                item_id=$(get_item_id "$PR_NODE_ID" || true)
                 if [ -n "$item_id" ]; then
-                  set_done "$item_id"
+                  set_done "$item_id" || true
                 fi
               else
                 echo "$LINKED" | while read -r issue_node issue_num; do
