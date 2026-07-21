@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to cora-cli are documented in this file.
+All notable changes to cora-code are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -242,7 +242,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Profiles bugs** — path resolution with project root, fail-fast on invalid config, dedup merge by `id` (#238)
 - **Code Scanning alert #79** — eliminated redundant `parse_diff()` call in language context injection
-- **Download hardening** — 5x retry with exponential backoff, gzip validation, checksum verification for cora-cli binary download in CI (#221)
+- **Download hardening** — 5x retry with exponential backoff, gzip validation, checksum verification for cora-code binary download in CI (#221)
 - **curl hardening** — `--fail --show-error` + `set -e` guard prevents silent HTML downloads
 - **Checksum enforcement** — hard fail on missing/invalid checksums (was warning-only)
 - **Exact checksum match** — `awk` exact filename lookup replaces `grep` substring match
@@ -374,7 +374,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`BundlingConfig`** — `strategy`, `max_chars_per_group`, `max_files_per_group`, `coalesce_by_directory`, `coalesce_by_language` in `.cora.yaml`
 - **`ContextConfig`** — `enabled`, `max_context_tokens`, `follow_depth`, `max_symbols` in `.cora.yaml` review section
 - **Default SARIF upload to GitHub Code Scanning ON** — opt-out with `upload-sarif: false` (#148)
-- **SARIF tool branding** — `CodeCora` driver name (`codecoradev/cora-cli`) in SARIF output (#148)
+- **SARIF tool branding** — `CodeCora` driver name (`codecoradev/cora-code`) in SARIF output (#148)
 
 ### Changed
 
@@ -395,7 +395,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Engine layer migrated from `anyhow` to `thiserror`** — structured error handling in engine, `anyhow` retained in CLI layer (#86)
 - **All clippy pedantic warnings resolved** — 175 → 0 warnings across entire codebase (#84)
-- **Repo URLs updated** to `codecoradev/cora-cli` org (#137)
+- **Repo URLs updated** to `codecoradev/cora-code` org (#137)
 - **CI actions bumped** — `upload-artifact@v7`, Node 24 strict mode (`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`) (#142)
 
 ### Fixed
@@ -576,7 +576,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Replaced ASCII art banner with eye icon in README
-- Updated README branding to cora-cli
+- Updated README branding to cora-code
 
 ### Fixed
 
@@ -600,25 +600,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.6.1...develop
-[0.6.1]: https://github.com/codecoradev/cora-cli/compare/v0.6.0...v0.6.1
-[0.6.0]: https://github.com/codecoradev/cora-cli/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/codecoradev/cora-cli/compare/v0.4.6...v0.5.0
-[0.4.6]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
-[0.4.5]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...v0.4.5
-[0.4.4]: https://github.com/codecoradev/cora-cli/compare/v0.4.3...v0.4.4
-[0.4.3]: https://github.com/codecoradev/cora-cli/compare/v0.4.2...v0.4.3
-[0.4.2]: https://github.com/codecoradev/cora-cli/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/codecoradev/cora-cli/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/codecoradev/cora-cli/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/codecoradev/cora-cli/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/codecoradev/cora-cli/compare/v0.1.8...v0.2.0
-[0.1.8]: https://github.com/codecoradev/cora-cli/compare/v0.1.7...v0.1.8
-[0.1.7]: https://github.com/codecoradev/cora-cli/compare/v0.1.6...v0.1.7
-[0.1.6]: https://github.com/codecoradev/cora-cli/compare/v0.1.5...v0.1.6
-[0.1.5]: https://github.com/codecoradev/cora-cli/compare/v0.1.4...v0.1.5
-[0.1.4]: https://github.com/codecoradev/cora-cli/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/codecoradev/cora-cli/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/codecoradev/cora-cli/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/codecoradev/cora-cli/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/codecoradev/cora-cli/releases/tag/v0.1.0
+[Unreleased]: https://github.com/codecoradev/cora-code/compare/v0.6.1...develop
+[0.6.1]: https://github.com/codecoradev/cora-code/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/codecoradev/cora-code/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/codecoradev/cora-code/compare/v0.4.6...v0.5.0
+[0.4.6]: https://github.com/codecoradev/cora-code/compare/v0.4.5...v0.4.6
+[0.4.5]: https://github.com/codecoradev/cora-code/compare/v0.4.4...v0.4.5
+[0.4.4]: https://github.com/codecoradev/cora-code/compare/v0.4.3...v0.4.4
+[0.4.3]: https://github.com/codecoradev/cora-code/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/codecoradev/cora-code/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/codecoradev/cora-code/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/codecoradev/cora-code/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/codecoradev/cora-code/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/codecoradev/cora-code/compare/v0.1.8...v0.2.0
+[0.1.8]: https://github.com/codecoradev/cora-code/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/codecoradev/cora-code/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/codecoradev/cora-code/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/codecoradev/cora-code/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/codecoradev/cora-code/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/codecoradev/cora-code/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/codecoradev/cora-code/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/codecoradev/cora-code/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/codecoradev/cora-code/releases/tag/v0.1.0

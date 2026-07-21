@@ -5,7 +5,7 @@ export default createConfig({
   title: 'Cora',
   description: 'AI-Powered Code Review CLI — BYOK, zero config, runs in your terminal',
   accent: 'green',
-  repo: 'cora-cli',
+  repo: 'cora-code',
   head: [
     ['meta', { property: 'og:title', content: 'Cora — AI Code Review CLI' }],
     ['meta', { property: 'og:description', content: 'BYOK, zero config, runs in your terminal' }],

@@ -9,7 +9,7 @@ title: Getting Started
 Get up and running with cora in three simple steps.
 
 1. **Install cora** — Single binary, no runtime dependencies:
-   `curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh`
+   `curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install.sh | sh`
 
 2. **Authenticate** — Run `cora auth login` to pick your provider and enter your API key.
    Cora stores the API key in `~/.cora/auth.toml` (never committed to git) and provider settings in `~/.cora/config.yaml`.
@@ -156,7 +156,7 @@ Install [Uteke](https://github.com/codecoradev/uteke) to give Cora a memory:
 
 ```bash
 # Install both tools
-curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-bundle.sh | sh
+curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install-bundle.sh | sh
 ```
 
 Then enable memory in reviews:

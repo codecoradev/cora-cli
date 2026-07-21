@@ -179,7 +179,7 @@ ignore:
 
 The action automatically:
 
-1. **Resolves** the latest cora-cli version from GitHub releases
+1. **Resolves** the latest cora-code version from GitHub releases
 2. **Downloads** the binary with retry + checksum verification
 3. **Runs** `cora review` on the PR diff
 4. **Posts** a formatted comment on the PR with findings
@@ -209,7 +209,7 @@ jobs:
         env:
           CORA_API_KEY: ${{ secrets.CORA_API_KEY }}
         run: |
-          curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+          curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install.sh | sh
           cora review --base origin/main --format sarif
 ```
 
@@ -233,10 +233,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install cora-cli
+      - name: Install cora-code
         run: |
-          VERSION=$(curl -sf https://api.github.com/repos/codecoradev/cora-cli/releases/latest | jq -r '.tag_name')
-          curl -sfL "https://github.com/codecoradev/cora-cli/releases/download/${VERSION}/cora-cli-x86_64-unknown-linux-gnu.tar.gz" | tar xz
+          VERSION=$(curl -sf https://api.github.com/repos/codecoradev/cora-code/releases/latest | jq -r '.tag_name')
+          curl -sfL "https://github.com/codecoradev/cora-code/releases/download/${VERSION}/cora-code-x86_64-unknown-linux-gnu.tar.gz" | tar xz
           sudo mv cora /usr/local/bin/
 
       - name: Run review
@@ -285,8 +285,8 @@ cora-review:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
-    - VERSION=$(curl -sf https://api.github.com/repos/codecoradev/cora-cli/releases/latest | jq -r '.tag_name')
-    - curl -sfL "https://github.com/codecoradev/cora-cli/releases/download/${VERSION}/cora-cli-x86_64-unknown-linux-gnu.tar.gz" | tar xz
+    - VERSION=$(curl -sf https://api.github.com/repos/codecoradev/cora-code/releases/latest | jq -r '.tag_name')
+    - curl -sfL "https://github.com/codecoradev/cora-code/releases/download/${VERSION}/cora-code-x86_64-unknown-linux-gnu.tar.gz" | tar xz
     - mv cora /usr/local/bin/
   script:
     - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
@@ -329,8 +329,8 @@ pipelines:
           script:
             - apt-get update && apt-get install -y jq
             - |
-              VERSION=$(curl -sf https://api.github.com/repos/codecoradev/cora-cli/releases/latest | jq -r '.tag_name')
-              curl -sfL "https://github.com/codecoradev/cora-cli/releases/download/${VERSION}/cora-cli-x86_64-unknown-linux-gnu.tar.gz" | tar xz
+              VERSION=$(curl -sf https://api.github.com/repos/codecoradev/cora-code/releases/latest | jq -r '.tag_name')
+              curl -sfL "https://github.com/codecoradev/cora-code/releases/download/${VERSION}/cora-code-x86_64-unknown-linux-gnu.tar.gz" | tar xz
               mv cora /usr/local/bin/
             - git fetch origin $BITBUCKET_PR_DESTINATION_BRANCH
             - cora review --base origin/$BITBUCKET_PR_DESTINATION_BRANCH --format markdown > review.md

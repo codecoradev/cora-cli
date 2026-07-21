@@ -235,7 +235,7 @@ pub async fn execute_review(
                         "tool": {
                             "driver": {
                                 "name": "cora",
-                                "informationUri": "https://github.com/codecoradev/cora-cli",
+                                "informationUri": "https://github.com/codecoradev/cora-code",
                                 "version": env!("CARGO_PKG_VERSION")
                             }
                         },

@@ -190,7 +190,7 @@ Cora works standalone. Install [Uteke](https://github.com/codecoradev/uteke) to 
 ### Install Both
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-bundle.sh | sh
+curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install-bundle.sh | sh
 ```
 
 ### Usage

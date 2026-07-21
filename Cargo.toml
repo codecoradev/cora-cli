@@ -1,10 +1,10 @@
 [package]
-name = "cora-cli"
+name = "cora-code"
 version = "0.7.0"
 edition = "2024"
 description = "CLI-first AI code review — BYOK, diff/scan/branch, pre-commit hooks"
 license = "MIT"
-repository = "https://github.com/codecoradev/cora-cli"
+repository = "https://github.com/codecoradev/cora-code"
 readme = "README.md"
 keywords = ["cli", "code-review", "ai", "git", "pre-commit"]
 categories = ["command-line-utilities", "development-tools"]

@@ -2,12 +2,12 @@
 
 ## Project Overview
 
-**cora-cli** is a Rust CLI tool for AI-powered code review. Bring Your Own Keys (BYOK) —
+**cora-code** is a Rust CLI tool for AI-powered code review. Bring Your Own Keys (BYOK) —
 no managed API, no cloud service. Runs locally against diffs, scans, or branches.
 
 - **License:** MIT
 - **Edition:** Rust 2024 (MSRV 1.85)
-- **Repo:** `codecoradev/cora-cli`
+- **Repo:** `codecoradev/cora-code`
 - **Default branch:** `develop`
 - **Marketplace:** https://github.com/marketplace/actions/cora-ai-code-review
 - **Website:** https://codecora.dev
@@ -275,7 +275,7 @@ reality BEFORE version bump.
 - [ ] **Consistent terminology**: Same name for features across all files (e.g. "Quality Gate" not "quality gate" or "gate check")
 - [ ] **No broken links**: All `codecora.dev` links resolve. All internal doc links work
 - [ ] **Version numbers**: README install example, docs/installation.md pin example, AGENT.md test count — all match current version
-- [ ] **Star History chart**: Repository list includes all relevant repos (e.g. `cora-cli,uteke`)
+- [ ] **Star History chart**: Repository list includes all relevant repos (e.g. `cora-code,uteke`)
 
 ### 4. CI & Scanning
 
@@ -311,7 +311,7 @@ Generate a comprehensive pre-release report covering:
 ║           LAPORAN PRE-RELEASE vX.Y.Z — FINAL               ║
 ╚══════════════════════════════════════════════════════════════╝
 
-📦 REPOSITORY: codecoradev/cora-cli
+📦 REPOSITORY: codecoradev/cora-code
 🌿 BRANCH:     develop (N commits ahead of main)
 🏷️  TAG:       Next → vX.Y.Z
 📋 CARGO:      version = "0.X.Y" (needs bump)
@@ -384,7 +384,7 @@ After release completes, verify:
 - [ ] GitHub Release page shows vX.Y.Z with correct changelog
 - [ ] 4 platform binaries attached to release
 - [ ] SHA256 checksums file included
-- [ ] `crates.io` shows new version: `cargo search cora-cli`
+- [ ] `crates.io` shows new version: `cargo search cora-code`
 - [ ] `codecora.dev` reflects new docs
 - [ ] Marketplace action still works (test on a test PR)
 - [ ] Close the released milestone/issues
@@ -396,7 +396,7 @@ If release fails or has critical bugs:
 
 1. Delete the tag: `git push origin --delete vX.Y.Z`
 2. Delete the GitHub Release
-3. Yank from crates.io: `cargo yank cora-cli@X.Y.Z`
+3. Yank from crates.io: `cargo yank cora-code@X.Y.Z`
 4. Fix on develop, re-tag when ready
 
 ### Version Numbering Convention
