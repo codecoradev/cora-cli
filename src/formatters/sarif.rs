@@ -123,7 +123,7 @@ fn build_sarif(issues: &[ReviewIssue]) -> Value {
             "tool": {
                 "driver": {
                     "name": "CodeCora",
-                    "fullName": "codecoradev/cora-cli",
+                    "fullName": "codecoradev/cora-code",
                     "version": env!("CARGO_PKG_VERSION"),
                     "informationUri": env!("CARGO_PKG_REPOSITORY"),
                     "rules": rules
@@ -234,7 +234,7 @@ mod tests {
             parsed["runs"][0]["tool"]["driver"]["fullName"]
                 .as_str()
                 .unwrap(),
-            "codecoradev/cora-cli"
+            "codecoradev/cora-code"
         );
     }
 

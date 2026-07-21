@@ -4,9 +4,9 @@
 
 **AI-Powered Code Review CLI — BYOK**
 
-[![GitHub stars](https://img.shields.io/github/stars/codecoradev/cora-cli?style=social)](https://github.com/codecoradev/cora-cli/stargazers)
-[![CI](https://github.com/codecoradev/cora-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/codecoradev/cora-cli/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/cora-cli.svg)](https://crates.io/crates/cora-cli)
+[![GitHub stars](https://img.shields.io/github/stars/codecoradev/cora-code?style=social)](https://github.com/codecoradev/cora-code/stargazers)
+[![CI](https://github.com/codecoradev/cora-code/actions/workflows/ci.yml/badge.svg)](https://github.com/codecoradev/cora-code/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/cora-code.svg)](https://crates.io/crates/cora-code)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/Rust-1.85+-orange.svg)](https://www.rust-lang.org/)
 
@@ -42,17 +42,17 @@ Pick **one** install method — mixing channels can leave stale binaries on your
 |---|---|
 | **`curl … install.sh`** (recommended) | Quick standalone install; fetches the latest GitHub release binary |
 | **`cargo install --git …`** | You already have a Rust toolchain; builds from source |
-| **Pre-built binaries** | Manual download from [Releases](https://github.com/codecoradev/cora-cli/releases) |
+| **Pre-built binaries** | Manual download from [Releases](https://github.com/codecoradev/cora-code/releases) |
 
 ```bash
 # Recommended: Cora only (standalone)
-curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install.sh | sh
 
 # Or install both Cora + Uteke (code review with memory)
-curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-bundle.sh | sh
+curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install-bundle.sh | sh
 
 # Or build from source with cargo
-cargo install --git https://github.com/codecoradev/cora-cli
+cargo install --git https://github.com/codecoradev/cora-code
 ```
 
 > Pin a version: `CORA_VERSION=v0.6.1 curl -fsSL ... | sh`
@@ -64,7 +64,7 @@ which -a cora            # list every `cora` on your PATH (one entry = healthy)
 cora --version           # should match the latest release
 ```
 
-If `which -a cora` shows more than one path (e.g. `~/.local/bin/cora` and `~/.cargo/bin/cora`), remove the one you don't want or reorder your `PATH`. See [Issue #314](https://github.com/codecoradev/cora-cli/issues/314) for background.
+If `which -a cora` shows more than one path (e.g. `~/.local/bin/cora` and `~/.cargo/bin/cora`), remove the one you don't want or reorder your `PATH`. See [Issue #314](https://github.com/codecoradev/cora-code/issues/314) for background.
 
 <details>
 <summary><b>macOS note — binary killed on launch (<code>Killed: 9</code>)?</b></summary>
@@ -204,7 +204,7 @@ Cora works 100% standalone. Install [Uteke](https://github.com/codecoradev/uteke
 curl -fsSL https://raw.githubusercontent.com/codecoradev/uteke/main/install.sh | sh
 
 # Or install both at once
-curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-bundle.sh | sh
+curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install-bundle.sh | sh
 
 # Enable memory
 export PATH="$HOME/.local/bin:$PATH"
@@ -238,11 +238,11 @@ Provider-specific keys are auto-detected: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=codecoradev%2Fcora-cli%2Ccodecoradev%2Futeke&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=codecoradev%2Fcora-code%2Ccodecoradev%2Futeke&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=codecoradev/cora-cli%2Ccodecoradev/uteke&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=codecoradev/cora-cli%2Ccodecoradev/uteke&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=codecoradev/cora-cli%2Ccodecoradev/uteke&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=codecoradev/cora-code%2Ccodecoradev/uteke&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=codecoradev/cora-code%2Ccodecoradev/uteke&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=codecoradev/cora-code%2Ccodecoradev/uteke&type=date&legend=top-left" />
  </picture>
 </a>
 

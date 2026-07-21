@@ -4,7 +4,7 @@
 # Installs both Cora (AI code review) and Uteke (AI memory) in one command.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-bundle.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install-bundle.sh | sh
 #
 # With version pinning:
 #   CORA_VERSION=v0.5.1 UTEKE_VERSION=v0.1.0 curl -fsSL ... | sh
@@ -47,7 +47,7 @@ install_cora() {
         fi
     fi
 
-    curl -fsSL "https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh" | sh
+    curl -fsSL "https://raw.githubusercontent.com/codecoradev/cora-code/main/install.sh" | sh
     ok "Cora installed: $(cora --version 2>/dev/null | head -1)"
 }
 
@@ -113,7 +113,7 @@ verify() {
         echo "    curl -fsSL https://raw.githubusercontent.com/codecoradev/uteke/main/install.sh | sh"
     elif [ "$UTEKE_OK" = "yes" ]; then
         printf "${YELLOW}Uteke installed.${NC} Install Cora separately for code review:\n"
-        echo "    curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh"
+        echo "    curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install.sh | sh"
     else
         error "Neither tool was installed successfully."
     fi
