@@ -6,6 +6,7 @@ use tracing_subscriber::FmtSubscriber;
 
 mod commands;
 mod config;
+mod data_dir;
 mod embed;
 mod engine;
 mod error;
@@ -15,6 +16,8 @@ mod hook;
 mod index;
 mod mcp;
 mod progress;
+
+use index::schema;
 
 use commands::{
     auth, commit_cmd, completion, config_cmd, debt, hook_cmd, init, profile, providers, review,
@@ -546,17 +549,22 @@ async fn main() -> Result<()> {
             verbose,
         } => {
             let project_root = std::env::current_dir()?;
-            let db_path = index::default_db_path(&project_root);
+            let conn = index::open_global_index()?;
+            let project_id = index::ensure_project(&conn, &project_root)?;
 
-            if rebuild && db_path.exists() {
-                std::fs::remove_file(&db_path)?;
-                eprintln!("{}", "Dropped existing index.".dimmed());
+            if rebuild {
+                // Delete all data for this project via CASCADE
+                schema::delete_project(&conn, project_id)?;
+                eprintln!("{}", "Dropped existing index for project.".dimmed());
+                // Re-register the project (gets a fresh project_id)
+                let _fresh_id = schema::get_or_create_project(
+                    &conn,
+                    &project_root.to_string_lossy(),
+                )?;
             }
 
-            let conn = index::open_index(&db_path)?;
-
             if show_stats {
-                let summary = index::index_stats(&conn)?;
+                let summary = index::index_stats(&conn, project_id)?;
                 println!("{}", "SYMBOL INDEX".cyan().bold());
                 println!("{}", "────────────────────────────".dimmed());
                 println!("  Total symbols:  {}", summary.total_symbols);
@@ -573,7 +581,7 @@ async fn main() -> Result<()> {
                     println!("    {lang:<16} {count}");
                 }
             } else if prune {
-                let deleted = index::prune_deleted(&conn, &project_root)?;
+                let deleted = index::prune_deleted(&conn, project_id, &project_root)?;
                 println!(
                     "{}",
                     format!("Pruned {deleted} deleted files from index.").green()
@@ -622,7 +630,10 @@ async fn main() -> Result<()> {
                     )
                     .green()
                 );
-                eprintln!("{}", format!("   Database: {}", db_path.display()).dimmed());
+                eprintln!(
+                    "{}",
+                    format!("   Database: {}", crate::data_dir::graph_db_path().display()).dimmed()
+                );
             }
             0
         }
@@ -636,14 +647,15 @@ async fn main() -> Result<()> {
             json,
         } => {
             let project_root = std::env::current_dir()?;
-            let db_path = index::default_db_path(&project_root);
+            let db_path = crate::data_dir::graph_db_path();
 
             if !db_path.exists() {
                 eprintln!("{}", "No index found. Run `cora index` first.".yellow());
                 std::process::exit(1);
             }
 
-            let conn = index::open_index(&db_path)?;
+            let conn = index::open_global_index()?;
+            let project_id = index::ensure_project(&conn, &project_root)?;
 
             let sym_kind = kind.as_deref().map(index::SymbolKind::from_str);
 
@@ -655,7 +667,7 @@ async fn main() -> Result<()> {
                 limit,
             };
 
-            let results = index::search(&conn, &q)?;
+            let results = index::search(&conn, project_id, &q)?;
 
             if json {
                 let json_results: Vec<serde_json::Value> = results
@@ -707,13 +719,14 @@ async fn main() -> Result<()> {
             json,
         } => {
             let project_root = std::env::current_dir()?;
-            let db_path = index::default_db_path(&project_root);
+            let db_path = crate::data_dir::graph_db_path();
             if !db_path.exists() {
                 eprintln!("{}", "No index found. Run `cora index` first.".yellow());
                 std::process::exit(1);
             }
-            let conn = index::open_index(&db_path)?;
-            let callers = index::graph::find_callers(&conn, &symbol, limit)?;
+            let conn = index::open_global_index()?;
+            let project_id = index::ensure_project(&conn, &project_root)?;
+            let callers = index::graph::find_callers(&conn, project_id, &symbol, limit)?;
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&callers)?);
@@ -743,13 +756,14 @@ async fn main() -> Result<()> {
             json,
         } => {
             let project_root = std::env::current_dir()?;
-            let db_path = index::default_db_path(&project_root);
+            let db_path = crate::data_dir::graph_db_path();
             if !db_path.exists() {
                 eprintln!("{}", "No index found. Run 'cora index' first.".yellow());
                 std::process::exit(1);
             }
-            let conn = index::open_index(&db_path)?;
-            let impact = index::graph::impact_analysis(&conn, &symbol, depth)?;
+            let conn = index::open_global_index()?;
+            let project_id = index::ensure_project(&conn, &project_root)?;
+            let impact = index::graph::impact_analysis(&conn, project_id, &symbol, depth)?;
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&impact)?);
@@ -790,12 +804,13 @@ async fn main() -> Result<()> {
             json,
         } => {
             let project_root = std::env::current_dir()?;
-            let db_path = index::default_db_path(&project_root);
+            let db_path = crate::data_dir::graph_db_path();
             if !db_path.exists() {
-                eprintln!("{}", "No index found. Run 'cora index' first.".yellow());
+                eprintln!("{}", "No index found. Run `cora index` first.".yellow());
                 std::process::exit(1);
             }
-            let conn = index::open_index(&db_path)?;
+            let conn = index::open_global_index()?;
+            let project_id = index::ensure_project(&conn, &project_root)?;
 
             // Gather changed files
             let mut changed: Vec<String> = files;
@@ -847,14 +862,19 @@ async fn main() -> Result<()> {
             let all_symbols: Vec<String> = {
                 let placeholders: String =
                     changed.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+                let n = changed.len() + 1;
                 let sql =
-                    format!("SELECT DISTINCT name FROM symbols WHERE file IN ({placeholders})");
+                    format!("SELECT DISTINCT name FROM symbols WHERE file IN ({placeholders}) AND project_id = ?{n}");
                 let mut stmt = conn.prepare(&sql)?;
-                let params: Vec<&dyn rusqlite::types::ToSql> = changed
+                let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = changed
                     .iter()
-                    .map(|f| f as &dyn rusqlite::types::ToSql)
+                    .map(|f| Box::new(f.clone()) as Box<dyn rusqlite::types::ToSql>)
                     .collect();
-                let rows = stmt.query_map(params.as_slice(), |row| row.get::<_, String>(0))?;
+                params.push(Box::new(project_id));
+                let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+                    params.iter().map(|p| p.as_ref()).collect();
+                let rows =
+                    stmt.query_map(param_refs.as_slice(), |row| row.get::<_, String>(0))?;
                 rows.filter_map(|r| r.ok()).collect()
             };
 
@@ -864,7 +884,7 @@ async fn main() -> Result<()> {
                     std::collections::HashSet::new();
                 for sym_name in all_symbols {
                     if seen_syms.insert(sym_name.clone()) {
-                        let callers = index::graph::find_callers(&conn, &sym_name, 100)?;
+                        let callers = index::graph::find_callers(&conn, project_id, &sym_name, 100)?;
                         for caller in callers {
                             if patterns.iter().any(|p| caller.file.contains(p.as_str())) {
                                 affected_tests.insert(caller.file.clone());
@@ -876,7 +896,7 @@ async fn main() -> Result<()> {
 
             // Strategy 2: Direct test file name convention (mod_test.rs, foo_test.go)
             // Prepare statement once before the loop
-            let mut stmt = conn.prepare("SELECT DISTINCT path FROM files WHERE path LIKE ?1")?;
+            let mut stmt = conn.prepare("SELECT DISTINCT path FROM files WHERE path LIKE ?1 AND project_id = ?2")?;
             for file in &changed {
                 // For Rust: src/foo.rs → tests/foo.rs or src/foo.rs → src/foo_test.rs
                 let stem = file
@@ -899,7 +919,7 @@ async fn main() -> Result<()> {
                 for tp in &test_patterns {
                     let pattern = format!("%{tp}");
                     let rows =
-                        stmt.query_map(rusqlite::params![pattern], |row| row.get::<_, String>(0))?;
+                        stmt.query_map(rusqlite::params![pattern, project_id], |row| row.get::<_, String>(0))?;
                     for f in rows.map_while(Result::ok) {
                         affected_tests.insert(f);
                     }

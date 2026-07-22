@@ -22,15 +22,15 @@ pub struct CallEdge {
     pub line: u32,
 }
 
-/// Store call edges in the database.
+/// Store call edges in the database, scoped to a project.
 #[allow(dead_code)]
-pub fn store_edges(conn: &Connection, edges: &[CallEdge]) -> anyhow::Result<usize> {
+pub fn store_edges(conn: &Connection, edges: &[CallEdge], project_id: i64) -> anyhow::Result<usize> {
     let tx = conn.unchecked_transaction()?;
     let mut count = 0;
     for edge in edges {
         tx.execute(
-            "INSERT INTO call_graph (caller, callee, file, line) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![edge.caller, edge.callee, edge.file, edge.line as i64],
+            "INSERT INTO call_graph (caller, callee, file, line, project_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![edge.caller, edge.callee, edge.file, edge.line as i64, project_id],
         )?;
         count += 1;
     }
@@ -38,21 +38,22 @@ pub fn store_edges(conn: &Connection, edges: &[CallEdge]) -> anyhow::Result<usiz
     Ok(count)
 }
 
-/// Clear call graph edges for a specific file (before re-indexing).
+/// Clear call graph edges for a specific file (before re-indexing), scoped to project.
 #[allow(dead_code)]
-pub fn clear_edges_for_file(conn: &Connection, file: &str) -> anyhow::Result<()> {
+pub fn clear_edges_for_file(conn: &Connection, file: &str, project_id: i64) -> anyhow::Result<()> {
     conn.execute(
-        "DELETE FROM call_graph WHERE file = ?1",
-        rusqlite::params![file],
+        "DELETE FROM call_graph WHERE file = ?1 AND project_id = ?2",
+        rusqlite::params![file, project_id],
     )?;
     Ok(())
 }
 
-/// Find all callers of a symbol (who calls this?).
+/// Find all callers of a symbol (who calls this?), scoped to a project.
 ///
 /// Returns symbols that call the given name, grouped by file.
 pub fn find_callers(
     conn: &Connection,
+    project_id: i64,
     symbol_name: &str,
     limit: usize,
 ) -> anyhow::Result<Vec<CallerResult>> {
@@ -61,11 +62,11 @@ pub fn find_callers(
     let mut stmt = conn.prepare(
         "SELECT DISTINCT cg.caller, cg.file, cg.line
          FROM call_graph cg
-         WHERE cg.callee LIKE ?1
-         LIMIT ?2",
+         WHERE cg.callee LIKE ?1 AND cg.project_id = ?2
+         LIMIT ?3",
     )?;
 
-    let rows = stmt.query_map(rusqlite::params![pattern, limit as i64], |row| {
+    let rows = stmt.query_map(rusqlite::params![pattern, project_id, limit as i64], |row| {
         Ok(CallerResult {
             caller: row.get(0)?,
             file: row.get(1)?,
@@ -76,12 +77,13 @@ pub fn find_callers(
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
-/// Find all callees of a symbol (what does this call?).
+/// Find all callees of a symbol (what does this call?), scoped to a project.
 ///
 /// Returns symbols that are called by the given name.
 #[allow(dead_code)]
 pub fn find_callees(
     conn: &Connection,
+    project_id: i64,
     symbol_name: &str,
     limit: usize,
 ) -> anyhow::Result<Vec<CalleeResult>> {
@@ -90,11 +92,11 @@ pub fn find_callees(
     let mut stmt = conn.prepare(
         "SELECT DISTINCT cg.callee, cg.file, cg.line
          FROM call_graph cg
-         WHERE cg.caller LIKE ?1
-         LIMIT ?2",
+         WHERE cg.caller LIKE ?1 AND cg.project_id = ?2
+         LIMIT ?3",
     )?;
 
-    let rows = stmt.query_map(rusqlite::params![pattern, limit as i64], |row| {
+    let rows = stmt.query_map(rusqlite::params![pattern, project_id, limit as i64], |row| {
         Ok(CalleeResult {
             callee: row.get(0)?,
             file: row.get(1)?,
@@ -105,11 +107,12 @@ pub fn find_callees(
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
-/// Impact analysis: what breaks if a symbol changes?
+/// Impact analysis: what breaks if a symbol changes?, scoped to a project.
 ///
 /// Uses reverse traversal: find all callers recursively up to `depth`.
 pub fn impact_analysis(
     conn: &Connection,
+    project_id: i64,
     symbol_name: &str,
     depth: u32,
 ) -> anyhow::Result<Vec<ImpactNode>> {
@@ -126,7 +129,7 @@ pub fn impact_analysis(
                 continue;
             }
 
-            let callers = find_callers(conn, sym, 100)?;
+            let callers = find_callers(conn, project_id, sym, 100)?;
             for caller in callers {
                 let node = ImpactNode {
                     symbol: caller.caller.clone(),
@@ -195,9 +198,15 @@ mod tests {
         conn
     }
 
+    /// Create a test project and return its project_id.
+    fn test_project(conn: &Connection) -> i64 {
+        super::super::schema::get_or_create_project(conn, "/tmp/test-project").unwrap()
+    }
+
     #[test]
     fn test_store_and_find_callers() {
         let conn = mem_conn();
+        let project_id = test_project(&conn);
 
         let edges = vec![
             CallEdge {
@@ -213,9 +222,9 @@ mod tests {
                 line: 25,
             },
         ];
-        store_edges(&conn, &edges).unwrap();
+        store_edges(&conn, &edges, project_id).unwrap();
 
-        let callers = find_callers(&conn, "authenticate", 10).unwrap();
+        let callers = find_callers(&conn, project_id, "authenticate", 10).unwrap();
         assert_eq!(callers.len(), 2);
         let names: Vec<&str> = callers.iter().map(|c| c.caller.as_str()).collect();
         assert!(names.contains(&"main"));
@@ -225,6 +234,7 @@ mod tests {
     #[test]
     fn test_find_callees() {
         let conn = mem_conn();
+        let project_id = test_project(&conn);
 
         let edges = vec![
             CallEdge {
@@ -240,15 +250,16 @@ mod tests {
                 line: 10,
             },
         ];
-        store_edges(&conn, &edges).unwrap();
+        store_edges(&conn, &edges, project_id).unwrap();
 
-        let callees = find_callees(&conn, "main", 10).unwrap();
+        let callees = find_callees(&conn, project_id, "main", 10).unwrap();
         assert_eq!(callees.len(), 2);
     }
 
     #[test]
     fn test_clear_edges_for_file() {
         let conn = mem_conn();
+        let project_id = test_project(&conn);
         store_edges(
             &conn,
             &[CallEdge {
@@ -257,17 +268,19 @@ mod tests {
                 file: "test.rs".to_string(),
                 line: 1,
             }],
+            project_id,
         )
         .unwrap();
 
-        clear_edges_for_file(&conn, "test.rs").unwrap();
-        let callers = find_callers(&conn, "b", 10).unwrap();
+        clear_edges_for_file(&conn, "test.rs", project_id).unwrap();
+        let callers = find_callers(&conn, project_id, "b", 10).unwrap();
         assert!(callers.is_empty());
     }
 
     #[test]
     fn test_impact_analysis_depth() {
         let conn = mem_conn();
+        let project_id = test_project(&conn);
         // a → b → c
         // If c changes, impact should find b (depth 1) and a (depth 2)
         let edges = vec![
@@ -284,9 +297,9 @@ mod tests {
                 line: 1,
             },
         ];
-        store_edges(&conn, &edges).unwrap();
+        store_edges(&conn, &edges, project_id).unwrap();
 
-        let impact = impact_analysis(&conn, "c", 3).unwrap();
+        let impact = impact_analysis(&conn, project_id, "c", 3).unwrap();
         // Should find b at depth 1, a at depth 2
         assert!(impact.iter().any(|n| n.symbol == "b" && n.depth == 1));
         assert!(impact.iter().any(|n| n.symbol == "a" && n.depth == 2));
