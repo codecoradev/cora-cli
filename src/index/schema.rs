@@ -4,7 +4,7 @@ use rusqlite::Connection;
 
 /// Current schema version.
 #[allow(dead_code)]
-const SCHEMA_VERSION: i32 = 2;
+const SCHEMA_VERSION: i32 = 3;
 
 /// Run database migrations (creates tables if not exist).
 pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
@@ -27,6 +27,9 @@ pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
     }
     if current < 2 {
         migrate_v2(conn)?;
+    }
+    if current < 3 {
+        migrate_v3(conn)?;
     }
 
     Ok(())
@@ -151,6 +154,42 @@ fn migrate_v2(conn: &Connection) -> anyhow::Result<()> {
     )?;
 
     conn.execute("INSERT INTO schema_version (version) VALUES (2)", [])?;
+
+    Ok(())
+}
+
+/// Migration v3: Knowledge graph edges.
+///
+/// Adds `edges` table — a richer version of `call_graph` that supports
+/// multiple edge types (CALLS, IMPORTS, IMPLEMENTS, INHERITS, CHILD_OF).
+/// Existing `call_graph` rows are migrated into `edges` with kind='CALLS'.
+fn migrate_v3(conn: &Connection) -> anyhow::Result<()> {
+    conn.execute_batch(
+        "
+        -- Knowledge graph edges: source → target with typed relationship
+        CREATE TABLE IF NOT EXISTS edges (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            source      TEXT NOT NULL,
+            kind        TEXT NOT NULL,
+            target      TEXT NOT NULL,
+            file        TEXT NOT NULL,
+            line        INTEGER NOT NULL,
+            project_id  INTEGER REFERENCES projects(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source);
+        CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target);
+        CREATE INDEX IF NOT EXISTS idx_edges_kind ON edges(kind);
+        CREATE INDEX IF NOT EXISTS idx_edges_project ON edges(project_id);
+        CREATE INDEX IF NOT EXISTS idx_edges_file ON edges(file);
+
+        -- Migrate existing call_graph data into edges
+        INSERT OR IGNORE INTO edges (source, kind, target, file, line, project_id)
+            SELECT caller, 'CALLS', callee, file, line, project_id FROM call_graph;
+        ",
+    )?;
+
+    conn.execute("INSERT INTO schema_version (version) VALUES (3)", [])?;
 
     Ok(())
 }
@@ -339,5 +378,75 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
             .unwrap();
         assert_eq!(proj_count, 0);
+    }
+
+    #[test]
+    fn test_v3_edges_table() {
+        let conn = mem_conn();
+        let pid = get_or_create_project(&conn, "/test/proj").unwrap();
+
+        // Check edges table exists
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM edges", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+
+        // Insert an edge
+        conn.execute(
+            "INSERT INTO edges (source, kind, target, file, line, project_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params!["Cache", "IMPLEMENTS", "Store", "cache.rs", 10, pid],
+        )
+        .unwrap();
+
+        // Query it back
+        let (source, kind, target): (String, String, String) = conn
+            .query_row(
+                "SELECT source, kind, target FROM edges WHERE kind = 'IMPLEMENTS'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(source, "Cache");
+        assert_eq!(kind, "IMPLEMENTS");
+        assert_eq!(target, "Store");
+    }
+
+    #[test]
+    fn test_v3_migrate_call_graph() {
+        let conn = mem_conn();
+        let pid = get_or_create_project(&conn, "/test/proj").unwrap();
+
+        // Insert into old call_graph
+        conn.execute(
+            "INSERT INTO call_graph (caller, callee, file, line, project_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params!["main", "helper", "main.rs", 5, pid],
+        )
+        .unwrap();
+
+        // Migration already ran, so edges should be empty
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM edges WHERE kind = 'CALLS'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+
+        // Manually verify the migration SQL works
+        conn.execute(
+            "INSERT OR IGNORE INTO edges (source, kind, target, file, line, project_id) SELECT caller, 'CALLS', callee, file, line, project_id FROM call_graph",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM edges WHERE kind = 'CALLS'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
     }
 }

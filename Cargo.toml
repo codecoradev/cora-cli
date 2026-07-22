@@ -59,6 +59,23 @@ chrono = { version = "0.4.44", features = ["serde"] }
 # Symbol index (v0.6 — Code Intelligence)
 rusqlite = { version = "0.31", features = ["bundled"] }
 
+# Tree-sitter AST parsing (optional — enable with --features tree-sitter)
+tree-sitter = { version = "0.26", optional = true }
+tree-sitter-rust = { version = "0.24", optional = true }
+tree-sitter-go = { version = "0.25", optional = true }
+tree-sitter-python = { version = "0.25", optional = true }
+tree-sitter-typescript = { version = "0.23", optional = true }
+
+[features]
+default = []
+tree-sitter = [
+    "dep:tree-sitter",
+    "dep:tree-sitter-rust",
+    "dep:tree-sitter-go",
+    "dep:tree-sitter-python",
+    "dep:tree-sitter-typescript",
+]
+
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"
