@@ -146,8 +146,20 @@ static RE_ZIG_CONST: LazyLock<Regex> =
 
 /// Extract symbols from source code.
 ///
-/// Returns a list of `IndexedSymbol` entries (without id, which is assigned by the database).
+/// When the `tree-sitter` feature is enabled, uses AST-based extraction for
+/// supported languages (Rust, Go, Python, TypeScript/TSX). Falls back to
+/// regex for all other languages.
 pub fn extract_symbols(content: &str, language: &str, file_path: &str) -> Vec<ExtractedDef> {
+    #[cfg(feature = "tree-sitter")]
+    {
+        use super::ast;
+        if ast::get_language(language).is_some() {
+            let (nodes, _edges) = ast::extract(content, language, file_path);
+            return nodes.into_iter().map(Into::into).collect();
+        }
+    }
+
+    // Regex fallback for unsupported languages or when feature is disabled
     let mut symbols = Vec::new();
 
     for (line_num, line) in content.lines().enumerate() {
@@ -350,11 +362,25 @@ fn extract_zig(line: &str, line_no: u32, file: &str, raw: &str, out: &mut Vec<Ex
     }
 }
 
-/// Helper: create an ExtractedDef from a regex capture.
 /// Extract function call sites from source code.
-/// Returns (caller_name, callee_name, file, line) tuples.
-/// The caller_name is the enclosing function (best-effort via scope tracking).
+///
+/// When the `tree-sitter` feature is enabled, uses AST-based extraction for
+/// supported languages. Falls back to regex-based scope tracking for others.
 pub fn extract_calls(content: &str, language: &str, file_path: &str) -> Vec<CallSite> {
+    #[cfg(feature = "tree-sitter")]
+    {
+        use super::ast;
+        if ast::get_language(language).is_some() {
+            let (_nodes, edges) = ast::extract(content, language, file_path);
+            return edges
+                .into_iter()
+                .filter(|e| e.kind == ast::EdgeKind::Calls)
+                .map(Into::into)
+                .collect();
+        }
+    }
+
+    // Regex fallback
     use crate::engine::context::extraction as ctx_extract;
     use crate::engine::context::types::SymbolKind as CtxSymbolKind;
 
@@ -411,6 +437,24 @@ pub fn extract_calls(content: &str, language: &str, file_path: &str) -> Vec<Call
     }
 
     calls
+}
+
+/// Extract all graph edges from source code (calls, imports, implements, inherits).
+///
+/// Only available with the `tree-sitter` feature. Returns empty for unsupported languages.
+#[cfg(feature = "tree-sitter")]
+#[allow(dead_code)]
+pub fn extract_edges(
+    content: &str,
+    language: &str,
+    file_path: &str,
+) -> Vec<crate::index::ast::AstEdge> {
+    use super::ast;
+    if ast::get_language(language).is_some() {
+        let (_nodes, edges) = ast::extract(content, language, file_path);
+        return edges;
+    }
+    Vec::new()
 }
 
 /// Detect function entry from a line (returns function name).
@@ -575,6 +619,7 @@ const MAX_SIZE: usize = 100;
 "#;
         let symbols = extract_symbols(code, "rs", "src/cache.rs");
         let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+        eprintln!("GO symbols: {:?}", symbols.iter().map(|s| (&s.kind, &s.name)).collect::<Vec<_>>());
 
         assert!(names.contains(&"Cache"));
         assert!(names.contains(&"new"));

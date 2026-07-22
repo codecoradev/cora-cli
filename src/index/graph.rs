@@ -42,6 +42,56 @@ pub fn store_edges(
     Ok(count)
 }
 
+
+
+/// A typed edge in the knowledge graph.
+#[cfg(feature = "tree-sitter")]
+#[derive(Debug, Clone)]
+pub struct KgEdge {
+    /// Source symbol.
+    pub source: String,
+    /// Edge kind: CALLS, IMPORTS, IMPLEMENTS, INHERITS, CHILD_OF.
+    pub kind: String,
+    /// Target symbol.
+    pub target: String,
+    /// File where the relationship is defined.
+    pub file: String,
+    /// Line number.
+    pub line: u32,
+}
+
+/// Store knowledge graph edges in the `edges` table.
+#[cfg(feature = "tree-sitter")]
+#[allow(dead_code)]
+pub fn store_kg_edges(
+    conn: &Connection,
+    edges: &[KgEdge],
+    project_id: i64,
+) -> anyhow::Result<usize> {
+    let tx = conn.unchecked_transaction()?;
+    let mut count = 0;
+    for edge in edges {
+        tx.execute(
+            "INSERT INTO edges (source, kind, target, file, line, project_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![edge.source, edge.kind, edge.target, edge.file, edge.line as i64, project_id],
+        )?;
+        count += 1;
+    }
+    tx.commit()?;
+    Ok(count)
+}
+
+/// Clear knowledge graph edges for a specific file.
+#[cfg(feature = "tree-sitter")]
+#[allow(dead_code)]
+pub fn clear_kg_edges_for_file(conn: &Connection, file: &str, project_id: i64) -> anyhow::Result<()> {
+    conn.execute(
+        "DELETE FROM edges WHERE file = ?1 AND project_id = ?2",
+        rusqlite::params![file, project_id],
+    )?;
+    Ok(())
+}
+
 /// Clear call graph edges for a specific file (before re-indexing), scoped to project.
 #[allow(dead_code)]
 pub fn clear_edges_for_file(conn: &Connection, file: &str, project_id: i64) -> anyhow::Result<()> {

@@ -4,6 +4,8 @@
 //! Uses regex-based extraction (same approach as `engine/context/extraction.rs`)
 //! stored in SQLite with FTS5 for fast full-text search.
 
+#[cfg(feature = "tree-sitter")]
+mod ast;
 mod extract;
 pub mod graph;
 pub mod schema;
@@ -113,10 +115,22 @@ pub fn index_file(
         )?;
     }
 
+    #[cfg(feature = "tree-sitter")]
+    {
+        graph::clear_kg_edges_for_file(&tx, file_path, project_id)?;
+        let kg_edges = extract::extract_edges(content, language, file_path);
+        for e in &kg_edges {
+            tx.execute(
+                "INSERT INTO edges (source, kind, target, file, line, project_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![e.source, e.kind.as_str(), e.target, e.file, e.line as i64, project_id],
+            )?;
+        }
+    }
+
     tx.commit()?;
 
     debug!(
-        "Indexed {file_path}: {count} symbols, {} edges ({language})",
+        "Indexed {file_path}: {count} symbols, {} call edges ({language})",
         call_sites.len()
     );
     Ok(count)
