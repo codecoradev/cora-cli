@@ -13,9 +13,7 @@
 //! Re-exports will be added to this module in Phase 3 when `cora brain`
 //! commands are wired up.
 
-// Phase 1: public API not yet consumed by any command.
-// Clippy dead_code warnings are expected and will resolve in Phase 3.
-#![allow(dead_code)]
+// Embedding engine — consumed by brain module (Phase 3).
 
 pub mod token_vocab;
 pub mod tokens;

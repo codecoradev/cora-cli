@@ -59,6 +59,10 @@ chrono = { version = "0.4.44", features = ["serde"] }
 # Symbol index (v0.6 — Code Intelligence)
 rusqlite = { version = "0.31", features = ["bundled"] }
 
+# Vector search (Phase 3 — Brain Mode)
+usearch = "2"
+fs2 = "0.4"
+
 # Tree-sitter AST parsing (optional — enable with --features tree-sitter)
 tree-sitter = { version = "0.26", optional = true }
 tree-sitter-rust = { version = "0.24", optional = true }

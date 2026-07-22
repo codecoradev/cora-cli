@@ -187,6 +187,20 @@ enum Command {
         json: bool,
     },
 
+    /// Hybrid search: FTS5 + vector + graph → RRF fusion
+    Brain {
+        /// Search query
+        query: Vec<String>,
+
+        /// Maximum results (default: 20)
+        #[clap(long, default_value = "20")]
+        limit: usize,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
     /// Find tests affected by changed files
     Affected {
         /// Changed files (space-separated). If empty, reads from git diff.
@@ -924,6 +938,53 @@ async fn main() -> Result<()> {
                     println!("  {}", "─".repeat(45).dimmed());
                     for (kind, count) in &overview.edge_counts {
                         println!("  {:<20} {:>6}", kind, count);
+                    }
+                }
+            }
+            0
+        }
+
+        Command::Brain { query, limit, json } => {
+            let query_str = query.join(" ");
+            if query_str.trim().is_empty() {
+                eprintln!("{}", "Usage: cora brain <query>".yellow());
+                std::process::exit(1);
+            }
+
+            let project_root = std::env::current_dir()?;
+            let db_path = crate::data_dir::graph_db_path();
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run `cora index` first.".yellow());
+                std::process::exit(1);
+            }
+            let conn = index::open_global_index()?;
+            let project_id = index::ensure_project(&conn, &project_root)?;
+
+            let results = index::brain::brain_search(&conn, project_id, &query_str, limit)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&results)?);
+            } else {
+                if results.is_empty() {
+                    println!("{}", "No results found.".dimmed());
+                } else {
+                    println!(
+                        "{} {} results for '{}'",
+                        "🧠".magenta(),
+                        results.len().to_string().bold(),
+                        query_str
+                    );
+                    println!("{}", "─".repeat(60).dimmed());
+                    for r in &results {
+                        let signals = r.signals.join(",");
+                        let score = format!("{:.4}", r.score);
+                        println!(
+                            "  {:<40} {:<15} {} {}",
+                            format!("{} ({})", r.name, r.file).green(),
+                            format!("[{}]", r.kind).dimmed(),
+                            format!("score={}", score).cyan(),
+                            format!("signals={}", signals).dimmed(),
+                        );
                     }
                 }
             }

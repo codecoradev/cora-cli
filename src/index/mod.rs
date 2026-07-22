@@ -6,10 +6,12 @@
 
 #[cfg(feature = "tree-sitter")]
 mod ast;
+pub mod brain;
 mod extract;
 pub mod graph;
 pub mod schema;
 mod symbols;
+pub mod vector;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -227,6 +229,20 @@ fn index_project_with_id(
         stats.files_scanned, stats.files_indexed, stats.symbols_indexed, stats.errors
     );
 
+    // Embed symbols into vector index for brain search
+    match brain::embed_project(conn, project_id) {
+        Ok(n) => {
+            stats.embedded_symbols = Some(n);
+            info!("Brain: embedded {n} symbols");
+        }
+        Err(e) => {
+            if verbose {
+                eprintln!("  ⚠ Embedding failed (non-fatal): {e}");
+            }
+            tracing::warn!("Embedding failed: {e}");
+        }
+    }
+
     Ok(stats)
 }
 
@@ -350,6 +366,7 @@ pub struct IndexStats {
     pub files_skipped: usize,
     pub symbols_indexed: usize,
     pub errors: usize,
+    pub embedded_symbols: Option<usize>,
 }
 
 /// Summary of the current index state.

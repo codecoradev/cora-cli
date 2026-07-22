@@ -4,7 +4,7 @@ use rusqlite::Connection;
 
 /// Current schema version.
 #[allow(dead_code)]
-const SCHEMA_VERSION: i32 = 3;
+const SCHEMA_VERSION: i32 = 4;
 
 /// Run database migrations (creates tables if not exist).
 pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
@@ -30,6 +30,9 @@ pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
     }
     if current < 3 {
         migrate_v3(conn)?;
+    }
+    if current < 4 {
+        migrate_v4(conn)?;
     }
 
     Ok(())
@@ -190,6 +193,21 @@ fn migrate_v3(conn: &Connection) -> anyhow::Result<()> {
     )?;
 
     conn.execute("INSERT INTO schema_version (version) VALUES (3)", [])?;
+
+    Ok(())
+}
+
+/// Migration v4: Embedding metadata on projects table.
+fn migrate_v4(conn: &Connection) -> anyhow::Result<()> {
+    conn.execute_batch(
+        "
+        ALTER TABLE projects ADD COLUMN embedding_tier TEXT NOT NULL DEFAULT 'static';
+        ALTER TABLE projects ADD COLUMN embedding_dims INTEGER NOT NULL DEFAULT 256;
+        ALTER TABLE projects ADD COLUMN last_embedded_at TEXT;
+        ",
+    )?;
+
+    conn.execute("INSERT INTO schema_version (version) VALUES (4)", [])?;
 
     Ok(())
 }
