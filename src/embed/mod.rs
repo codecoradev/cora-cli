@@ -9,12 +9,13 @@
 //!    embeddings distilled from [nomic-ai/nomic-embed-code](https://huggingface.co/nomic-ai/nomic-embed-code),
 //!    compiled into the binary via `include_bytes!` / `include_str!`.
 //!    Higher quality at the cost of ~30 MB binary size.
+//!
+//! Re-exports will be added to this module in Phase 3 when `cora brain`
+//! commands are wired up.
+
+// Phase 1: public API not yet consumed by any command.
+// Clippy dead_code warnings are expected and will resolve in Phase 3.
+#![allow(dead_code)]
 
 pub mod token_vocab;
 pub mod tokens;
-
-pub use token_vocab::{
-    embed_pretrained, pretrained_cosine_similarity, verify_binary_format, PretrainedEmbedding,
-    PRETRAINED_DIM, VOCAB_SIZE,
-};
-pub use tokens::{cosine_similarity, embed, embed_code, tokenize_code, TokenEmbedding, EMBEDDING_DIM};

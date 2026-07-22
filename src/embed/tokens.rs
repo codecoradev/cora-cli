@@ -391,15 +391,17 @@ mod tests {
         let a = embed_code("fn add(a: i32, b: i32) -> i32 { a + b }");
         let b = embed_code("fn add(x: i64, y: i64) -> i64 { x + y }");
         let sim = cosine_similarity(&a, &b);
-        assert!(sim > 0.8, "similar functions should have high similarity, got {sim}");
+        assert!(
+            sim > 0.8,
+            "similar functions should have high similarity, got {sim}"
+        );
     }
 
     #[test]
     fn dissimilar_code_lower_similarity() {
         let a = embed_code("fn add(a: i32, b: i32) -> i32 { a + b }");
-        let b = embed_code(
-            "SELECT * FROM users WHERE email = 'test@example.com' ORDER BY created_at",
-        );
+        let b =
+            embed_code("SELECT * FROM users WHERE email = 'test@example.com' ORDER BY created_at");
         let sim = cosine_similarity(&a, &b);
         // The hashing trick is inherently noisy for cross-language comparison
         // (256-dim pseudo-random projections). We just verify it's not exactly 1.0.

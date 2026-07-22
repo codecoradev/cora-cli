@@ -100,7 +100,10 @@ impl PretrainedEmbedding {
 /// Panics if `idx >= VOCAB_SIZE`.
 #[inline]
 fn pretrained_vec_at(idx: usize) -> &'static [i8] {
-    assert!(idx < VOCAB_SIZE, "token index {idx} out of range (vocab={VOCAB_SIZE})");
+    assert!(
+        idx < VOCAB_SIZE,
+        "token index {idx} out of range (vocab={VOCAB_SIZE})"
+    );
     let offset = 8 + idx * PRETRAINED_DIM;
     // SAFETY: the static blob is exactly 8 + VOCAB_SIZE * PRETRAINED_DIM bytes
     // and we just verified idx is in bounds.
@@ -147,11 +150,7 @@ pub fn embed_pretrained(tokens: &HashMap<String, u32>) -> PretrainedEmbedding {
 /// Because vectors are pre-normalised, this is just the dot product.
 /// Returns a value in `[-1, 1]`.
 pub fn pretrained_cosine_similarity(a: &PretrainedEmbedding, b: &PretrainedEmbedding) -> f32 {
-    a.vec
-        .iter()
-        .zip(b.vec.iter())
-        .map(|(x, y)| x * y)
-        .sum()
+    a.vec.iter().zip(b.vec.iter()).map(|(x, y)| x * y).sum()
 }
 
 // ─── Verification ────────────────────────────────────────────────────────────
@@ -197,7 +196,7 @@ pub fn verify_binary_format() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::embed::tokenize_code;
+    use crate::embed::tokens::tokenize_code;
 
     #[test]
     fn binary_format_is_valid() {
@@ -237,10 +236,7 @@ mod tests {
         let tokens = tokenize_code("fn add(a: i32, b: i32) -> i32 { a + b }");
         let emb = embed_pretrained(&tokens);
         let norm: f32 = emb.as_slice().iter().map(|v| v * v).sum::<f32>().sqrt();
-        assert!(
-            (norm - 1.0).abs() < 1e-6,
-            "expected unit norm, got {norm}"
-        );
+        assert!((norm - 1.0).abs() < 1e-6, "expected unit norm, got {norm}");
     }
 
     #[test]
@@ -313,10 +309,7 @@ mod tests {
         let vec = pretrained_vec_at(0);
         for &v in vec.iter().take(16) {
             let f = v as f32 / 127.0;
-            assert!(
-                f >= -1.0 && f <= 1.0,
-                "int8 {v} → f32 {f} out of [-1, 1]"
-            );
+            assert!(f >= -1.0 && f <= 1.0, "int8 {v} → f32 {f} out of [-1, 1]");
         }
     }
 }
