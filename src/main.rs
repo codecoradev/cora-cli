@@ -6,6 +6,7 @@ use tracing_subscriber::FmtSubscriber;
 
 mod commands;
 mod config;
+mod embed;
 mod engine;
 mod error;
 mod formatters;
