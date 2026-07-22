@@ -530,7 +530,9 @@ fn extract_go(
                                 });
                             }
                         }
-                        if !cc.goto_next_sibling() { break; }
+                        if !cc.goto_next_sibling() {
+                            break;
+                        }
                     }
                 }
             }
@@ -551,7 +553,9 @@ fn extract_go(
                                 });
                             }
                         }
-                        if !vc.goto_next_sibling() { break; }
+                        if !vc.goto_next_sibling() {
+                            break;
+                        }
                     }
                 }
             }

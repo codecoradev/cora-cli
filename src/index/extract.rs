@@ -619,7 +619,13 @@ const MAX_SIZE: usize = 100;
 "#;
         let symbols = extract_symbols(code, "rs", "src/cache.rs");
         let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
-        eprintln!("GO symbols: {:?}", symbols.iter().map(|s| (&s.kind, &s.name)).collect::<Vec<_>>());
+        eprintln!(
+            "GO symbols: {:?}",
+            symbols
+                .iter()
+                .map(|s| (&s.kind, &s.name))
+                .collect::<Vec<_>>()
+        );
 
         assert!(names.contains(&"Cache"));
         assert!(names.contains(&"new"));

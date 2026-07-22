@@ -35,7 +35,6 @@ pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
-
 /// Migration v1: Initial schema — symbols, files, FTS5 index.
 fn migrate_v1(conn: &Connection) -> anyhow::Result<()> {
     conn.execute_batch(
@@ -426,7 +425,11 @@ mod tests {
 
         // Migration already ran, so edges should be empty
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM edges WHERE kind = 'CALLS'", [], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM edges WHERE kind = 'CALLS'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(count, 0);
 
@@ -438,7 +441,11 @@ mod tests {
         .unwrap();
 
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM edges WHERE kind = 'CALLS'", [], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM edges WHERE kind = 'CALLS'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(count, 1);
     }

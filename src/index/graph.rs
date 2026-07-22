@@ -42,8 +42,6 @@ pub fn store_edges(
     Ok(count)
 }
 
-
-
 /// A typed edge in the knowledge graph.
 #[cfg(feature = "tree-sitter")]
 #[derive(Debug, Clone)]
@@ -84,7 +82,11 @@ pub fn store_kg_edges(
 /// Clear knowledge graph edges for a specific file.
 #[cfg(feature = "tree-sitter")]
 #[allow(dead_code)]
-pub fn clear_kg_edges_for_file(conn: &Connection, file: &str, project_id: i64) -> anyhow::Result<()> {
+pub fn clear_kg_edges_for_file(
+    conn: &Connection,
+    file: &str,
+    project_id: i64,
+) -> anyhow::Result<()> {
     conn.execute(
         "DELETE FROM edges WHERE file = ?1 AND project_id = ?2",
         rusqlite::params![file, project_id],
