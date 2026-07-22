@@ -557,10 +557,8 @@ async fn main() -> Result<()> {
                 schema::delete_project(&conn, project_id)?;
                 eprintln!("{}", "Dropped existing index for project.".dimmed());
                 // Re-register the project (gets a fresh project_id)
-                let _fresh_id = schema::get_or_create_project(
-                    &conn,
-                    &project_root.to_string_lossy(),
-                )?;
+                let _fresh_id =
+                    schema::get_or_create_project(&conn, &project_root.to_string_lossy())?;
             }
 
             if show_stats {
@@ -632,7 +630,11 @@ async fn main() -> Result<()> {
                 );
                 eprintln!(
                     "{}",
-                    format!("   Database: {}", crate::data_dir::graph_db_path().display()).dimmed()
+                    format!(
+                        "   Database: {}",
+                        crate::data_dir::graph_db_path().display()
+                    )
+                    .dimmed()
                 );
             }
             0
@@ -863,8 +865,9 @@ async fn main() -> Result<()> {
                 let placeholders: String =
                     changed.iter().map(|_| "?").collect::<Vec<_>>().join(",");
                 let n = changed.len() + 1;
-                let sql =
-                    format!("SELECT DISTINCT name FROM symbols WHERE file IN ({placeholders}) AND project_id = ?{n}");
+                let sql = format!(
+                    "SELECT DISTINCT name FROM symbols WHERE file IN ({placeholders}) AND project_id = ?{n}"
+                );
                 let mut stmt = conn.prepare(&sql)?;
                 let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = changed
                     .iter()
@@ -873,8 +876,7 @@ async fn main() -> Result<()> {
                 params.push(Box::new(project_id));
                 let param_refs: Vec<&dyn rusqlite::types::ToSql> =
                     params.iter().map(|p| p.as_ref()).collect();
-                let rows =
-                    stmt.query_map(param_refs.as_slice(), |row| row.get::<_, String>(0))?;
+                let rows = stmt.query_map(param_refs.as_slice(), |row| row.get::<_, String>(0))?;
                 rows.filter_map(|r| r.ok()).collect()
             };
 
@@ -884,7 +886,8 @@ async fn main() -> Result<()> {
                     std::collections::HashSet::new();
                 for sym_name in all_symbols {
                     if seen_syms.insert(sym_name.clone()) {
-                        let callers = index::graph::find_callers(&conn, project_id, &sym_name, 100)?;
+                        let callers =
+                            index::graph::find_callers(&conn, project_id, &sym_name, 100)?;
                         for caller in callers {
                             if patterns.iter().any(|p| caller.file.contains(p.as_str())) {
                                 affected_tests.insert(caller.file.clone());
@@ -896,7 +899,9 @@ async fn main() -> Result<()> {
 
             // Strategy 2: Direct test file name convention (mod_test.rs, foo_test.go)
             // Prepare statement once before the loop
-            let mut stmt = conn.prepare("SELECT DISTINCT path FROM files WHERE path LIKE ?1 AND project_id = ?2")?;
+            let mut stmt = conn.prepare(
+                "SELECT DISTINCT path FROM files WHERE path LIKE ?1 AND project_id = ?2",
+            )?;
             for file in &changed {
                 // For Rust: src/foo.rs → tests/foo.rs or src/foo.rs → src/foo_test.rs
                 let stem = file
@@ -918,8 +923,9 @@ async fn main() -> Result<()> {
                 ];
                 for tp in &test_patterns {
                     let pattern = format!("%{tp}");
-                    let rows =
-                        stmt.query_map(rusqlite::params![pattern, project_id], |row| row.get::<_, String>(0))?;
+                    let rows = stmt.query_map(rusqlite::params![pattern, project_id], |row| {
+                        row.get::<_, String>(0)
+                    })?;
                     for f in rows.map_while(Result::ok) {
                         affected_tests.insert(f);
                     }

@@ -114,10 +114,7 @@ fn migrate_v1(conn: &Connection) -> anyhow::Result<()> {
         ",
     )?;
 
-    conn.execute(
-        "INSERT INTO schema_version (version) VALUES (1)",
-        [],
-    )?;
+    conn.execute("INSERT INTO schema_version (version) VALUES (1)", [])?;
 
     Ok(())
 }
@@ -153,10 +150,7 @@ fn migrate_v2(conn: &Connection) -> anyhow::Result<()> {
         ",
     )?;
 
-    conn.execute(
-        "INSERT INTO schema_version (version) VALUES (2)",
-        [],
-    )?;
+    conn.execute("INSERT INTO schema_version (version) VALUES (2)", [])?;
 
     Ok(())
 }
@@ -271,9 +265,7 @@ mod tests {
 
         // Verify project_id column exists on files
         let _: i64 = conn
-            .query_row("SELECT project_id FROM files LIMIT 0", [], |row| {
-                row.get(0)
-            })
+            .query_row("SELECT project_id FROM files LIMIT 0", [], |row| row.get(0))
             .unwrap_or(0);
 
         // Verify project_id column exists on call_graph

@@ -75,7 +75,13 @@ pub fn index_file(
            language = excluded.language,
            symbol_count = excluded.symbol_count,
            project_id = excluded.project_id",
-        rusqlite::params![file_path, fingerprint, language, symbols.len() as i64, project_id],
+        rusqlite::params![
+            file_path,
+            fingerprint,
+            language,
+            symbols.len() as i64,
+            project_id
+        ],
     )?;
 
     // Insert symbols
@@ -211,7 +217,11 @@ fn index_project_with_id(
 }
 
 /// Search the symbol index using FTS5 full-text search, scoped to a project.
-pub fn search(conn: &Connection, project_id: i64, query: &SymbolQuery) -> anyhow::Result<Vec<SearchResult>> {
+pub fn search(
+    conn: &Connection,
+    project_id: i64,
+    query: &SymbolQuery,
+) -> anyhow::Result<Vec<SearchResult>> {
     symbols::search(conn, project_id, query)
 }
 
@@ -238,9 +248,8 @@ pub fn index_stats(conn: &Connection, project_id: i64) -> anyhow::Result<IndexSu
     };
 
     let mut kind_counts: HashMap<String, usize> = HashMap::new();
-    let mut stmt = conn.prepare(
-        "SELECT kind, COUNT(*) FROM symbols WHERE project_id = ?1 GROUP BY kind",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT kind, COUNT(*) FROM symbols WHERE project_id = ?1 GROUP BY kind")?;
     let rows = stmt.query_map(rusqlite::params![project_id], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
     })?;
@@ -274,9 +283,7 @@ pub fn index_stats(conn: &Connection, project_id: i64) -> anyhow::Result<IndexSu
 pub fn prune_deleted(conn: &Connection, project_id: i64, root: &Path) -> anyhow::Result<usize> {
     let mut deleted = 0;
 
-    let mut stmt = conn.prepare(
-        "SELECT path FROM files WHERE project_id = ?1",
-    )?;
+    let mut stmt = conn.prepare("SELECT path FROM files WHERE project_id = ?1")?;
     let paths: Vec<String> = stmt
         .query_map(rusqlite::params![project_id], |row| row.get::<_, String>(0))?
         .filter_map(|r| r.ok())
@@ -388,8 +395,7 @@ impl Cache {
     }
 }
 "#;
-        let count =
-            index_file(&conn, project_id, "src/cache.rs", code, "rs").unwrap();
+        let count = index_file(&conn, project_id, "src/cache.rs", code, "rs").unwrap();
         assert!(count > 0, "Should extract symbols from Rust code");
     }
 
@@ -409,12 +415,7 @@ impl Cache {
         assert!(!needs_reindex(&conn, project_id, "test.rs", code));
 
         // Changed content → needs reindex
-        assert!(needs_reindex(
-            &conn,
-            project_id,
-            "test.rs",
-            "fn world() {}"
-        ));
+        assert!(needs_reindex(&conn, project_id, "test.rs", "fn world() {}"));
     }
 
     #[test]
@@ -456,14 +457,7 @@ pub struct AuthService {
     fn test_prune_deleted() {
         let conn = mem_conn();
         let project_id = test_project(&conn);
-        index_file(
-            &conn,
-            project_id,
-            "gone.rs",
-            "fn removed() {}",
-            "rs",
-        )
-        .unwrap();
+        index_file(&conn, project_id, "gone.rs", "fn removed() {}", "rs").unwrap();
 
         // Create temp dir to use as root
         let tmp = tempfile::tempdir().unwrap();
@@ -479,22 +473,8 @@ pub struct AuthService {
     fn test_reindex_replaces_symbols() {
         let conn = mem_conn();
         let project_id = test_project(&conn);
-        index_file(
-            &conn,
-            project_id,
-            "test.rs",
-            "fn old_name() {}",
-            "rs",
-        )
-        .unwrap();
-        index_file(
-            &conn,
-            project_id,
-            "test.rs",
-            "fn new_name() {}",
-            "rs",
-        )
-        .unwrap();
+        index_file(&conn, project_id, "test.rs", "fn old_name() {}", "rs").unwrap();
+        index_file(&conn, project_id, "test.rs", "fn new_name() {}", "rs").unwrap();
 
         let stats = index_stats(&conn, project_id).unwrap();
         // Should have 1 symbol (replaced, not 2)

@@ -24,7 +24,11 @@ pub struct CallEdge {
 
 /// Store call edges in the database, scoped to a project.
 #[allow(dead_code)]
-pub fn store_edges(conn: &Connection, edges: &[CallEdge], project_id: i64) -> anyhow::Result<usize> {
+pub fn store_edges(
+    conn: &Connection,
+    edges: &[CallEdge],
+    project_id: i64,
+) -> anyhow::Result<usize> {
     let tx = conn.unchecked_transaction()?;
     let mut count = 0;
     for edge in edges {
@@ -66,13 +70,16 @@ pub fn find_callers(
          LIMIT ?3",
     )?;
 
-    let rows = stmt.query_map(rusqlite::params![pattern, project_id, limit as i64], |row| {
-        Ok(CallerResult {
-            caller: row.get(0)?,
-            file: row.get(1)?,
-            line: row.get::<_, i64>(2)? as u32,
-        })
-    })?;
+    let rows = stmt.query_map(
+        rusqlite::params![pattern, project_id, limit as i64],
+        |row| {
+            Ok(CallerResult {
+                caller: row.get(0)?,
+                file: row.get(1)?,
+                line: row.get::<_, i64>(2)? as u32,
+            })
+        },
+    )?;
 
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
@@ -96,13 +103,16 @@ pub fn find_callees(
          LIMIT ?3",
     )?;
 
-    let rows = stmt.query_map(rusqlite::params![pattern, project_id, limit as i64], |row| {
-        Ok(CalleeResult {
-            callee: row.get(0)?,
-            file: row.get(1)?,
-            line: row.get::<_, i64>(2)? as u32,
-        })
-    })?;
+    let rows = stmt.query_map(
+        rusqlite::params![pattern, project_id, limit as i64],
+        |row| {
+            Ok(CalleeResult {
+                callee: row.get(0)?,
+                file: row.get(1)?,
+                line: row.get::<_, i64>(2)? as u32,
+            })
+        },
+    )?;
 
     Ok(rows.filter_map(|r| r.ok()).collect())
 }

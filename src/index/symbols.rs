@@ -118,7 +118,11 @@ pub struct SearchResult {
 }
 
 /// Execute a symbol search query against the database, scoped to a project.
-pub fn search(conn: &Connection, project_id: i64, query: &SymbolQuery) -> anyhow::Result<Vec<SearchResult>> {
+pub fn search(
+    conn: &Connection,
+    project_id: i64,
+    query: &SymbolQuery,
+) -> anyhow::Result<Vec<SearchResult>> {
     let limit = if query.limit > 0 {
         query.limit as i64
     } else {
@@ -215,8 +219,7 @@ fn like_search(
          FROM symbols WHERE name LIKE ?1 AND project_id = ?2",
     );
 
-    let mut params: Vec<Box<dyn rusqlite::ToSql>> =
-        vec![Box::new(pattern), Box::new(project_id)];
+    let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(pattern), Box::new(project_id)];
     let mut idx = 3;
 
     if let Some(kind) = &query.kind {
