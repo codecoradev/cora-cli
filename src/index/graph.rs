@@ -249,6 +249,296 @@ pub struct ImpactNode {
     pub depth: u32,
 }
 
+/// Trace the execution path from a symbol — BFS over call_graph + edges.
+///
+/// Returns a tree-like structure showing outgoing call chains.
+pub fn trace_path(
+    conn: &Connection,
+    project_id: i64,
+    symbol_name: &str,
+    depth: u32,
+    direction: TraceDirection,
+) -> anyhow::Result<Vec<TraceNode>> {
+    let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    let mut current_level = vec![(symbol_name.to_string(), 0u32)];
+
+    visited.insert(symbol_name.to_string());
+
+    while !current_level.is_empty() {
+        let mut next_level = Vec::new();
+
+        for (sym, d) in &current_level {
+            if *d >= depth {
+                continue;
+            }
+
+            let neighbors = match direction {
+                TraceDirection::Outgoing => find_callees_edges(conn, project_id, sym, 100)?,
+                TraceDirection::Incoming => find_callers_edges(conn, project_id, sym, 100)?,
+            };
+
+            for neighbor in neighbors {
+                let name = match direction {
+                    TraceDirection::Outgoing => neighbor.target,
+                    TraceDirection::Incoming => neighbor.source,
+                };
+
+                let is_new = visited.insert(name.clone());
+                let node = TraceNode {
+                    symbol: name.clone(),
+                    file: neighbor.file,
+                    line: neighbor.line,
+                    kind: neighbor.kind,
+                    depth: d + 1,
+                };
+
+                if is_new {
+                    next_level.push((name.clone(), d + 1));
+                }
+                result.push(node);
+            }
+        }
+
+        current_level = next_level;
+    }
+
+    result.sort_by(|a, b| a.depth.cmp(&b.depth).then_with(|| a.file.cmp(&b.file)));
+    Ok(result)
+}
+
+/// Trace direction: follow outgoing calls or incoming callers.
+#[derive(Debug, Clone, Copy)]
+pub enum TraceDirection {
+    Outgoing,
+    Incoming,
+}
+
+/// A trace node with edge kind info.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TraceNode {
+    pub symbol: String,
+    pub file: String,
+    pub line: u32,
+    pub kind: String,
+    pub depth: u32,
+}
+
+/// Find outgoing edges from a symbol (uses edges table, falls back to call_graph).
+fn find_callees_edges(
+    conn: &Connection,
+    project_id: i64,
+    symbol_name: &str,
+    limit: usize,
+) -> anyhow::Result<Vec<EdgeRow>> {
+    let pattern = format!("%{symbol_name}%");
+
+    // Try edges table first (has typed relationships)
+    let mut stmt = conn.prepare(
+        "SELECT source, kind, target, file, line
+         FROM edges
+         WHERE source LIKE ?1 AND project_id = ?2
+         LIMIT ?3",
+    )?;
+
+    let rows: Vec<EdgeRow> = stmt
+        .query_map(
+            rusqlite::params![pattern, project_id, limit as i64],
+            |row| {
+                Ok(EdgeRow {
+                    source: row.get(0)?,
+                    kind: row.get(1)?,
+                    target: row.get(2)?,
+                    file: row.get(3)?,
+                    line: row.get::<_, i64>(4)? as u32,
+                })
+            },
+        )?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if !rows.is_empty() {
+        return Ok(rows);
+    }
+
+    // Fallback to call_graph
+    let mut stmt = conn.prepare(
+        "SELECT caller, 'CALLS', callee, file, line
+         FROM call_graph
+         WHERE caller LIKE ?1 AND project_id = ?2
+         LIMIT ?3",
+    )?;
+
+    let rows: Vec<EdgeRow> = stmt
+        .query_map(
+            rusqlite::params![pattern, project_id, limit as i64],
+            |row| {
+                Ok(EdgeRow {
+                    source: row.get(0)?,
+                    kind: row.get(1)?,
+                    target: row.get(2)?,
+                    file: row.get(3)?,
+                    line: row.get::<_, i64>(4)? as u32,
+                })
+            },
+        )?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(rows)
+}
+
+/// Find incoming edges to a symbol (uses edges table, falls back to call_graph).
+fn find_callers_edges(
+    conn: &Connection,
+    project_id: i64,
+    symbol_name: &str,
+    limit: usize,
+) -> anyhow::Result<Vec<EdgeRow>> {
+    let pattern = format!("%{symbol_name}%");
+
+    let mut stmt = conn.prepare(
+        "SELECT source, kind, target, file, line
+         FROM edges
+         WHERE target LIKE ?1 AND project_id = ?2
+         LIMIT ?3",
+    )?;
+
+    let rows: Vec<EdgeRow> = stmt
+        .query_map(
+            rusqlite::params![pattern, project_id, limit as i64],
+            |row| {
+                Ok(EdgeRow {
+                    source: row.get(0)?,
+                    kind: row.get(1)?,
+                    target: row.get(2)?,
+                    file: row.get(3)?,
+                    line: row.get::<_, i64>(4)? as u32,
+                })
+            },
+        )?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if !rows.is_empty() {
+        return Ok(rows);
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT caller, 'CALLS', callee, file, line
+         FROM call_graph
+         WHERE callee LIKE ?1 AND project_id = ?2
+         LIMIT ?3",
+    )?;
+
+    let rows: Vec<EdgeRow> = stmt
+        .query_map(
+            rusqlite::params![pattern, project_id, limit as i64],
+            |row| {
+                Ok(EdgeRow {
+                    source: row.get(0)?,
+                    kind: row.get(1)?,
+                    target: row.get(2)?,
+                    file: row.get(3)?,
+                    line: row.get::<_, i64>(4)? as u32,
+                })
+            },
+        )?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(rows)
+}
+
+/// Raw edge row from the database.
+struct EdgeRow {
+    source: String,
+    kind: String,
+    target: String,
+    file: String,
+    line: u32,
+}
+
+/// Architecture overview: module statistics and edge density.
+pub fn arch_overview(conn: &Connection, project_id: i64) -> anyhow::Result<ArchOverview> {
+    // Module = directory component of file path (e.g., "src/index" from "src/index/mod.rs")
+    let mut stmt = conn.prepare(
+        "SELECT
+            CASE
+                WHEN instr(file, '/') > 0 THEN substr(file, 1, instr(file, '/') - 1)
+                ELSE file
+            END AS module,
+            COUNT(*) AS symbol_count,
+            COUNT(DISTINCT kind) AS edge_types
+         FROM symbols
+         WHERE project_id = ?1
+         GROUP BY module
+         ORDER BY symbol_count DESC",
+    )?;
+
+    let modules: Vec<ModuleInfo> = stmt
+        .query_map(rusqlite::params![project_id], |row| {
+            Ok(ModuleInfo {
+                name: row.get(0)?,
+                symbol_count: row.get::<_, i64>(1)? as usize,
+                edge_types: row.get::<_, i64>(2)? as usize,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    // Edge type distribution
+    let edge_counts = get_edge_kind_counts(conn, project_id);
+
+    Ok(ArchOverview {
+        modules,
+        edge_counts,
+    })
+}
+
+/// Count edges by kind.
+fn get_edge_kind_counts(conn: &Connection, project_id: i64) -> Vec<(String, i64)> {
+    let mut counts = Vec::new();
+
+    if let Ok(mut s) = conn.prepare(
+        "SELECT kind, COUNT(*) FROM edges WHERE project_id = ?1 GROUP BY kind ORDER BY COUNT(*) DESC",
+    ) {
+        if let Ok(rows) = s.query_map(rusqlite::params![project_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        }) {
+            counts.extend(rows.flatten());
+        }
+    }
+
+    if counts.is_empty() {
+        if let Ok(mut s) =
+            conn.prepare("SELECT 'CALLS', COUNT(*) FROM call_graph WHERE project_id = ?1")
+        {
+            if let Ok(rows) = s.query_map(rusqlite::params![project_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            }) {
+                counts.extend(rows.flatten());
+            }
+        }
+    }
+
+    counts
+}
+
+/// Architecture overview result.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ArchOverview {
+    pub modules: Vec<ModuleInfo>,
+    pub edge_counts: Vec<(String, i64)>,
+}
+
+/// Module-level statistics.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ModuleInfo {
+    pub name: String,
+    pub symbol_count: usize,
+    pub edge_types: usize,
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -365,5 +655,86 @@ mod tests {
         // Should find b at depth 1, a at depth 2
         assert!(impact.iter().any(|n| n.symbol == "b" && n.depth == 1));
         assert!(impact.iter().any(|n| n.symbol == "a" && n.depth == 2));
+    }
+
+    #[test]
+    fn test_trace_path_outgoing() {
+        let conn = mem_conn();
+        let pid = test_project(&conn);
+
+        // a→b→c, a→d
+        for (caller, callee) in [("a", "b"), ("b", "c"), ("a", "d")] {
+            store_edges(
+                &conn,
+                &[CallEdge {
+                    caller: caller.into(),
+                    callee: callee.into(),
+                    file: "x.rs".into(),
+                    line: 1,
+                }],
+                pid,
+            )
+            .unwrap();
+        }
+
+        let nodes = trace_path(&conn, pid, "a", 2, TraceDirection::Outgoing).unwrap();
+        let syms: Vec<&str> = nodes.iter().map(|n| n.symbol.as_str()).collect();
+        assert!(syms.contains(&"b"));
+        assert!(syms.contains(&"c"));
+        assert!(syms.contains(&"d"));
+    }
+
+    #[test]
+    fn test_trace_path_incoming() {
+        let conn = mem_conn();
+        let pid = test_project(&conn);
+
+        for (caller, callee) in [("a", "c"), ("b", "c")] {
+            store_edges(
+                &conn,
+                &[CallEdge {
+                    caller: caller.into(),
+                    callee: callee.into(),
+                    file: "y.rs".into(),
+                    line: 1,
+                }],
+                pid,
+            )
+            .unwrap();
+        }
+
+        let nodes = trace_path(&conn, pid, "c", 1, TraceDirection::Incoming).unwrap();
+        let syms: Vec<&str> = nodes.iter().map(|n| n.symbol.as_str()).collect();
+        assert!(syms.contains(&"a"));
+        assert!(syms.contains(&"b"));
+    }
+
+    #[test]
+    fn test_arch_overview() {
+        let conn = mem_conn();
+        let pid = test_project(&conn);
+
+        store_edges(
+            &conn,
+            &[CallEdge {
+                caller: "main".into(),
+                callee: "run".into(),
+                file: "src/main.rs".into(),
+                line: 1,
+            }],
+            pid,
+        )
+        .unwrap();
+
+        // Insert a symbol so arch has data
+        conn.execute(
+            "INSERT INTO symbols (name, kind, file, line, project_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params!["main", "function", "src/main.rs", 1i64, pid],
+        )
+        .unwrap();
+
+        let overview = arch_overview(&conn, pid).unwrap();
+        assert_eq!(overview.modules.len(), 1);
+        assert_eq!(overview.modules[0].name, "src");
     }
 }
