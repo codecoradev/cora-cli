@@ -181,6 +181,19 @@ pub fn list_tools() -> Vec<Tool> {
                 "required": ["query"]
             }),
         },
+        // Brain Mode (Phase 3)
+        Tool {
+            name: "cora.brain_search".to_string(),
+            description: "Hybrid code search: FTS5 + vector embeddings + graph proximity → RRF fusion. Better than plain text search for semantic code queries.".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Search query (code concept, symbol name, or description)" },
+                    "limit": { "type": "integer", "description": "Max results (default: 20)" }
+                },
+                "required": ["query"]
+            }),
+        },
     ]
 }
 
@@ -206,6 +219,8 @@ pub fn handle_tool_call(name: &str, params: &serde_json::Value) -> ToolResult {
         // Context Enrichment (Phase 3)
         "cora.get_project_info" => handle_get_project_info(),
         "cora.get_memory" => handle_get_memory(params),
+        // Brain Mode (Phase 3)
+        "cora.brain_search" => handle_brain_search(params),
         _ => ToolResult::error(format!("Unknown tool: {name}")),
     }
 }
@@ -875,6 +890,45 @@ fn handle_get_memory(params: &serde_json::Value) -> ToolResult {
     ToolResult::text(serde_json::to_string_pretty(&json).unwrap_or_default())
 }
 
+// ─── Brain Mode Handlers (Phase 3) ───
+
+fn handle_brain_search(params: &serde_json::Value) -> ToolResult {
+    let query = match params.get("query").and_then(|v| v.as_str()) {
+        Some(q) => q,
+        None => return ToolResult::error("Missing required parameter: query"),
+    };
+    let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as usize;
+
+    let (conn, project_id) = match open_index_db() {
+        Ok((c, pid)) => (c, pid),
+        Err(e) => return ToolResult::error(e.to_string()),
+    };
+
+    match crate::index::brain::brain_search(&conn, project_id, query, limit) {
+        Ok(results) => {
+            if results.is_empty() {
+                return ToolResult::text(format!("No results found for '{query}'."));
+            }
+            let json: Vec<serde_json::Value> = results
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "name": r.name,
+                        "kind": r.kind,
+                        "file": r.file,
+                        "line": r.line,
+                        "signature": r.signature,
+                        "score": r.score,
+                        "signals": r.signals,
+                    })
+                })
+                .collect();
+            ToolResult::text(serde_json::to_string_pretty(&json).unwrap_or_default())
+        }
+        Err(e) => ToolResult::error(format!("Brain search failed: {e}")),
+    }
+}
+
 /// Load project config safely (no API keys exposed).
 fn load_project_config() -> anyhow::Result<crate::config::schema::Config> {
     let mut config = crate::config::schema::Config::default();
@@ -1055,7 +1109,7 @@ mod tests {
     #[test]
     fn total_tool_count() {
         let tools = list_tools();
-        // Phase 1 (5 existing) + Phase 1 code intel (5) + Phase 2 (2) + Phase 3 (2) = 14
-        assert_eq!(tools.len(), 14);
+        // Phase 1 (5) + code intel (5) + Phase 2 (2) + Phase 3 (3) = 15
+        assert_eq!(tools.len(), 15);
     }
 }
