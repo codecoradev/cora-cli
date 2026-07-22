@@ -374,14 +374,17 @@ fn handle_list_profiles() -> ToolResult {
 
 // ─── Code Intelligence Handlers ───
 
-/// Open the index database, returning helpful error if not found.
-fn open_index_db() -> anyhow::Result<rusqlite::Connection> {
+/// Open the global index database and resolve project_id for the current directory.
+/// Returns helpful error if not found.
+fn open_index_db() -> anyhow::Result<(rusqlite::Connection, i64)> {
     let cwd = std::env::current_dir()?;
-    let db_path = crate::index::default_db_path(&cwd);
+    let db_path = crate::data_dir::graph_db_path();
     if !db_path.exists() {
         anyhow::bail!("No symbol index found. Run 'cora index' first to build the index.");
     }
-    crate::index::open_index(&db_path)
+    let conn = crate::index::open_global_index()?;
+    let project_id = crate::index::ensure_project(&conn, &cwd)?;
+    Ok((conn, project_id))
 }
 
 fn handle_search_symbols(params: &serde_json::Value) -> ToolResult {
@@ -390,8 +393,8 @@ fn handle_search_symbols(params: &serde_json::Value) -> ToolResult {
         None => return ToolResult::error("Missing required parameter: query"),
     };
 
-    let conn = match open_index_db() {
-        Ok(c) => c,
+    let (conn, project_id) = match open_index_db() {
+        Ok((c, pid)) => (c, pid),
         Err(e) => return ToolResult::error(e.to_string()),
     };
 
@@ -417,7 +420,7 @@ fn handle_search_symbols(params: &serde_json::Value) -> ToolResult {
         limit,
     };
 
-    match crate::index::search(&conn, &query) {
+    match crate::index::search(&conn, project_id, &query) {
         Ok(results) => {
             if results.is_empty() {
                 return ToolResult::text(format!("No symbols found matching '{query_text}'."));
@@ -449,12 +452,12 @@ fn handle_find_callers(params: &serde_json::Value) -> ToolResult {
     };
     let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
 
-    let conn = match open_index_db() {
-        Ok(c) => c,
+    let (conn, project_id) = match open_index_db() {
+        Ok((c, pid)) => (c, pid),
         Err(e) => return ToolResult::error(e.to_string()),
     };
 
-    match crate::index::graph::find_callers(&conn, symbol, limit) {
+    match crate::index::graph::find_callers(&conn, project_id, symbol, limit) {
         Ok(callers) => {
             if callers.is_empty() {
                 return ToolResult::text(format!("No callers found for '{symbol}'."));
@@ -482,12 +485,12 @@ fn handle_find_impact(params: &serde_json::Value) -> ToolResult {
     };
     let depth = params.get("depth").and_then(|v| v.as_u64()).unwrap_or(3) as u32;
 
-    let conn = match open_index_db() {
-        Ok(c) => c,
+    let (conn, project_id) = match open_index_db() {
+        Ok((c, pid)) => (c, pid),
         Err(e) => return ToolResult::error(e.to_string()),
     };
 
-    match crate::index::graph::impact_analysis(&conn, symbol, depth) {
+    match crate::index::graph::impact_analysis(&conn, project_id, symbol, depth) {
         Ok(impact) => {
             if impact.is_empty() {
                 return ToolResult::text(format!("No impact found for '{symbol}'."));
@@ -523,8 +526,8 @@ fn handle_find_affected_tests(params: &serde_json::Value) -> ToolResult {
         return ToolResult::error("Parameter 'files' must not be empty");
     }
 
-    let conn = match open_index_db() {
-        Ok(c) => c,
+    let (conn, project_id) = match open_index_db() {
+        Ok((c, pid)) => (c, pid),
         Err(e) => return ToolResult::error(e.to_string()),
     };
 
@@ -534,16 +537,22 @@ fn handle_find_affected_tests(params: &serde_json::Value) -> ToolResult {
     // Batch fetch all symbols for all files in a single query
     let all_symbols: Vec<String> = {
         let placeholders = files.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let sql = format!("SELECT DISTINCT name FROM symbols WHERE file IN ({placeholders})");
+        let n = files.len() + 1;
+        let sql = format!(
+            "SELECT DISTINCT name FROM symbols WHERE file IN ({placeholders}) AND project_id = ?{n}"
+        );
         let mut stmt = match conn.prepare(&sql) {
             Ok(s) => s,
             Err(e) => return ToolResult::error(format!("DB error: {e}")),
         };
-        let params: Vec<&dyn rusqlite::types::ToSql> = files
+        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = files
             .iter()
-            .map(|f| f as &dyn rusqlite::types::ToSql)
+            .map(|f| Box::new(f.clone()) as Box<dyn rusqlite::types::ToSql>)
             .collect();
-        let rows = match stmt.query_map(params.as_slice(), |row| row.get::<_, String>(0)) {
+        params.push(Box::new(project_id));
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
+        let rows = match stmt.query_map(param_refs.as_slice(), |row| row.get::<_, String>(0)) {
             Ok(r) => r,
             Err(e) => return ToolResult::error(format!("DB error: {e}")),
         };
@@ -555,7 +564,9 @@ fn handle_find_affected_tests(params: &serde_json::Value) -> ToolResult {
         let mut seen_syms: std::collections::HashSet<String> = std::collections::HashSet::new();
         for sym_name in &all_symbols {
             if seen_syms.insert(sym_name.clone()) {
-                if let Ok(callers) = crate::index::graph::find_callers(&conn, sym_name, 100) {
+                if let Ok(callers) =
+                    crate::index::graph::find_callers(&conn, project_id, sym_name, 100)
+                {
                     for caller in callers {
                         if patterns.iter().any(|p| caller.file.contains(*p)) {
                             affected.insert(caller.file.clone());
@@ -586,10 +597,11 @@ fn handle_find_affected_tests(params: &serde_json::Value) -> ToolResult {
         ]);
     }
 
-    // Query with a single LIKE batch
+    // Query with a single LIKE batch, scoped to project
     {
+        let n = test_names.len() + 1;
         let sql = format!(
-            "SELECT DISTINCT path FROM files WHERE path LIKE '%' || ?1 OR {}",
+            "SELECT DISTINCT path FROM files WHERE (path LIKE '%' || ?1 OR {}) AND project_id = ?{n}",
             test_names
                 .iter()
                 .enumerate()
@@ -602,11 +614,14 @@ fn handle_find_affected_tests(params: &serde_json::Value) -> ToolResult {
             Ok(s) => s,
             Err(e) => return ToolResult::error(format!("DB error: {e}")),
         };
-        let params: Vec<&dyn rusqlite::types::ToSql> = test_names
+        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = test_names
             .iter()
-            .map(|t| t as &dyn rusqlite::types::ToSql)
+            .map(|t| Box::new(t.clone()) as Box<dyn rusqlite::types::ToSql>)
             .collect();
-        if let Ok(rows) = stmt.query_map(params.as_slice(), |row| row.get::<_, String>(0)) {
+        params.push(Box::new(project_id));
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
+        if let Ok(rows) = stmt.query_map(param_refs.as_slice(), |row| row.get::<_, String>(0)) {
             for row in rows.map_while(Result::ok) {
                 affected.insert(row);
             }
@@ -624,12 +639,12 @@ fn handle_find_affected_tests(params: &serde_json::Value) -> ToolResult {
 }
 
 fn handle_index_status() -> ToolResult {
-    let conn = match open_index_db() {
-        Ok(c) => c,
+    let (conn, project_id) = match open_index_db() {
+        Ok((c, pid)) => (c, pid),
         Err(e) => return ToolResult::error(e.to_string()),
     };
 
-    match crate::index::index_stats(&conn) {
+    match crate::index::index_stats(&conn, project_id) {
         Ok(stats) => {
             let json = serde_json::json!({
                 "exists": true,
@@ -776,7 +791,7 @@ fn handle_get_project_info() -> ToolResult {
         })
         .unwrap_or_else(|| "unknown".to_string());
 
-    let index_exists = crate::index::default_db_path(&cwd).exists();
+    let index_exists = crate::data_dir::graph_db_path().exists();
 
     let json = serde_json::json!({
         "repository": repo_name,

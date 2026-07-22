@@ -3,7 +3,8 @@
 use rusqlite::Connection;
 
 /// Current schema version.
-const SCHEMA_VERSION: i32 = 1;
+#[allow(dead_code)]
+const SCHEMA_VERSION: i32 = 2;
 
 /// Run database migrations (creates tables if not exist).
 pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
@@ -23,6 +24,9 @@ pub fn run_migrations(conn: &Connection) -> anyhow::Result<()> {
 
     if current < 1 {
         migrate_v1(conn)?;
+    }
+    if current < 2 {
+        migrate_v2(conn)?;
     }
 
     Ok(())
@@ -110,23 +114,103 @@ fn migrate_v1(conn: &Connection) -> anyhow::Result<()> {
         ",
     )?;
 
-    conn.execute(
-        "INSERT INTO schema_version (version) VALUES (?1)",
-        rusqlite::params![SCHEMA_VERSION],
-    )?;
+    conn.execute("INSERT INTO schema_version (version) VALUES (1)", [])?;
 
     Ok(())
+}
+
+/// Migration v2: Multi-project support.
+///
+/// Adds `projects` table and `project_id` column to `symbols`, `files`,
+/// and `call_graph`. The global DB at `~/.codecora/cora-code/graph.db`
+/// stores data for all indexed projects, keyed by absolute path.
+fn migrate_v2(conn: &Connection) -> anyhow::Result<()> {
+    conn.execute_batch(
+        "
+        -- Projects table: one row per indexed codebase
+        CREATE TABLE IF NOT EXISTS projects (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            root_path     TEXT NOT NULL UNIQUE,
+            name          TEXT NOT NULL DEFAULT '',
+            last_indexed  TEXT NOT NULL DEFAULT (datetime('now')),
+            created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        -- Add project_id to symbols (nullable for migration compat)
+        ALTER TABLE symbols ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;
+        CREATE INDEX IF NOT EXISTS idx_symbols_project ON symbols(project_id);
+
+        -- Add project_id to files (nullable for migration compat)
+        ALTER TABLE files ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;
+        CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id);
+
+        -- Add project_id to call_graph (nullable for migration compat)
+        ALTER TABLE call_graph ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;
+        CREATE INDEX IF NOT EXISTS idx_cg_project ON call_graph(project_id);
+        ",
+    )?;
+
+    conn.execute("INSERT INTO schema_version (version) VALUES (2)", [])?;
+
+    Ok(())
+}
+
+/// Get or create a project entry by root path.
+///
+/// Returns the project ID.
+pub fn get_or_create_project(conn: &Connection, root_path: &str) -> anyhow::Result<i64> {
+    // Try to find existing project
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM projects WHERE root_path = ?1",
+            rusqlite::params![root_path],
+            |row| row.get(0),
+        )
+        .ok();
+
+    if let Some(id) = existing {
+        return Ok(id);
+    }
+
+    // Extract project name from directory name
+    let name = std::path::Path::new(root_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+
+    conn.execute(
+        "INSERT INTO projects (root_path, name) VALUES (?1, ?2)",
+        rusqlite::params![root_path, name],
+    )?;
+
+    Ok(conn.last_insert_rowid())
+}
+
+/// Remove a project and all its associated data (CASCADE).
+///
+/// Returns the number of rows deleted.
+pub fn delete_project(conn: &Connection, project_id: i64) -> anyhow::Result<usize> {
+    let affected = conn.execute(
+        "DELETE FROM projects WHERE id = ?1",
+        rusqlite::params![project_id],
+    )?;
+    Ok(affected)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_migration_creates_tables() {
+    fn mem_conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
         run_migrations(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_migration_creates_tables() {
+        let conn = mem_conn();
 
         // Check symbols table
         let count: i64 = conn
@@ -146,6 +230,12 @@ mod tests {
         })
         .unwrap();
 
+        // Check projects table
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+
         // Check schema version
         let version: i32 = conn
             .query_row("SELECT MAX(version) FROM schema_version", [], |row| {
@@ -157,9 +247,97 @@ mod tests {
 
     #[test]
     fn test_migration_idempotent() {
-        let conn = Connection::open_in_memory().unwrap();
-        run_migrations(&conn).unwrap();
+        let conn = mem_conn();
         // Running again should not error
         run_migrations(&conn).unwrap();
+    }
+
+    #[test]
+    fn test_v2_project_columns_exist() {
+        let conn = mem_conn();
+
+        // Verify project_id column exists on symbols
+        let _: i64 = conn
+            .query_row("SELECT project_id FROM symbols LIMIT 0", [], |row| {
+                row.get(0)
+            })
+            .unwrap_or(0);
+
+        // Verify project_id column exists on files
+        let _: i64 = conn
+            .query_row("SELECT project_id FROM files LIMIT 0", [], |row| row.get(0))
+            .unwrap_or(0);
+
+        // Verify project_id column exists on call_graph
+        let _: i64 = conn
+            .query_row("SELECT project_id FROM call_graph LIMIT 0", [], |row| {
+                row.get(0)
+            })
+            .unwrap_or(0);
+    }
+
+    #[test]
+    fn test_get_or_create_project() {
+        let conn = mem_conn();
+
+        // Create project
+        let id1 = get_or_create_project(&conn, "/home/user/myproject").unwrap();
+        assert!(id1 > 0);
+
+        // Same path returns same id
+        let id2 = get_or_create_project(&conn, "/home/user/myproject").unwrap();
+        assert_eq!(id1, id2);
+
+        // Different path returns different id
+        let id3 = get_or_create_project(&conn, "/home/user/other").unwrap();
+        assert_ne!(id1, id3);
+
+        // Check name extraction
+        let name: String = conn
+            .query_row(
+                "SELECT name FROM projects WHERE id = ?1",
+                rusqlite::params![id1],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(name, "myproject");
+    }
+
+    #[test]
+    fn test_delete_project_cascades() {
+        let conn = mem_conn();
+
+        let pid = get_or_create_project(&conn, "/tmp/testproj").unwrap();
+
+        // Insert symbol and file linked to project
+        conn.execute(
+            "INSERT INTO symbols (name, kind, file, line, project_id) VALUES ('test_fn', 'function', 'main.rs', 1, ?1)",
+            rusqlite::params![pid],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files (path, fingerprint, last_indexed, project_id) VALUES ('main.rs', 'abc', datetime('now'), ?1)",
+            rusqlite::params![pid],
+        )
+        .unwrap();
+
+        // Delete project
+        delete_project(&conn, pid).unwrap();
+
+        // Symbols and files should be cascade-deleted
+        let sym_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM symbols", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(sym_count, 0);
+
+        let file_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(file_count, 0);
+
+        let proj_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(proj_count, 0);
     }
 }

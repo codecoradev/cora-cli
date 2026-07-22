@@ -117,8 +117,12 @@ pub struct SearchResult {
     pub score: f64,
 }
 
-/// Execute a symbol search query against the database.
-pub fn search(conn: &Connection, query: &SymbolQuery) -> anyhow::Result<Vec<SearchResult>> {
+/// Execute a symbol search query against the database, scoped to a project.
+pub fn search(
+    conn: &Connection,
+    project_id: i64,
+    query: &SymbolQuery,
+) -> anyhow::Result<Vec<SearchResult>> {
     let limit = if query.limit > 0 {
         query.limit as i64
     } else {
@@ -134,12 +138,13 @@ pub fn search(conn: &Connection, query: &SymbolQuery) -> anyhow::Result<Vec<Sear
                     bm25(symbols_fts) as score
              FROM symbols_fts
              JOIN symbols s ON s.id = symbols_fts.rowid
-             WHERE symbols_fts MATCH ?1",
+             WHERE symbols_fts MATCH ?1 AND s.project_id = ?2",
         );
 
-        let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(fts_query.clone())];
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> =
+            vec![Box::new(fts_query.clone()), Box::new(project_id)];
 
-        let mut param_idx = 2;
+        let mut param_idx = 3;
 
         if let Some(kind) = &query.kind {
             sql.push_str(&format!(" AND s.kind = ?{param_idx}"));
@@ -188,13 +193,13 @@ pub fn search(conn: &Connection, query: &SymbolQuery) -> anyhow::Result<Vec<Sear
 
         // If FTS returns nothing, try LIKE fallback on name
         if results.is_empty() {
-            results = like_search(conn, text, query, limit)?;
+            results = like_search(conn, project_id, text, query, limit)?;
         }
 
         Ok(results)
     } else {
         // No text query — just filter by kind/file/language
-        filter_search(conn, query, limit)
+        filter_search(conn, project_id, query, limit)
     }
 }
 
@@ -202,6 +207,7 @@ pub fn search(conn: &Connection, query: &SymbolQuery) -> anyhow::Result<Vec<Sear
 #[allow(unused_assignments)]
 fn like_search(
     conn: &Connection,
+    project_id: i64,
     text: &str,
     query: &SymbolQuery,
     limit: i64,
@@ -210,11 +216,11 @@ fn like_search(
 
     let mut sql = String::from(
         "SELECT id, name, kind, file, line, signature, language
-         FROM symbols WHERE name LIKE ?1",
+         FROM symbols WHERE name LIKE ?1 AND project_id = ?2",
     );
 
-    let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(pattern)];
-    let mut idx = 2;
+    let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(pattern), Box::new(project_id)];
+    let mut idx = 3;
 
     if let Some(kind) = &query.kind {
         sql.push_str(&format!(" AND kind = ?{idx}"));
@@ -249,15 +255,16 @@ fn like_search(
 #[allow(unused_assignments)]
 fn filter_search(
     conn: &Connection,
+    project_id: i64,
     query: &SymbolQuery,
     limit: i64,
 ) -> anyhow::Result<Vec<SearchResult>> {
     let mut sql = String::from(
-        "SELECT id, name, kind, file, line, signature, language FROM symbols WHERE 1=1",
+        "SELECT id, name, kind, file, line, signature, language FROM symbols WHERE project_id = ?1",
     );
 
-    let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![];
-    let mut idx = 1;
+    let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(project_id)];
+    let mut idx = 2;
 
     if let Some(kind) = &query.kind {
         sql.push_str(&format!(" AND kind = ?{idx}"));

@@ -6,11 +6,11 @@
 
 mod extract;
 pub mod graph;
-mod schema;
+pub mod schema;
 mod symbols;
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
@@ -20,36 +20,36 @@ use tracing::{debug, info};
 pub use graph::{CallEdge, CalleeResult, CallerResult, ImpactNode};
 pub use symbols::{SearchResult, SymbolKind, SymbolQuery};
 
-/// Default index database path relative to project root.
-pub const INDEX_DB_NAME: &str = ".cora/index.db";
+/// Open or create the **global** symbol index database.
+///
+/// All projects share a single SQLite database at `~/.codecora/cora-code/graph.db`.
+/// Project isolation is handled via the `project_id` foreign key.
+pub fn open_global_index() -> anyhow::Result<Connection> {
+    crate::data_dir::ensure_data_dir()?;
+    let db_path = crate::data_dir::graph_db_path();
 
-/// Open or create the symbol index database.
-pub fn open_index(db_path: &Path) -> anyhow::Result<Connection> {
-    if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-
-    let conn = Connection::open(db_path)?;
-
-    // Enable WAL mode for better concurrent read performance
+    let conn = Connection::open(&db_path)?;
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
-
     schema::run_migrations(&conn)?;
 
-    debug!("Opened index at {}", db_path.display());
+    debug!("Opened global index at {}", db_path.display());
     Ok(conn)
 }
-
-/// Resolve the default index database path for a project.
-pub fn default_db_path(project_root: &Path) -> PathBuf {
-    project_root.join(INDEX_DB_NAME)
+/// Resolve the `project_id` for a given root path, creating the project row if needed.
+pub fn ensure_project(conn: &Connection, root: &Path) -> anyhow::Result<i64> {
+    let root_str = root.to_string_lossy().to_string();
+    schema::get_or_create_project(conn, &root_str)
 }
 
 /// Index a single file: extract symbols and store in the database.
 ///
+/// `project_id` is written to every row so data is scoped per-project
+/// in the global database.
+///
 /// Returns the number of symbols indexed.
 pub fn index_file(
     conn: &Connection,
+    project_id: i64,
     file_path: &str,
     content: &str,
     language: &str,
@@ -57,28 +57,39 @@ pub fn index_file(
     let fingerprint = file_fingerprint(content);
     let symbols = extract::extract_symbols(content, language, file_path);
 
-    // Begin transaction
     let tx = conn.unchecked_transaction()?;
 
-    // Delete existing symbols for this file
+    // Delete existing symbols for this file within this project
     tx.execute(
-        "DELETE FROM symbols WHERE file = ?1",
-        rusqlite::params![file_path],
+        "DELETE FROM symbols WHERE file = ?1 AND project_id = ?2",
+        rusqlite::params![file_path, project_id],
     )?;
 
-    // Update file fingerprint
+    // Upsert file fingerprint
     tx.execute(
-        "INSERT OR REPLACE INTO files (path, fingerprint, last_indexed, language, symbol_count)
-         VALUES (?1, ?2, datetime('now'), ?3, ?4)",
-        rusqlite::params![file_path, fingerprint, language, symbols.len() as i64],
+        "INSERT INTO files (path, fingerprint, last_indexed, language, symbol_count, project_id)
+         VALUES (?1, ?2, datetime('now'), ?3, ?4, ?5)
+         ON CONFLICT(path) DO UPDATE SET
+           fingerprint = excluded.fingerprint,
+           last_indexed = excluded.last_indexed,
+           language = excluded.language,
+           symbol_count = excluded.symbol_count,
+           project_id = excluded.project_id",
+        rusqlite::params![
+            file_path,
+            fingerprint,
+            language,
+            symbols.len() as i64,
+            project_id
+        ],
     )?;
 
     // Insert symbols
     let mut count = 0;
     for sym in &symbols {
         tx.execute(
-            "INSERT INTO symbols (name, kind, file, line, signature, language)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO symbols (name, kind, file, line, signature, language, project_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             rusqlite::params![
                 sym.name,
                 sym.kind.as_str(),
@@ -86,18 +97,19 @@ pub fn index_file(
                 sym.line as i64,
                 sym.signature,
                 language,
+                project_id,
             ],
         )?;
         count += 1;
     }
 
     // Extract and store call graph edges
-    graph::clear_edges_for_file(&tx, file_path)?;
+    graph::clear_edges_for_file(&tx, file_path, project_id)?;
     let call_sites = extract::extract_calls(content, language, file_path);
     for site in &call_sites {
         tx.execute(
-            "INSERT INTO call_graph (caller, callee, file, line) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![site.caller, site.callee, site.file, site.line as i64],
+            "INSERT INTO call_graph (caller, callee, file, line, project_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![site.caller, site.callee, site.file, site.line as i64, project_id],
         )?;
     }
 
@@ -111,13 +123,13 @@ pub fn index_file(
 }
 
 /// Check if a file needs re-indexing based on content hash.
-pub fn needs_reindex(conn: &Connection, file_path: &str, content: &str) -> bool {
+pub fn needs_reindex(conn: &Connection, project_id: i64, file_path: &str, content: &str) -> bool {
     let fingerprint = file_fingerprint(content);
 
     let stored: Option<String> = conn
         .query_row(
-            "SELECT fingerprint FROM files WHERE path = ?1",
-            rusqlite::params![file_path],
+            "SELECT fingerprint FROM files WHERE path = ?1 AND project_id = ?2",
+            rusqlite::params![file_path, project_id],
             |row| row.get(0),
         )
         .ok();
@@ -132,6 +144,17 @@ pub fn needs_reindex(conn: &Connection, file_path: &str, content: &str) -> bool 
 ///
 /// Returns summary stats.
 pub fn index_project(conn: &Connection, root: &Path, verbose: bool) -> anyhow::Result<IndexStats> {
+    let project_id = ensure_project(conn, root)?;
+    index_project_with_id(conn, project_id, root, verbose)
+}
+
+/// Internal: index a project with an already-resolved `project_id`.
+fn index_project_with_id(
+    conn: &Connection,
+    project_id: i64,
+    root: &Path,
+    verbose: bool,
+) -> anyhow::Result<IndexStats> {
     let mut stats = IndexStats::default();
 
     let walker = ignore::WalkBuilder::new(root)
@@ -162,13 +185,13 @@ pub fn index_project(conn: &Connection, root: &Path, verbose: bool) -> anyhow::R
             Err(_) => continue,
         };
 
-        if !needs_reindex(conn, &rel_str, &content) {
+        if !needs_reindex(conn, project_id, &rel_str, &content) {
             stats.files_skipped += 1;
             continue;
         }
 
         stats.files_indexed += 1;
-        match index_file(conn, &rel_str, &content, language) {
+        match index_file(conn, project_id, &rel_str, &content, language) {
             Ok(n) => stats.symbols_indexed += n,
             Err(e) => {
                 stats.errors += 1;
@@ -179,6 +202,12 @@ pub fn index_project(conn: &Connection, root: &Path, verbose: bool) -> anyhow::R
         }
     }
 
+    // Update project's last_indexed timestamp
+    conn.execute(
+        "UPDATE projects SET last_indexed = datetime('now') WHERE id = ?1",
+        rusqlite::params![project_id],
+    )?;
+
     info!(
         "Index complete: {} files scanned, {} indexed, {} symbols, {} errors",
         stats.files_scanned, stats.files_indexed, stats.symbols_indexed, stats.errors
@@ -187,18 +216,28 @@ pub fn index_project(conn: &Connection, root: &Path, verbose: bool) -> anyhow::R
     Ok(stats)
 }
 
-/// Search the symbol index using FTS5 full-text search.
-pub fn search(conn: &Connection, query: &SymbolQuery) -> anyhow::Result<Vec<SearchResult>> {
-    symbols::search(conn, query)
+/// Search the symbol index using FTS5 full-text search, scoped to a project.
+pub fn search(
+    conn: &Connection,
+    project_id: i64,
+    query: &SymbolQuery,
+) -> anyhow::Result<Vec<SearchResult>> {
+    symbols::search(conn, project_id, query)
 }
 
-/// Get index statistics.
-pub fn index_stats(conn: &Connection) -> anyhow::Result<IndexSummary> {
-    let total_symbols: i64 =
-        conn.query_row("SELECT COUNT(*) FROM symbols", [], |row| row.get(0))?;
-    let total_files: i64 = conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))?;
+/// Get index statistics for a specific project.
+pub fn index_stats(conn: &Connection, project_id: i64) -> anyhow::Result<IndexSummary> {
+    let total_symbols: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM symbols WHERE project_id = ?1",
+        rusqlite::params![project_id],
+        |row| row.get(0),
+    )?;
+    let total_files: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM files WHERE project_id = ?1",
+        rusqlite::params![project_id],
+        |row| row.get(0),
+    )?;
     let db_size: i64 = {
-        // Use the actual page size instead of assuming 4096 bytes (#23).
         let page_size: i64 = conn
             .query_row("PRAGMA page_size", [], |row| row.get(0))
             .unwrap_or(4096);
@@ -208,10 +247,10 @@ pub fn index_stats(conn: &Connection) -> anyhow::Result<IndexSummary> {
         page_size * page_count
     };
 
-    // Symbols by kind
     let mut kind_counts: HashMap<String, usize> = HashMap::new();
-    let mut stmt = conn.prepare("SELECT kind, COUNT(*) FROM symbols GROUP BY kind")?;
-    let rows = stmt.query_map([], |row| {
+    let mut stmt =
+        conn.prepare("SELECT kind, COUNT(*) FROM symbols WHERE project_id = ?1 GROUP BY kind")?;
+    let rows = stmt.query_map(rusqlite::params![project_id], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
     })?;
     for row in rows {
@@ -219,10 +258,11 @@ pub fn index_stats(conn: &Connection) -> anyhow::Result<IndexSummary> {
         kind_counts.insert(kind, count);
     }
 
-    // Symbols by language
     let mut lang_counts: HashMap<String, usize> = HashMap::new();
-    let mut stmt = conn.prepare("SELECT language, COUNT(*) FROM symbols GROUP BY language")?;
-    let rows = stmt.query_map([], |row| {
+    let mut stmt = conn.prepare(
+        "SELECT language, COUNT(*) FROM symbols WHERE project_id = ?1 GROUP BY language",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![project_id], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
     })?;
     for row in rows {
@@ -239,17 +279,16 @@ pub fn index_stats(conn: &Connection) -> anyhow::Result<IndexSummary> {
     })
 }
 
-/// Remove symbols for files that no longer exist on disk.
-pub fn prune_deleted(conn: &Connection, root: &Path) -> anyhow::Result<usize> {
+/// Remove symbols for files that no longer exist on disk, scoped to a project.
+pub fn prune_deleted(conn: &Connection, project_id: i64, root: &Path) -> anyhow::Result<usize> {
     let mut deleted = 0;
 
-    let mut stmt = conn.prepare("SELECT path FROM files")?;
+    let mut stmt = conn.prepare("SELECT path FROM files WHERE project_id = ?1")?;
     let paths: Vec<String> = stmt
-        .query_map([], |row| row.get::<_, String>(0))?
+        .query_map(rusqlite::params![project_id], |row| row.get::<_, String>(0))?
         .filter_map(|r| r.ok())
         .collect();
 
-    // Batch all deletes in a single transaction instead of per-file
     let to_prune: Vec<&String> = paths
         .iter()
         .filter(|path| !root.join(path).exists())
@@ -259,10 +298,17 @@ pub fn prune_deleted(conn: &Connection, root: &Path) -> anyhow::Result<usize> {
         let tx = conn.unchecked_transaction()?;
         for path in &to_prune {
             tx.execute(
-                "DELETE FROM symbols WHERE file = ?1",
-                rusqlite::params![path],
+                "DELETE FROM symbols WHERE file = ?1 AND project_id = ?2",
+                rusqlite::params![path, project_id],
             )?;
-            tx.execute("DELETE FROM files WHERE path = ?1", rusqlite::params![path])?;
+            tx.execute(
+                "DELETE FROM call_graph WHERE file = ?1 AND project_id = ?2",
+                rusqlite::params![path, project_id],
+            )?;
+            tx.execute(
+                "DELETE FROM files WHERE path = ?1 AND project_id = ?2",
+                rusqlite::params![path, project_id],
+            )?;
         }
         tx.commit()?;
         deleted = to_prune.len();
@@ -313,6 +359,11 @@ mod tests {
         conn
     }
 
+    /// Create a test project and return its project_id.
+    fn test_project(conn: &Connection) -> i64 {
+        schema::get_or_create_project(conn, "/tmp/test-project").unwrap()
+    }
+
     #[test]
     fn test_open_and_migrate() {
         let conn = mem_conn();
@@ -326,6 +377,7 @@ mod tests {
     #[test]
     fn test_index_rust_file() {
         let conn = mem_conn();
+        let project_id = test_project(&conn);
         let code = r#"
 use std::collections::HashMap;
 
@@ -343,31 +395,33 @@ impl Cache {
     }
 }
 "#;
-        let count = index_file(&conn, "src/cache.rs", code, "rs").unwrap();
+        let count = index_file(&conn, project_id, "src/cache.rs", code, "rs").unwrap();
         assert!(count > 0, "Should extract symbols from Rust code");
     }
 
     #[test]
     fn test_needs_reindex() {
         let conn = mem_conn();
+        let project_id = test_project(&conn);
         let code = "fn hello() {}";
 
         // First time → needs reindex
-        assert!(needs_reindex(&conn, "test.rs", code));
+        assert!(needs_reindex(&conn, project_id, "test.rs", code));
 
         // Index it
-        index_file(&conn, "test.rs", code, "rs").unwrap();
+        index_file(&conn, project_id, "test.rs", code, "rs").unwrap();
 
         // Same content → no reindex needed
-        assert!(!needs_reindex(&conn, "test.rs", code));
+        assert!(!needs_reindex(&conn, project_id, "test.rs", code));
 
         // Changed content → needs reindex
-        assert!(needs_reindex(&conn, "test.rs", "fn world() {}"));
+        assert!(needs_reindex(&conn, project_id, "test.rs", "fn world() {}"));
     }
 
     #[test]
     fn test_search() {
         let conn = mem_conn();
+        let project_id = test_project(&conn);
         let code = r#"
 pub fn authenticate(token: &str) -> bool {
     false
@@ -377,10 +431,10 @@ pub struct AuthService {
     secret: String,
 }
 "#;
-        index_file(&conn, "src/auth.rs", code, "rs").unwrap();
+        index_file(&conn, project_id, "src/auth.rs", code, "rs").unwrap();
 
         let query = SymbolQuery::text("authenticate");
-        let results = search(&conn, &query).unwrap();
+        let results = search(&conn, project_id, &query).unwrap();
         assert!(!results.is_empty());
         assert!(results[0].symbol.name.contains("authenticate"));
     }
@@ -388,10 +442,11 @@ pub struct AuthService {
     #[test]
     fn test_index_stats() {
         let conn = mem_conn();
-        index_file(&conn, "a.rs", "fn foo() {}", "rs").unwrap();
-        index_file(&conn, "b.rs", "struct Bar {}", "rs").unwrap();
+        let project_id = test_project(&conn);
+        index_file(&conn, project_id, "a.rs", "fn foo() {}", "rs").unwrap();
+        index_file(&conn, project_id, "b.rs", "struct Bar {}", "rs").unwrap();
 
-        let stats = index_stats(&conn).unwrap();
+        let stats = index_stats(&conn, project_id).unwrap();
         assert!(stats.total_symbols >= 2);
         assert_eq!(stats.total_files, 2);
         assert!(stats.symbols_by_kind.contains_key("function"));
@@ -401,25 +456,27 @@ pub struct AuthService {
     #[test]
     fn test_prune_deleted() {
         let conn = mem_conn();
-        index_file(&conn, "gone.rs", "fn removed() {}", "rs").unwrap();
+        let project_id = test_project(&conn);
+        index_file(&conn, project_id, "gone.rs", "fn removed() {}", "rs").unwrap();
 
         // Create temp dir to use as root
         let tmp = tempfile::tempdir().unwrap();
         // gone.rs doesn't exist in temp dir → should be pruned
-        let deleted = prune_deleted(&conn, tmp.path()).unwrap();
+        let deleted = prune_deleted(&conn, project_id, tmp.path()).unwrap();
         assert_eq!(deleted, 1);
 
-        let stats = index_stats(&conn).unwrap();
+        let stats = index_stats(&conn, project_id).unwrap();
         assert_eq!(stats.total_symbols, 0);
     }
 
     #[test]
     fn test_reindex_replaces_symbols() {
         let conn = mem_conn();
-        index_file(&conn, "test.rs", "fn old_name() {}", "rs").unwrap();
-        index_file(&conn, "test.rs", "fn new_name() {}", "rs").unwrap();
+        let project_id = test_project(&conn);
+        index_file(&conn, project_id, "test.rs", "fn old_name() {}", "rs").unwrap();
+        index_file(&conn, project_id, "test.rs", "fn new_name() {}", "rs").unwrap();
 
-        let stats = index_stats(&conn).unwrap();
+        let stats = index_stats(&conn, project_id).unwrap();
         // Should have 1 symbol (replaced, not 2)
         assert_eq!(stats.total_symbols, 1);
     }
