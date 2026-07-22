@@ -162,6 +162,31 @@ enum Command {
         json: bool,
     },
 
+    /// Trace execution paths through the codebase
+    Trace {
+        /// Symbol name to start tracing from
+        symbol: String,
+
+        /// Trace direction: outgoing (callees) or incoming (callers)
+        #[clap(long, value_parser = ["outgoing", "incoming"], default_value = "outgoing")]
+        direction: String,
+
+        /// Traversal depth (max hops)
+        #[clap(long, default_value = "3")]
+        depth: u32,
+
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
+    /// Show architecture overview (modules, edge types, structure)
+    Arch {
+        /// Output as JSON
+        #[clap(long)]
+        json: bool,
+    },
+
     /// Find tests affected by changed files
     Affected {
         /// Changed files (space-separated). If empty, reads from git diff.
@@ -794,6 +819,112 @@ async fn main() -> Result<()> {
                         node.file.dimmed(),
                         node.line
                     );
+                }
+            }
+            0
+        }
+
+        Command::Trace {
+            symbol,
+            direction,
+            depth,
+            json,
+        } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = crate::data_dir::graph_db_path();
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run `cora index` first.".yellow());
+                std::process::exit(1);
+            }
+            let conn = index::open_global_index()?;
+            let project_id = index::ensure_project(&conn, &project_root)?;
+
+            let dir = match direction.as_str() {
+                "incoming" => index::graph::TraceDirection::Incoming,
+                _ => index::graph::TraceDirection::Outgoing,
+            };
+
+            let nodes = index::graph::trace_path(&conn, project_id, &symbol, depth, dir)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&nodes)?);
+            } else if nodes.is_empty() {
+                eprintln!("{}", format!("No trace results for '{symbol}'.").yellow());
+            } else {
+                let dir_label = match dir {
+                    index::graph::TraceDirection::Outgoing => "calls",
+                    index::graph::TraceDirection::Incoming => "called by",
+                };
+                println!(
+                    "{}",
+                    format!(
+                        "Trace from '{}' ({}, {} nodes):",
+                        symbol,
+                        dir_label,
+                        nodes.len()
+                    )
+                    .cyan()
+                );
+                println!("{}", "─".repeat(60).dimmed());
+                let mut prev_depth = 0u32;
+                for node in &nodes {
+                    if node.depth != prev_depth {
+                        prev_depth = node.depth;
+                        println!("  {}", format!("depth {}", node.depth).blue().bold());
+                    }
+                    let indent = "  ".repeat(node.depth as usize + 1);
+                    let kind_tag = format!("[{}]", node.kind).dimmed();
+                    println!(
+                        "  {}{} {} {}:{}",
+                        indent,
+                        node.symbol.white().bold(),
+                        kind_tag,
+                        node.file.dimmed(),
+                        node.line
+                    );
+                }
+            }
+            0
+        }
+
+        Command::Arch { json } => {
+            let project_root = std::env::current_dir()?;
+            let db_path = crate::data_dir::graph_db_path();
+            if !db_path.exists() {
+                eprintln!("{}", "No index found. Run `cora index` first.".yellow());
+                std::process::exit(1);
+            }
+            let conn = index::open_global_index()?;
+            let project_id = index::ensure_project(&conn, &project_root)?;
+
+            let overview = index::graph::arch_overview(&conn, project_id)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&overview)?);
+            } else {
+                println!("{}", "ARCHITECTURE OVERVIEW".cyan().bold());
+                println!("{}", "─".repeat(50).dimmed());
+                println!();
+                println!(
+                    "  {}  {}  {}",
+                    "MODULE".bold(),
+                    "SYMBOLS".bold(),
+                    "EDGE TYPES".bold()
+                );
+                println!("  {}", "─".repeat(45).dimmed());
+                for m in &overview.modules {
+                    println!(
+                        "  {:<30} {:>6}  {:>10}",
+                        m.name, m.symbol_count, m.edge_types
+                    );
+                }
+                println!();
+                if !overview.edge_counts.is_empty() {
+                    println!("  {}", "EDGE DISTRIBUTION".cyan().bold());
+                    println!("  {}", "─".repeat(45).dimmed());
+                    for (kind, count) in &overview.edge_counts {
+                        println!("  {:<20} {:>6}", kind, count);
+                    }
                 }
             }
             0
