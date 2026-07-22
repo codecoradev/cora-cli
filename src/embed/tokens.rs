@@ -231,7 +231,7 @@ pub fn tokenize_code(code: &str) -> HashMap<String, u32> {
     // Keep only the top MAX_TOKENS by frequency
     if counts.len() > MAX_TOKENS {
         let mut entries: Vec<_> = counts.into_iter().collect();
-        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.sort_by_key(|b| std::cmp::Reverse(b.1));
         entries.truncate(MAX_TOKENS);
         counts = entries.into_iter().collect();
     }

@@ -309,7 +309,10 @@ mod tests {
         let vec = pretrained_vec_at(0);
         for &v in vec.iter().take(16) {
             let f = v as f32 / 127.0;
-            assert!(f >= -1.0 && f <= 1.0, "int8 {v} → f32 {f} out of [-1, 1]");
+            assert!(
+                (-1.0..=1.0).contains(&f),
+                "int8 {v} → f32 {f} out of [-1, 1]"
+            );
         }
     }
 }
