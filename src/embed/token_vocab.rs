@@ -1,3 +1,6 @@
+//! Pre-trained token vocabulary — reserved for Phase 5 (Voyage-4-Nano ONNX).
+#![allow(dead_code)]
+
 //! Pre-trained token vocabulary from nomic-embed-code.
 //!
 //! Provides real 768-dimensional code embeddings distilled from

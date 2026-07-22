@@ -51,6 +51,7 @@ impl TokenEmbedding {
     }
 
     /// Consumes self and returns the underlying vector.
+    #[allow(dead_code)]
     pub fn into_vec(self) -> Vec<f64> {
         self.vec
     }
@@ -278,6 +279,7 @@ pub fn embed_code(code: &str) -> TokenEmbedding {
 ///
 /// Because vectors are pre-normalised by [`embed`], this is just the dot
 /// product.  Returns a value in `[-1, 1]`.
+#[cfg(test)]
 pub fn cosine_similarity(a: &TokenEmbedding, b: &TokenEmbedding) -> f64 {
     a.vec.iter().zip(b.vec.iter()).map(|(x, y)| x * y).sum()
 }

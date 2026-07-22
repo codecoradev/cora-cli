@@ -4,6 +4,9 @@
 //! - Keys are symbol database IDs (i64) instead of UUID strings
 //! - Single purpose: code symbol semantic search
 
+// Public API reserved for Phase 4+ (remove, dims, etc.).
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use fs2::FileExt;
 use std::collections::HashMap;
@@ -71,11 +74,9 @@ impl CodeVectorIndex {
     fn load_from_file(file: &mut File, path: &Path) -> Result<Self> {
         use std::io::{Read, Seek, SeekFrom};
 
-        file.seek(SeekFrom::Start(0))
-            .context("seek usearch file")?;
+        file.seek(SeekFrom::Start(0)).context("seek usearch file")?;
         let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)
-            .context("read usearch file")?;
+        file.read_to_end(&mut buffer).context("read usearch file")?;
 
         let index =
             Index::restore_from_buffer(&buffer).context("load usearch index from buffer")?;
@@ -87,16 +88,14 @@ impl CodeVectorIndex {
 
         let mapping_path = path.with_extension("keys");
         if mapping_path.exists() {
-            let data = std::fs::read_to_string(&mapping_path)
-                .context("read key mapping file")?;
+            let data = std::fs::read_to_string(&mapping_path).context("read key mapping file")?;
             for line in data.lines() {
                 let line = line.trim();
                 if line.is_empty() {
                     continue;
                 }
                 if let Some((key_str, sym_id)) = line.split_once('\t') {
-                    if let (Ok(key), Ok(sym)) = (key_str.parse::<u64>(), sym_id.parse::<i64>())
-                    {
+                    if let (Ok(key), Ok(sym)) = (key_str.parse::<u64>(), sym_id.parse::<i64>()) {
                         key_to_symbol.insert(key, sym);
                         symbol_to_key.insert(sym, key);
                         next_key = next_key.max(key + 1);
@@ -206,9 +205,7 @@ impl CodeVectorIndex {
             .keys
             .iter()
             .zip(results.distances.iter())
-            .filter_map(|(key, dist)| {
-                self.key_to_symbol.get(key).map(|&id| (id, *dist))
-            })
+            .filter_map(|(key, dist)| self.key_to_symbol.get(key).map(|&id| (id, *dist)))
             .collect()
     }
 

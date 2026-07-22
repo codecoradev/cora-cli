@@ -6,11 +6,11 @@
 
 #[cfg(feature = "tree-sitter")]
 mod ast;
+pub mod brain;
 mod extract;
 pub mod graph;
 pub mod schema;
 mod symbols;
-pub mod brain;
 pub mod vector;
 
 use std::collections::HashMap;
@@ -366,7 +366,7 @@ pub struct IndexStats {
     pub files_skipped: usize,
     pub symbols_indexed: usize,
     pub errors: usize,
-        pub embedded_symbols: Option<usize>,
+    pub embedded_symbols: Option<usize>,
 }
 
 /// Summary of the current index state.

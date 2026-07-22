@@ -3,10 +3,9 @@
 //! RRF fusion (k=60) merges 3 signal sources into ranked results.
 //! Pattern adopted from uteke `doc_search_hybrid()`.
 
-use crate::data_dir::codecora_home;
 use crate::embed::tokens::embed_code;
 use crate::index::symbols::SymbolQuery;
-use crate::index::vector::{cosine_distance_to_similarity, CodeVectorIndex, DEFAULT_DIMS};
+use crate::index::vector::{CodeVectorIndex, DEFAULT_DIMS, cosine_distance_to_similarity};
 use anyhow::{Context, Result};
 use rusqlite::Connection;
 use std::collections::HashMap;
@@ -43,9 +42,8 @@ pub fn embed_project(conn: &Connection, project_id: i64) -> Result<usize> {
     let mut vi =
         CodeVectorIndex::load_or_create(&vi_path, DEFAULT_DIMS).context("load vector index")?;
 
-    let mut stmt = conn.prepare(
-        "SELECT id, name, kind, signature FROM symbols WHERE project_id = ?1",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT id, name, kind, signature FROM symbols WHERE project_id = ?1")?;
     let rows: Vec<(i64, String, String, String)> = stmt
         .query_map(rusqlite::params![project_id], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
@@ -64,7 +62,8 @@ pub fn embed_project(conn: &Connection, project_id: i64) -> Result<usize> {
         let embedding = embed_code(&text);
         let vec: Vec<f32> = embedding.as_slice().iter().map(|&v| v as f32).collect();
 
-        vi.insert(*sym_id, &vec).context("insert symbol embedding")?;
+        vi.insert(*sym_id, &vec)
+            .context("insert symbol embedding")?;
         count += 1;
     }
 
@@ -154,12 +153,7 @@ pub fn brain_search(
 // ── Signal sources ───────────────────────────────────────────────────────
 
 /// FTS5 keyword search → (symbol_id, rank_score) pairs.
-fn fts5_search(
-    conn: &Connection,
-    project_id: i64,
-    query: &str,
-    limit: usize,
-) -> Vec<(i64, f64)> {
+fn fts5_search(conn: &Connection, project_id: i64, query: &str, limit: usize) -> Vec<(i64, f64)> {
     let sq = SymbolQuery::text(query);
     match crate::index::search(conn, project_id, &sq) {
         Ok(results) => results
@@ -233,9 +227,10 @@ fn graph_proximity_search(
     };
 
     let ids: Vec<(i64, f32)> = stmt
-        .query_map(rusqlite::params![top_name, project_id, top_id, limit], |row| {
-            row.get(0)
-        })
+        .query_map(
+            rusqlite::params![top_name, project_id, top_id, limit],
+            |row| row.get(0),
+        )
         .ok()
         .map(|rows| {
             rows.filter_map(|r| r.ok())
@@ -249,14 +244,19 @@ fn graph_proximity_search(
 }
 
 /// Fetch symbol row by ID → (name, kind, file, line, signature).
-fn get_symbol_by_id(
-    conn: &Connection,
-    id: i64,
-) -> Result<(String, String, String, i64, String)> {
+fn get_symbol_by_id(conn: &Connection, id: i64) -> Result<(String, String, String, i64, String)> {
     conn.query_row(
         "SELECT name, kind, file, line, signature FROM symbols WHERE id = ?1",
         rusqlite::params![id],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        },
     )
     .map_err(Into::into)
 }
