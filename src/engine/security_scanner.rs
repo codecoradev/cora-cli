@@ -422,7 +422,10 @@ mod tests {
             &[r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">"#],
         )];
         let findings = scan_security(&chunks, 10);
-        assert!(findings.is_empty(), "SVG xmlns should not trigger security findings");
+        assert!(
+            findings.is_empty(),
+            "SVG xmlns should not trigger security findings"
+        );
     }
 
     #[test]
@@ -436,7 +439,10 @@ mod tests {
             .iter()
             .filter(|f| f.rule_id == "crypto/hardcoded-secret")
             .collect();
-        assert!(secret_findings.is_empty(), "Empty $state('') secret should not trigger");
+        assert!(
+            secret_findings.is_empty(),
+            "Empty $state('') secret should not trigger"
+        );
     }
 
     #[test]
@@ -450,6 +456,10 @@ mod tests {
             .iter()
             .filter(|f| f.rule_id == "crypto/hardcoded-secret")
             .collect();
-        assert_eq!(secret_findings.len(), 1, "Real hardcoded secret should still be detected");
+        assert_eq!(
+            secret_findings.len(),
+            1,
+            "Real hardcoded secret should still be detected"
+        );
     }
 }
