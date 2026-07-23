@@ -14,7 +14,7 @@
 
 ---
 
-**Cora** is a fast, native CLI that uses any LLM to review your code — in your terminal, CI/CD, git hooks, or directly inside AI coding agents. Bring your own key, pick any model, review in seconds.
+**Cora** is a fast, native CLI for AI-powered code review and code intelligence — in your terminal, CI/CD, git hooks, or directly inside AI coding agents. Bring your own key, pick any model, index your codebase, and search semantically. All local, zero cloud.
 
 ## Why Cora?
 
@@ -28,7 +28,11 @@
 - 📐 **Quality profiles** — strict, balanced, or lax presets for different project needs
 - 📏 **Custom rule engine** — write your own regex rules in `.cora.yaml`
 - ✂️ **Auto-chunking** — splits large PRs into reviewable chunks automatically
-- 🔌 **MCP server** — expose rules and config to AI agents (Claude Code, Cursor, Copilot, Windsurf)
+- 🔍 **Code Intelligence** — index symbols across 15 languages, call graph, trace, impact analysis
+- 🧠 **Brain Mode** — hybrid semantic search (FTS5 + vector KNN + graph) with RRF fusion
+- 🗄️ **Multi-project database** — one global index, search across all your repos at once
+- 🌳 **tree-sitter** (opt-in) — AST-based call graph extraction for Rust, Go, Python, TypeScript
+- 🔌 **MCP server** — 15 tools for AI agents (review, search, brain, debt, trace, ...)
 - 💾 **Diff-hash caching** — skip repeat reviews automatically
 - 🔧 **Configurable** — per-project `.cora.yaml`, global `~/.cora/config.yaml`, or env vars
 
@@ -172,19 +176,37 @@ Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](https://codecor
 
 ## Commands
 
+### Code Review
+
 | Command | Description |
 |---------|-------------|
-| `cora commit` | Review + generate commit message + commit |
-| `cora review` | Review code changes |
+| `cora review` | Review code changes (diff, branch, commit, file) |
 | `cora scan` | Scan files for issues |
+| `cora commit` | Review + generate commit message + commit |
+| `cora debt` | Show tech debt report from review history |
+
+### Code Intelligence
+
+| Command | Description |
+|---------|-------------|
+| `cora index` | Index project symbols, vectors, and call graph |
+| `cora explore` | Search symbols by keyword (FTS5) |
+| `cora brain` | Hybrid semantic search (FTS5 + vectors + graph → RRF) |
+| `cora trace` | Trace call chains through the codebase |
+| `cora arch` | Architecture overview (modules, edges, hotspots) |
+| `cora callers` | Find all callers of a symbol |
+| `cora impact` | Analyze blast radius of changing a symbol |
+| `cora affected` | Find tests impacted by changed files |
+
+### Config & Setup
+
+| Command | Description |
+|---------|-------------|
 | `cora init` | Create project config + hook |
 | `cora auth login` | Save API key |
 | `cora config show` | Show resolved config |
 | `cora providers` | List available LLM providers |
-| `cora debt` | Show tech debt report from review history |
-| `cora review --memory` | Recall project patterns from Uteke before review |
-| `cora review --learn` | Recall + save findings to Uteke |
-| `cora mcp` | Start MCP server for AI coding agents |
+| `cora mcp` | Start MCP server (15 tools) for AI coding agents |
 | `cora hook install` | Install pre-commit hook |
 
 See **[CLI Reference →](https://codecora.dev/cli-reference.html)** for all flags and examples.
