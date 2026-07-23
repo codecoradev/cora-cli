@@ -49,10 +49,7 @@ Pick **one** install method — mixing channels can leave stale binaries on your
 | **Pre-built binaries** | Manual download from [Releases](https://github.com/codecoradev/cora-code/releases) |
 
 ```bash
-# Recommended: Cora only (standalone)
-curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install.sh | sh
-
-# Or install both Cora + Uteke (code review with memory)
+# Install with the quick installer
 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install-bundle.sh | sh
 
 # Or build from source with cargo
@@ -210,30 +207,6 @@ Works on **all CI platforms** — [Gitea, GitLab, Bitbucket →](https://codecor
 | `cora hook install` | Install pre-commit hook |
 
 See **[CLI Reference →](https://codecora.dev/cli-reference.html)** for all flags and examples.
-
-## Uteke Memory Integration
-
-Cora works 100% standalone. Install [Uteke](https://github.com/codecoradev/uteke) to unlock **memory-powered reviews** that learn from your codebase history.
-
-| Mode | Command | What it does |
-|------|---------|-------------|
-| Standalone (default) | `cora review` | AI review, zero deps |
-| Memory recall | `cora review --memory` | Recall project patterns before review |
-| Learning | `cora review --memory --learn` | Recall + save findings after review |
-
-```bash
-# Install Uteke separately
-curl -fsSL https://raw.githubusercontent.com/codecoradev/uteke/main/install.sh | sh
-
-# Or install both at once
-curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install-bundle.sh | sh
-
-# Enable memory
-export PATH="$HOME/.local/bin:$PATH"
-cora review --staged --memory --learn
-```
-
-Your code review gets smarter every sprint.
 
 ## Environment Variables
 
