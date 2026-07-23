@@ -31,8 +31,6 @@ Complete command reference for the cora CLI.
 | `cora commit --edit` | Always open `$EDITOR` to edit message |
 | `cora review` | Review code changes (default: staged files) |
 | `cora review --staged` | Review staged git changes explicitly |
-| `cora review --memory` | Recall project patterns from Uteke before review |
-| `cora review --learn` | Recall + save findings to Uteke (implies --memory) |
 | `cora review --unstaged` | Review unstaged working changes |
 | `cora review --unpushed` | Review unpushed commits |
 | `cora review --base` `<branch>` | Compare current branch against target |
@@ -99,14 +97,6 @@ $ cora commit
 
 # YOLO mode — auto-commit, no prompts
 $ cora commit --yolo
-```
-
-```bash
-# Install both Cora + Uteke (code review with memory)
-$ curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install-bundle.sh | sh
-
-# Then review with memory:
-$ cora review --staged --memory --learn
 ```
 
 ```bash
