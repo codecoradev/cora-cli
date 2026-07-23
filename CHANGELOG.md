@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Highlights
+
+- **Brain Mode — hybrid code search.** `cora brain <query>` combines FTS5 keyword search, usearch vector similarity (HNSW), and graph BFS proximity into a single ranked result set via RRF fusion (k=60). Index-time embeddings use a zero-dependency static token method (256d) — no model download, no GPU.
+- **tree-sitter AST extraction + call edges.** Schema v3 adds an `edges` table storing caller→callee relationships. When `cora index` runs with `--features tree-sitter`, it extracts function calls from AST nodes, enabling `cora trace` and `cora arch`.
+- **`cora trace` and `cora arch` commands.** Trace symbol call chains (depth-limited) and display architecture overview (module breakdown, edge types, top connectors) from the indexed call graph.
+- **Static token embedding engine.** Zero-dependency bag-of-tokens hashing (256d) for code symbol embeddings — suitable for near-duplicate detection and semantic search without external models.
+- **Global index directory.** The symbol database migrated from `.cora/graph.db` (per-project) to `~/.codecora/cora-code/graph.db` (per-user), shared across all projects.
+- **Renamed `cora-cli` → `cora-code`.** Binary is now `cora`, crate is `cora-code`.
+
+### Added
+
+- **Phase 3 — Brain Mode** (#362)
+  - `CodeVectorIndex` — persistent usearch HNSW vector index with fs2 file locking, key↔symbol mapping, and disk serialization
+  - `brain_search()` — hybrid search: FTS5 + usearch KNN (cosine, top-50) + graph BFS (depth-2 from FTS hits) → RRF k=60 fusion
+  - Schema v4: `embedding_tier`, `embedding_dims`, `embedding_model`, `last_embedded_at` columns on `projects` table
+  - Index-time embedding: all symbols embedded via static tokens during `cora index`
+  - CLI: `cora brain <query> [--json] [--limit N]`
+  - MCP tool: `cora.brain_search` — semantic code search for AI coding agents
+- **Phase 2C — `cora trace` and `cora arch`** (#358)
+  - `cora trace <symbol>` — trace call chains from a symbol (depth-limited BFS on call edges)
+  - `cora arch` — architecture overview: module breakdown, edge types, top connectors
+- **Phase 2 — tree-sitter AST extraction + Schema v3** (#356)
+  - tree-sitter AST node extraction for Rust, Python, JavaScript, TypeScript, Go, Java
+  - Schema v3: `edges` table (caller_id, callee_id, edge_type) storing call relationships
+  - Gated behind `--features tree-sitter` (default build does not include tree-sitter)
+- **Phase 1 — Static token embedding engine** (#354)
+  - Bag-of-tokens hashing: 256d vectors from code text, zero external dependencies
+  - Pre-trained nomic-embed-code vocabulary included (768d, reserved for Phase 5)
+  - `tokenize_code()`, `embed_code()`, `cosine_similarity()` public API
+- **Global index migration** (#355)
+  - Symbol database moved from `.cora/graph.db` to `~/.codecora/cora-code/graph.db`
+  - `CODECORA_HOME` env var override for custom data directory
+- **Binary rename** (#338)
+  - Crate renamed `cora-cli` → `cora-code`
+  - Binary name: `cora`
+
 ## [0.7.0] - 2026-07-16
 
 ### Highlights
