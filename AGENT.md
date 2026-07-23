@@ -2,8 +2,10 @@
 
 ## Project Overview
 
-**cora-code** is a Rust CLI tool for AI-powered code review. Bring Your Own Keys (BYOK) —
-no managed API, no cloud service. Runs locally against diffs, scans, or branches.
+**cora-code** is a Rust CLI for AI-powered code review and code intelligence.
+Bring Your Own Keys (BYOK) — no managed API, no cloud service. Runs locally against
+diffs, scans, or branches. Includes a built-in symbol index, call graph, and hybrid
+semantic search engine (Brain Mode).
 
 - **License:** MIT
 - **Edition:** Rust 2024 (MSRV 1.85)
@@ -17,8 +19,8 @@ no managed API, no cloud service. Runs locally against diffs, scans, or branches
 ```bash
 cargo build              # Build (debug)
 cargo build --release    # Build (release)
-cargo test               # Run all 567 tests
-cargo clippy --all-targets -- -D warnings  # Lint (strict)
+cargo test               # Run all 708 tests (default) / 714 (tree-sitter)
+cargo clippy --all-targets -- -D warnings  # Lint (strict -D warnings)
 cargo fmt --all -- --check  # Format check
 ```
 
@@ -29,26 +31,37 @@ Always run `cargo fmt --all` before committing. CI runs all three checks.
 ```
 src/
 ├── main.rs              # Entry point, CLI argument parsing
+├── data_dir.rs          # Global data directory (~/.codecora/cora-code/)
 ├── commands/            # Subcommand handlers
-│   ├── mod.rs
 │   ├── review.rs        # cora review (diff-based review)
 │   ├── scan.rs          # cora scan (full-file scan)
-│   ├── debt.rs          # cora debt (tech debt report)
 │   ├── commit_cmd.rs    # cora commit (review + commit message + commit)
-├── index/               # Symbol index (v0.6 — Code Intelligence)
-│   ├── mod.rs           # Index engine (open, index_project, search)
-│   ├── schema.rs        # SQLite schema + FTS5
-│   ├── symbols.rs       # SymbolKind, SymbolQuery, SearchResult
-│   ├── extract.rs       # Per-language definition + call extraction
-│   └── graph.rs         # Call graph (callers, impact, affected)
+│   ├── debt.rs          # cora debt (tech debt report)
+│   ├── index_cmd.rs     # cora index / explore / callers / impact / affected
+│   ├── trace_cmd.rs     # cora trace (call chain BFS traversal)
+│   ├── arch_cmd.rs      # cora arch (architecture overview)
+│   ├── brain_cmd.rs     # cora brain (hybrid semantic search)
+│   ├── export_cmd.rs    # cora export
+│   ├── import_cmd.rs    # cora import
 │   ├── config_cmd.rs    # cora config (show/set/validate)
 │   ├── auth.rs          # cora auth (API key management)
 │   ├── hook_cmd.rs      # cora hook (pre-commit hook install/uninstall)
 │   ├── init.rs          # cora init (project scaffolding)
 │   ├── upload.rs        # cora upload (review upload)
 │   ├── completion.rs    # Shell completion generation
-│   ├── debt.rs          # cora debt (tech debt report)
 │   └── providers.rs     # cora providers (list providers)
+├── index/               # Code Intelligence — symbol index + graph + vectors
+│   ├── mod.rs           # Index engine (open DB, index_project, FTS5 search)
+│   ├── schema.rs        # SQLite schema v4 + auto-migration (projects, symbols, edges)
+│   ├── symbols.rs       # SymbolKind, SymbolQuery, SearchResult types
+│   ├── extract.rs       # 15 language extractors (def + call extraction)
+│   ├── graph.rs         # Call graph (callers, impact, affected)
+│   ├── brain.rs         # Hybrid search: FTS5 + usearch KNN + graph BFS → RRF k=60
+│   └── vector.rs        # CodeVectorIndex using usearch HNSW (256d, Cosine, F32)
+├── embed/               # Embedding engine
+│   ├── mod.rs           # Re-exports
+│   ├── tokens.rs        # Static token embedding (256d, zero-dep bag-of-tokens)
+│   └── token_vocab.rs   # Token vocabulary (reserved for Phase 5 ONNX upgrade)
 ├── config/
 │   ├── mod.rs
 │   ├── schema.rs        # Config structs & defaults
@@ -79,7 +92,7 @@ src/
 │   ├── mod.rs
 │   ├── protocol.rs      # JSON-RPC 2.0 types
 │   ├── server.rs        # Stdio transport + request dispatch
-│   └── tools.rs         # 5 tool handlers
+│   └── tools.rs         # 15 tool handlers (review, search, brain, debt, ...)
 ├── formatters/          # Output format implementations
 │   ├── mod.rs
 │   ├── pretty.rs        # Human-readable terminal output
@@ -104,14 +117,19 @@ src/
 | `config/loader.rs` | Config loading with full priority chain resolution |
 | `config/schema.rs` | All config structs, defaults, serde annotations |
 | `commands/init.rs` | Project scaffolding, `.cora.yaml` generation |
+| `index/brain.rs` | Hybrid search orchestration (FTS5 + usearch + graph → RRF) |
+| `index/vector.rs` | CodeVectorIndex — usearch HNSW wrapper, load/save/insert/search |
+| `index/schema.rs` | SQLite schema v4, auto-migration, FTS5 virtual table |
+| `embed/tokens.rs` | Static token embedding (256d, zero-dependency) |
 
 ## Testing
 
 ```bash
-cargo test               # 567 tests total
-                         #   484 unit tests
+cargo test               # 708 tests (default) / 714 (tree-sitter)
+                         #   637 unit tests
                          #    16 CLI integration tests
                          #     6 config tests
+                         #    49 tree-sitter tests (opt-in)
 cargo test --no-verify   # Skip pre-commit hooks (avoids timeout in hooks)
 ```
 
@@ -240,7 +258,7 @@ Missing any = release blocker.
 ### 1. Code
 
 - [ ] All target issues merged to `develop`
-- [ ] `cargo test` — all 567+ tests pass
+- [ ] `cargo test` — all 708+ tests pass
 - [ ] `cargo clippy --all-targets -- -D warnings` — clean
 - [ ] `cargo fmt --all -- --check` — clean
 - [ ] `cargo build --release` — no errors
@@ -265,6 +283,7 @@ reality BEFORE version bump.
 | `docs/usage.md` | Review modes, output formats, exit codes up to date. New sections present |
 | `docs/examples.md` | CI examples work. Marketplace action reference correct. Multi-platform examples present |
 | `docs/providers.md` | Provider list, default models, env vars accurate |
+| `docs/code-intelligence.md` | Index, brain, trace, arch, multi-project DB, data directory |
 | `docs/installation.md` | Version pin example uses latest. Platforms list accurate |
 | `AGENT.md` | Code structure tree current. Test count current. Key files table current |
 | `.agent.md` | Pre-release checklist current. CI checks count current. Module dependencies current |
@@ -426,18 +445,18 @@ When submitting cora to directories, aggregators, or showcases (Trendshift, etc.
 > works with any OpenAI-compatible LLM. Runs locally via CLI, CI/CD, pre-commit hooks, or
 > as an MCP server for AI coding agents (Claude Code, Cursor, Copilot).
 >
-> Features: diff-based review, static security scanning (11 regex patterns), quality gate
-> with configurable thresholds, language-specific analyzers (Dart/Flutter, Svelte,
-> TypeScript, Go, Rust, Python), secret detection, custom rule engine, quality profiles,
-> auto-chunking for large PRs, and SARIF output for CI integration.
+> Features: diff-based AI code review, static security scanning, quality gate,
+> language-specific analyzers, secret detection, custom rule engine, code intelligence
+> (symbol index, call graph, semantic search via Brain Mode), MCP server with 15 tools,
+> SARIF output, and multi-project global database.
 
 ### Key Metrics to Mention
 
-- Test count (495+)
-- Lines of Rust code (16,800+)
+- Test count (708+)
+- Lines of Rust code (26,400+)
 - CI checks (10)
 - GitHub Marketplace action published
-- MCP server with 5 tools
+- MCP server with 15 tools
 - MIT license
 - Active development cadence
 
