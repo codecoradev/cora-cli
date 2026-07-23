@@ -150,29 +150,8 @@ Or skip the prompt in CI/trusted workflows:
 cora commit --yolo    # auto-commit, no prompts
 ```
 
-### Memory-Powered Reviews (Optional)
-
-Install [Uteke](https://github.com/codecoradev/uteke) to give Cora a memory:
-
-```bash
-# Install both tools
-curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install-bundle.sh | sh
-```
-
-Then enable memory in reviews:
-
-```bash
-cora review --staged --memory         # recall project patterns
-cora review --staged --memory --learn # recall + save findings
-```
-
-- `--memory` — Cora recalls past review findings and code patterns from Uteke before reviewing
-- `--learn` — After review, Cora saves findings to Uteke for future recall
-- Works with any review mode (staged, unpushed, branch)
-
-Your code review gets smarter every sprint.
-
 ## AI Agent Integration
+
 
 cora includes a built-in MCP server for AI coding agents. After installation:
 

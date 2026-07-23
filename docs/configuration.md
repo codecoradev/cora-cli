@@ -407,30 +407,6 @@ cora debt --branch develop   # Filter by branch
 
 Snapshots are auto-saved after every review (best-effort, never fails the review).
 
-## Uteke Memory Integration
-
-cora can optionally integrate with [Uteke](https://github.com/codecoradev/uteke) — a local-first memory engine for AI agents.
-
-### Prerequisites
-
-Install Uteke: `curl -fsSL https://raw.githubusercontent.com/codecoradev/uteke/main/install.sh | sh`
-
-### Usage
-
-```bash
-cora review                  # Standalone review (default, no memory)
-cora review --memory         # Recall project patterns before review
-cora review --memory --learn # Recall + save findings after review
-```
-
-### How It Works
-
-1. **`--memory`**: Cora calls `uteke recall` to fetch project-specific patterns from previous reviews, enriching the LLM prompt with historical context.
-
-2. **`--learn`**: After review, Cora calls `uteke remember` to save findings, patterns, and stats for future recall.
-
-3. **Graceful degradation**: If Uteke is not installed, Cora warns and continues without memory. Reviews never fail due to memory issues.
-
 ## MCP Server
 
 cora includes a built-in MCP (Model Context Protocol) server that exposes rules and config to AI coding agents like Claude Code, Cursor, Copilot, and Windsurf.
