@@ -10,6 +10,7 @@ use tracing::debug;
 
 use crate::engine::Severity;
 use crate::engine::diff_parser::{DiffLineType, FileChunk};
+use crate::engine::rules::builtin::post_match_filter;
 use crate::engine::rules::types::RuleFinding;
 
 // ─── Security patterns ───
@@ -142,6 +143,17 @@ pub fn scan_security(chunks: &[FileChunk], max_findings: usize) -> Vec<RuleFindi
 
                 for (rule_id, name, regex, severity) in COMPILED_PATTERNS.iter() {
                     if regex.is_match(&line.content) {
+                        // Apply post-match filter to suppress known false positives
+                        if post_match_filter(rule_id, &line.content) {
+                            debug!(
+                                rule = %rule_id,
+                                file = path,
+                                line = line_no,
+                                "security pattern suppressed by post-match filter"
+                            );
+                            continue;
+                        }
+
                         debug!(
                             rule = %rule_id,
                             file = path,
@@ -399,5 +411,45 @@ mod tests {
             1,
             "subprocess.run with shell=True should trigger"
         );
+    }
+
+    // ─── False positive suppression via post_match_filter (issue #357) ───
+
+    #[test]
+    fn svg_xmlns_url_suppressed_in_security_scan() {
+        let chunks = vec![make_chunk(
+            "src/icon.svg",
+            &[r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">"#],
+        )];
+        let findings = scan_security(&chunks, 10);
+        assert!(findings.is_empty(), "SVG xmlns should not trigger security findings");
+    }
+
+    #[test]
+    fn empty_secret_value_suppressed_in_security_scan() {
+        let chunks = vec![make_chunk(
+            "src/Form.svelte",
+            &["let formAppSecret = $state('');"],
+        )];
+        let findings = scan_security(&chunks, 10);
+        let secret_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.rule_id == "crypto/hardcoded-secret")
+            .collect();
+        assert!(secret_findings.is_empty(), "Empty $state('') secret should not trigger");
+    }
+
+    #[test]
+    fn real_hardcoded_secret_still_detected_after_filter() {
+        let chunks = vec![make_chunk(
+            "src/config.py",
+            &["API_KEY = sk_live_abc123def456"],
+        )];
+        let findings = scan_security(&chunks, 10);
+        let secret_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.rule_id == "crypto/hardcoded-secret")
+            .collect();
+        assert_eq!(secret_findings.len(), 1, "Real hardcoded secret should still be detected");
     }
 }
