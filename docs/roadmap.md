@@ -104,5 +104,16 @@ Query layer built on top of the v0.6 index — call graph traversal, test impact
 
 ## Future — What's Next
 
+### Brain Mode Roadmap
+
+- [Phase 1](https://github.com/codecoradev/cora-code/pull/354) — Static token embedding engine (256d) — ✓ Done
+- [Phase 2](https://github.com/codecoradev/cora-code/pull/356) — tree-sitter AST + schema v3 edges table — ✓ Done
+- [Phase 2C](https://github.com/codecoradev/cora-code/pull/358) — `cora trace` + `cora arch` — ✓ Done
+- [Phase 3](https://github.com/codecoradev/cora-code/pull/362) — Brain Mode hybrid search (usearch + RRF) — ✓ Done
+- [Phase 4](https://github.com/codecoradev/cora-code/issues/360) — Uteke integration upgrade → Planned
+- [Phase 5](https://github.com/codecoradev/cora-code/issues/361) — Voyage-4-Nano ONNX (opt-in, 1024d) → Deferred
+
+### Other
+
 - [#117](https://github.com/codecoradev/cora-code/issues/117) Lightweight agent follow-up — 1 capped tool-call — → Planned
 - [#132](https://github.com/codecoradev/cora-code/issues/132) GitHub App backend MVP in Rust (Axum) — → Planned

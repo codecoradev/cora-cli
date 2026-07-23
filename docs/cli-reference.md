@@ -61,13 +61,15 @@ Complete command reference for the cora CLI.
 | `cora debt --estimate` | Show estimated fix time |
 | `cora debt --since v0.4.5` | Filter by git tag or date |
 | `cora debt --branch main` | Filter by branch |
+| `cora arch` | Architecture overview — modules, edge types, top connectors |
+| `cora trace` `<symbol>` | Trace call chains from a symbol (depth-limited BFS) |
+| `cora brain` `<query>` | Hybrid search: FTS5 + vector + graph → RRF fusion |
+| `cora brain` `--json` | Brain search as JSON |
+| `cora brain` `--limit N` | Max results (default: 20) |
+| `cora index` | Index project symbols into SQLite + usearch |
+| `cora index --rebuild` | Rebuild index from scratch |
 | `cora completion` `<shell>` | Generate shell completions (bash/zsh/fish) |
 | `cora mcp` | Start MCP server for AI coding agents (Claude Code, Cursor, Windsurf) |
-| `cora debt` | Show tech debt report from review history |
-| `cora debt --json` | Debt report in JSON format |
-| `cora debt --trend` | Quality score trend graph |
-| `cora debt --since <date\|tag>` | Filter by date or git tag |
-| `cora debt --branch <name>` | Filter by branch name |
 
 ## Quick Examples
 
@@ -105,4 +107,17 @@ $ curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/instal
 
 # Then review with memory:
 $ cora review --staged --memory --learn
+```
+
+```bash
+# Index your project and search with Brain Mode
+$ cora index
+$ cora brain "error handling"
+$ cora brain "TokenEmbedding" --json --limit 5
+```
+
+```bash
+# Trace call chains and view architecture
+$ cora trace main
+$ cora arch
 ```
