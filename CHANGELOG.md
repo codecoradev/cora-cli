@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-24
+
+### Fixed
+
+- crates.io publish (503 transient on v0.8.0)
+
+
 ## [0.8.0] - 2026-07-24
 
 ### Highlights
