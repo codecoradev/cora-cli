@@ -1,11 +1,68 @@
 # Changelog
 
-All notable changes to cora-cli are documented in this file.
+All notable changes to cora-code are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.8.0] - 2026-07-24
+
+### Highlights
+
+- **Brain Mode — hybrid code search.** `cora brain <query>` combines FTS5 keyword search, usearch vector similarity (HNSW), and graph BFS proximity into a single ranked result set via RRF fusion (k=60). Index-time embeddings use a zero-dependency static token method (256d) — no model download, no GPU.
+- **tree-sitter AST extraction + call edges.** Schema v3 adds an `edges` table storing caller→callee relationships. When `cora index` runs with `--features tree-sitter`, it extracts function calls from AST nodes, enabling `cora trace` and `cora arch`.
+- **`cora trace` and `cora arch` commands.** Trace symbol call chains (depth-limited) and display architecture overview (module breakdown, edge types, top connectors) from the indexed call graph.
+- **Static token embedding engine.** Zero-dependency bag-of-tokens hashing (256d) for code symbol embeddings — suitable for near-duplicate detection and semantic search without external models.
+- **Global index directory.** The symbol database migrated from `.cora/graph.db` (per-project) to `~/.codecora/cora-code/graph.db` (per-user), shared across all projects.
+- **Renamed `cora-cli` → `cora-code`.** Binary is now `cora`, crate is `cora-code`.
+
+### Added
+
+- **Phase 3 — Brain Mode** (#362)
+  - `CodeVectorIndex` — persistent usearch HNSW vector index with fs2 file locking, key↔symbol mapping, and disk serialization
+  - `brain_search()` — hybrid search: FTS5 + usearch KNN (cosine, top-50) + graph BFS (depth-2 from FTS hits) → RRF k=60 fusion
+  - Schema v4: `embedding_tier`, `embedding_dims`, `embedding_model`, `last_embedded_at` columns on `projects` table
+  - Index-time embedding: all symbols embedded via static tokens during `cora index`
+  - CLI: `cora brain <query> [--json] [--limit N]`
+  - MCP tool: `cora.brain_search` — semantic code search for AI coding agents
+- **Phase 2C — `cora trace` and `cora arch`** (#358)
+  - `cora trace <symbol>` — trace call chains from a symbol (depth-limited BFS on call edges)
+  - `cora arch` — architecture overview: module breakdown, edge types, top connectors
+- **Phase 2 — tree-sitter AST extraction + Schema v3** (#356)
+  - tree-sitter AST node extraction for Rust, Python, JavaScript, TypeScript, Go, Java
+  - Schema v3: `edges` table (caller_id, callee_id, edge_type) storing call relationships
+  - Gated behind `--features tree-sitter` (default build does not include tree-sitter)
+- **Phase 1 — Static token embedding engine** (#354)
+  - Bag-of-tokens hashing: 256d vectors from code text, zero external dependencies
+  - Pre-trained nomic-embed-code vocabulary included (768d, reserved for Phase 5)
+  - `tokenize_code()`, `embed_code()`, `cosine_similarity()` public API
+- **Global index migration** (#355)
+  - Symbol database moved from `.cora/graph.db` to `~/.codecora/cora-code/graph.db`
+  - `CODECORA_HOME` env var override for custom data directory
+- **Binary rename** (#338)
+  - Crate renamed `cora-cli` → `cora-code`
+  - Binary name: `cora`
+
+### Changed
+
+- **Docs website** — adopted `@codecora/theme` + VitePress base `/cora/docs/`, retired standalone LandingPage (#348)
+- **Uteke memory integration** — removed from user-facing docs (implementation exists but undocumented until API stabilizes) (#367)
+
+### Fixed
+
+- **False positives suppressed in `sec-hardcoded-url` and `crypto/hardcoded-secret` rules** (#369, closes #357, #364)
+  - `post_match_filter()` added to `builtin.rs` — filters matches in XML/SVG `xmlns` attributes, Rust docstrings, config files, and bare identifiers
+  - Integrated into `security_scanner.rs` scan loop — all security scanner matches now pass through `post_match_filter`
+  - Docker hostname regex (`DOCKER_HOST_RE`) fixed — `\d+` now correctly matches port digits
+  - 31 targeted unit tests added for false positive suppression
+- **CI clippy lints** — `map_or(false, ...) → idiomatic `is_some_and(...)` (#369)
+
+### Stats
+
+- 56 files changed, +46,948 / -2,050 lines since v0.7.0
+- 11 PRs merged
 
 ## [0.7.0] - 2026-07-16
 
@@ -242,7 +299,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Profiles bugs** — path resolution with project root, fail-fast on invalid config, dedup merge by `id` (#238)
 - **Code Scanning alert #79** — eliminated redundant `parse_diff()` call in language context injection
-- **Download hardening** — 5x retry with exponential backoff, gzip validation, checksum verification for cora-cli binary download in CI (#221)
+- **Download hardening** — 5x retry with exponential backoff, gzip validation, checksum verification for cora-code binary download in CI (#221)
 - **curl hardening** — `--fail --show-error` + `set -e` guard prevents silent HTML downloads
 - **Checksum enforcement** — hard fail on missing/invalid checksums (was warning-only)
 - **Exact checksum match** — `awk` exact filename lookup replaces `grep` substring match
@@ -374,7 +431,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`BundlingConfig`** — `strategy`, `max_chars_per_group`, `max_files_per_group`, `coalesce_by_directory`, `coalesce_by_language` in `.cora.yaml`
 - **`ContextConfig`** — `enabled`, `max_context_tokens`, `follow_depth`, `max_symbols` in `.cora.yaml` review section
 - **Default SARIF upload to GitHub Code Scanning ON** — opt-out with `upload-sarif: false` (#148)
-- **SARIF tool branding** — `CodeCora` driver name (`codecoradev/cora-cli`) in SARIF output (#148)
+- **SARIF tool branding** — `CodeCora` driver name (`codecoradev/cora-code`) in SARIF output (#148)
 
 ### Changed
 
@@ -395,7 +452,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Engine layer migrated from `anyhow` to `thiserror`** — structured error handling in engine, `anyhow` retained in CLI layer (#86)
 - **All clippy pedantic warnings resolved** — 175 → 0 warnings across entire codebase (#84)
-- **Repo URLs updated** to `codecoradev/cora-cli` org (#137)
+- **Repo URLs updated** to `codecoradev/cora-code` org (#137)
 - **CI actions bumped** — `upload-artifact@v7`, Node 24 strict mode (`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`) (#142)
 
 ### Fixed
@@ -576,7 +633,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Replaced ASCII art banner with eye icon in README
-- Updated README branding to cora-cli
+- Updated README branding to cora-code
 
 ### Fixed
 
@@ -600,25 +657,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform** — Linux (x86_64, ARM64), macOS (Apple Silicon), Windows (x86_64)
 - **MIT License** — fully open source
 
-[Unreleased]: https://github.com/codecoradev/cora-cli/compare/v0.6.1...develop
-[0.6.1]: https://github.com/codecoradev/cora-cli/compare/v0.6.0...v0.6.1
-[0.6.0]: https://github.com/codecoradev/cora-cli/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/codecoradev/cora-cli/compare/v0.4.6...v0.5.0
-[0.4.6]: https://github.com/codecoradev/cora-cli/compare/v0.4.5...v0.4.6
-[0.4.5]: https://github.com/codecoradev/cora-cli/compare/v0.4.4...v0.4.5
-[0.4.4]: https://github.com/codecoradev/cora-cli/compare/v0.4.3...v0.4.4
-[0.4.3]: https://github.com/codecoradev/cora-cli/compare/v0.4.2...v0.4.3
-[0.4.2]: https://github.com/codecoradev/cora-cli/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/codecoradev/cora-cli/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/codecoradev/cora-cli/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/codecoradev/cora-cli/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/codecoradev/cora-cli/compare/v0.1.8...v0.2.0
-[0.1.8]: https://github.com/codecoradev/cora-cli/compare/v0.1.7...v0.1.8
-[0.1.7]: https://github.com/codecoradev/cora-cli/compare/v0.1.6...v0.1.7
-[0.1.6]: https://github.com/codecoradev/cora-cli/compare/v0.1.5...v0.1.6
-[0.1.5]: https://github.com/codecoradev/cora-cli/compare/v0.1.4...v0.1.5
-[0.1.4]: https://github.com/codecoradev/cora-cli/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/codecoradev/cora-cli/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/codecoradev/cora-cli/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/codecoradev/cora-cli/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/codecoradev/cora-cli/releases/tag/v0.1.0
+[Unreleased]: https://github.com/codecoradev/cora-code/compare/v0.6.1...develop
+[0.6.1]: https://github.com/codecoradev/cora-code/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/codecoradev/cora-code/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/codecoradev/cora-code/compare/v0.4.6...v0.5.0
+[0.4.6]: https://github.com/codecoradev/cora-code/compare/v0.4.5...v0.4.6
+[0.4.5]: https://github.com/codecoradev/cora-code/compare/v0.4.4...v0.4.5
+[0.4.4]: https://github.com/codecoradev/cora-code/compare/v0.4.3...v0.4.4
+[0.4.3]: https://github.com/codecoradev/cora-code/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/codecoradev/cora-code/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/codecoradev/cora-code/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/codecoradev/cora-code/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/codecoradev/cora-code/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/codecoradev/cora-code/compare/v0.1.8...v0.2.0
+[0.1.8]: https://github.com/codecoradev/cora-code/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/codecoradev/cora-code/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/codecoradev/cora-code/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/codecoradev/cora-code/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/codecoradev/cora-code/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/codecoradev/cora-code/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/codecoradev/cora-code/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/codecoradev/cora-code/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/codecoradev/cora-code/releases/tag/v0.1.0

@@ -9,7 +9,7 @@ title: Installation
 The fastest way to get cora — single command, no Rust required:
 
 ```bash
-$ curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+$ curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install.sh | sh
 ```
 
 Installs to `~/.local/bin`. Add to PATH if needed:
@@ -21,7 +21,7 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 Pin a specific version:
 
 ```bash
-$ CORA_VERSION=v0.6.1 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+$ CORA_VERSION=v0.6.1 curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install.sh | sh
 ```
 
 ## Install via Cargo
@@ -29,14 +29,14 @@ $ CORA_VERSION=v0.6.1 curl -fsSL https://raw.githubusercontent.com/codecoradev/c
 If you have Rust 1.85+ installed:
 
 ```bash
-$ cargo install cora-cli
+$ cargo install cora-code
 ```
 
 This compiles cora from source and installs it to Cargo's binary directory (typically `~/.cargo/bin/`).
 
 ## Download Binary
 
-Pre-built binaries are available from the [GitHub Releases](https://github.com/codecoradev/cora-cli/releases) page.
+Pre-built binaries are available from the [GitHub Releases](https://github.com/codecoradev/cora-code/releases) page.
 
 Supported platforms:
 
@@ -47,7 +47,7 @@ Supported platforms:
 
 ```bash
 # Download and extract
-$ curl -sL https://github.com/codecoradev/cora-cli/releases/latest/download/cora-linux-x86_64.tar.gz | tar xz
+$ curl -sL https://github.com/codecoradev/cora-code/releases/latest/download/cora-linux-x86_64.tar.gz | tar xz
 $ mv cora ~/.local/bin/cora
 ```
 
@@ -56,8 +56,8 @@ $ mv cora ~/.local/bin/cora
 If you prefer to build from the latest source:
 
 ```bash
-$ git clone https://github.com/codecoradev/cora-cli.git
-$ cd cora-cli
+$ git clone https://github.com/codecoradev/cora-code.git
+$ cd cora-code
 $ cargo build --release
 # Binary at target/release/cora
 ```
@@ -106,7 +106,7 @@ $ cora --version
 cora 0.6.1
 ```
 
-If `which -a cora` shows more than one path (e.g. `~/.local/bin/cora` and `~/.cargo/bin/cora`), remove the one you don't want or reorder your `PATH`. See [Issue #314](https://github.com/codecoradev/cora-cli/issues/314) for background.
+If `which -a cora` shows more than one path (e.g. `~/.local/bin/cora` and `~/.cargo/bin/cora`), remove the one you don't want or reorder your `PATH`. See [Issue #314](https://github.com/codecoradev/cora-code/issues/314) for background.
 
 ## macOS: `Killed: 9` on launch?
 
@@ -127,5 +127,5 @@ To update cora to the latest version:
 
 | Method | Command |
 |--------|---------|
-| Via Cargo | `cargo install cora-cli --force` |
+| Via Cargo | `cargo install cora-code --force` |
 | Via Binary | Download the latest release from GitHub and replace the existing binary |

@@ -31,8 +31,6 @@ Complete command reference for the cora CLI.
 | `cora commit --edit` | Always open `$EDITOR` to edit message |
 | `cora review` | Review code changes (default: staged files) |
 | `cora review --staged` | Review staged git changes explicitly |
-| `cora review --memory` | Recall project patterns from Uteke before review |
-| `cora review --learn` | Recall + save findings to Uteke (implies --memory) |
 | `cora review --unstaged` | Review unstaged working changes |
 | `cora review --unpushed` | Review unpushed commits |
 | `cora review --base` `<branch>` | Compare current branch against target |
@@ -61,13 +59,15 @@ Complete command reference for the cora CLI.
 | `cora debt --estimate` | Show estimated fix time |
 | `cora debt --since v0.4.5` | Filter by git tag or date |
 | `cora debt --branch main` | Filter by branch |
+| `cora arch` | Architecture overview — modules, edge types, top connectors |
+| `cora trace` `<symbol>` | Trace call chains from a symbol (depth-limited BFS) |
+| `cora brain` `<query>` | Hybrid search: FTS5 + vector + graph → RRF fusion |
+| `cora brain` `--json` | Brain search as JSON |
+| `cora brain` `--limit N` | Max results (default: 20) |
+| `cora index` | Index project symbols into SQLite + usearch |
+| `cora index --rebuild` | Rebuild index from scratch |
 | `cora completion` `<shell>` | Generate shell completions (bash/zsh/fish) |
 | `cora mcp` | Start MCP server for AI coding agents (Claude Code, Cursor, Windsurf) |
-| `cora debt` | Show tech debt report from review history |
-| `cora debt --json` | Debt report in JSON format |
-| `cora debt --trend` | Quality score trend graph |
-| `cora debt --since <date\|tag>` | Filter by date or git tag |
-| `cora debt --branch <name>` | Filter by branch name |
 
 ## Quick Examples
 
@@ -100,9 +100,14 @@ $ cora commit --yolo
 ```
 
 ```bash
-# Install both Cora + Uteke (code review with memory)
-$ curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install-bundle.sh | sh
+# Index your project and search with Brain Mode
+$ cora index
+$ cora brain "error handling"
+$ cora brain "TokenEmbedding" --json --limit 5
+```
 
-# Then review with memory:
-$ cora review --staged --memory --learn
+```bash
+# Trace call chains and view architecture
+$ cora trace main
+$ cora arch
 ```

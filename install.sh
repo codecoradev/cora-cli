@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
-# cora installer — https://github.com/codecoradev/cora-cli
-# Usage: curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-cli/main/install.sh | sh
+# cora installer — https://github.com/codecoradev/cora-code
+# Usage: curl -fsSL https://raw.githubusercontent.com/codecoradev/cora-code/main/install.sh | sh
 
 set -e
 
-REPO="codecoradev/cora-cli"
+REPO="codecoradev/cora-code"
 BINARY_NAME="cora"
 INSTALL_DIR="${CORA_INSTALL_DIR:-$HOME/.local/bin}"
 

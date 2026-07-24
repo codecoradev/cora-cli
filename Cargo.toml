@@ -1,10 +1,10 @@
 [package]
-name = "cora-cli"
-version = "0.7.0"
+name = "cora-code"
+version = "0.8.0"
 edition = "2024"
 description = "CLI-first AI code review — BYOK, diff/scan/branch, pre-commit hooks"
 license = "MIT"
-repository = "https://github.com/codecoradev/cora-cli"
+repository = "https://github.com/codecoradev/cora-code"
 readme = "README.md"
 keywords = ["cli", "code-review", "ai", "git", "pre-commit"]
 categories = ["command-line-utilities", "development-tools"]
@@ -58,6 +58,27 @@ chrono = { version = "0.4.44", features = ["serde"] }
 
 # Symbol index (v0.6 — Code Intelligence)
 rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Vector search (Phase 3 — Brain Mode)
+usearch = "2"
+fs2 = "0.4"
+
+# Tree-sitter AST parsing (optional — enable with --features tree-sitter)
+tree-sitter = { version = "0.26", optional = true }
+tree-sitter-rust = { version = "0.24", optional = true }
+tree-sitter-go = { version = "0.25", optional = true }
+tree-sitter-python = { version = "0.25", optional = true }
+tree-sitter-typescript = { version = "0.23", optional = true }
+
+[features]
+default = []
+tree-sitter = [
+    "dep:tree-sitter",
+    "dep:tree-sitter-rust",
+    "dep:tree-sitter-go",
+    "dep:tree-sitter-python",
+    "dep:tree-sitter-typescript",
+]
 
 [dev-dependencies]
 assert_cmd = "2"

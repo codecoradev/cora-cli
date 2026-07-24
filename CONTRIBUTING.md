@@ -1,6 +1,6 @@
-# Contributing to cora-cli
+# Contributing to cora-code
 
-First off — thank you for considering contributing to **cora-cli**! 🎉
+First off — thank you for considering contributing to **cora-code**! 🎉
 This guide will help you get started.
 
 ## Table of Contents
@@ -29,8 +29,8 @@ Be respectful, constructive, and inclusive. We follow the [Rust Code of Conduct]
 
 ```bash
 # Clone the repository
-git clone https://github.com/codecoradev/cora-cli.git
-cd cora-cli
+git clone https://github.com/codecoradev/cora-code.git
+cd cora-code
 
 # Build in debug mode
 cargo build
@@ -45,7 +45,7 @@ cargo clippy -- -D warnings
 ### Project Structure
 
 ```
-cora-cli/
+cora-code/
 ├── src/
 │   ├── main.rs              # CLI entry point + clap args
 │   ├── cli.rs               # Argument parsing (clap)
@@ -135,11 +135,11 @@ mod tests {
 
 ## Reporting Bugs
 
-Please open a [GitHub Issue](https://github.com/codecoradev/cora-cli/issues/new) with:
+Please open a [GitHub Issue](https://github.com/codecoradev/cora-code/issues/new) with:
 
 - **Description** — What happened vs. what you expected
 - **Steps to reproduce** — Minimal reproduction steps
-- **Environment** — OS, Rust version, cora-cli version
+- **Environment** — OS, Rust version, cora-code version
 - **Logs** — Output with `RUST_LOG=debug cora review`
 
 ## Feature Requests
@@ -156,4 +156,4 @@ Feel free to open an issue tagged with `question` or reach out on GitHub Discuss
 
 ---
 
-Thank you for helping make cora-cli better! 🦀
+Thank you for helping make cora-code better! 🦀
