@@ -133,7 +133,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-release, publish-crates]
+    needs: [build-release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
