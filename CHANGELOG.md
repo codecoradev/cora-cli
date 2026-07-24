@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-24
+
 ### Highlights
 
 - **Brain Mode — hybrid code search.** `cora brain <query>` combines FTS5 keyword search, usearch vector similarity (HNSW), and graph BFS proximity into a single ranked result set via RRF fusion (k=60). Index-time embeddings use a zero-dependency static token method (256d) — no model download, no GPU.
@@ -42,6 +44,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Binary rename** (#338)
   - Crate renamed `cora-cli` → `cora-code`
   - Binary name: `cora`
+
+### Changed
+
+- **Docs website** — adopted `@codecora/theme` + VitePress base `/cora/docs/`, retired standalone LandingPage (#348)
+- **Uteke memory integration** — removed from user-facing docs (implementation exists but undocumented until API stabilizes) (#367)
+
+### Fixed
+
+- **False positives suppressed in `sec-hardcoded-url` and `crypto/hardcoded-secret` rules** (#369, closes #357, #364)
+  - `post_match_filter()` added to `builtin.rs` — filters matches in XML/SVG `xmlns` attributes, Rust docstrings, config files, and bare identifiers
+  - Integrated into `security_scanner.rs` scan loop — all security scanner matches now pass through `post_match_filter`
+  - Docker hostname regex (`DOCKER_HOST_RE`) fixed — `\d+` now correctly matches port digits
+  - 31 targeted unit tests added for false positive suppression
+- **CI clippy lints** — `map_or(false, ...) → idiomatic `is_some_and(...)` (#369)
+
+### Stats
+
+- 56 files changed, +46,948 / -2,050 lines since v0.7.0
+- 11 PRs merged
 
 ## [0.7.0] - 2026-07-16
 
